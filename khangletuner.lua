@@ -1,371 +1,395 @@
---[==[
-    PROTECTED BY KHANG LE - ULTIMATE TUNER EDITION
-    DO NOT REMOVE THIS HEADER OR DECOMPILE
-]==]
-local _P_Env = getgenv and getgenv() or _G
-if _P_Env._KhangLeProtectedTuner then
-    pcall(function() _P_Env._KhangLeProtectedTuner:Destroy() end)
-end
+-- KhangLe Custom Tuner - Ultimate Edition (Auto T Tự Ngắt Khi Té/Xuống Xe)
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
 
-local _0x1 = game:GetService("CoreGui")
-local _0x2 = game:GetService("Players")
-local _0x3 = game:GetService("RunService")
-local _0x4 = game:GetService("VirtualInputManager")
-local _0x5 = _0x2.LocalPlayer
-
-local _0x6 = nil
+local parent = nil
 pcall(function()
-    _0x6 = gethui and gethui() or _0x1
+    parent = gethui and gethui() or CoreGui
 end)
-if not _0x6 then
-    _0x6 = _0x5:WaitForChild("PlayerGui")
+if not parent then
+    parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
-if _0x6:FindFirstChild("KhangLeCustomTuner") then
-    _0x6.KhangLeCustomTuner:Destroy()
+if parent:FindFirstChild("KhangLeCustomTuner") then
+    parent.KhangLeCustomTuner:Destroy()
 end
 
-local _0x7 = Instance.new("ScreenGui")
-_0x7.Name = "KhangLeCustomTuner"
-_0x7.ResetOnSpawn = false
-_0x7.Parent = _0x6
-_P_Env._KhangLeProtectedTuner = _0x7
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KhangLeCustomTuner"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parent
 
-local _0x8 = Instance.new("TextButton")
-_0x8.Size = UDim2.new(0, 52, 0, 52)
-_0x8.Position = UDim2.new(0, 40, 0.4, 0)
-_0x8.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-_0x8.TextColor3 = Color3.fromRGB(255, 215, 0)
-_0x8.Text = "\xF0\x9F\x91\x91"
-_0x8.TextSize = 24
-_0x8.Font = Enum.Font.GothamBold
-_0x8.Draggable = true
-_0x8.Parent = _0x7
+-- 1. Nút tròn mở menu chính (Icon vương miện hoàng gia sang trọng 👑)
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 52, 0, 52)
+ToggleBtn.Position = UDim2.new(0, 40, 0.4, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 215, 0)
+ToggleBtn.Text = "👑"
+ToggleBtn.TextSize = 24
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Draggable = true
+ToggleBtn.Parent = ScreenGui
 
-local _0x9 = Instance.new("UICorner")
-_0x9.CornerRadius = UDim.new(1, 0)
-_0x9.Parent = _0x8
+local corner1 = Instance.new("UICorner")
+corner1.CornerRadius = UDim.new(1, 0)
+corner1.Parent = ToggleBtn
 
-local _0x10 = Instance.new("UIStroke")
-_0x10.Color = Color3.fromRGB(255, 215, 0)
-_0x10.Thickness = 2
-_0x10.Parent = _0x8
+local stroke1 = Instance.new("UIStroke")
+stroke1.Color = Color3.fromRGB(255, 215, 0)
+stroke1.Thickness = 2
+stroke1.Parent = ToggleBtn
 
-local _0x11 = Instance.new("UIStroke")
-_0x11.Color = Color3.fromRGB(0, 0, 0)
-_0x11.Thickness = 4
-_0x11.Transparency = 0.5
-_0x11.Parent = _0x8
+local shadow1 = Instance.new("UIStroke")
+shadow1.Color = Color3.fromRGB(0, 0, 0)
+shadow1.Thickness = 4
+shadow1.Transparency = 0.5
+shadow1.Parent = ToggleBtn
 
-local _0x12 = Instance.new("TextButton")
-_0x12.Size = UDim2.new(0, 52, 0, 52)
-_0x12.Position = UDim2.new(0, 40, 0.55, 0)
-_0x12.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-_0x12.TextColor3 = Color3.fromRGB(255, 100, 0)
-_0x12.Text = "\xF0\x9F\x8E\xAE"
-_0x12.TextSize = 24
-_0x12.Font = Enum.Font.GothamBold
-_0x12.Draggable = true
-_0x12.Visible = false
-_0x12.Parent = _0x7
+-- 2. Nút nổi Auto T Phím T riêng biệt (Hình điều khiển 🕹️)
+local AutoTFloatingBtn = Instance.new("TextButton")
+AutoTFloatingBtn.Size = UDim2.new(0, 52, 0, 52)
+AutoTFloatingBtn.Position = UDim2.new(0, 40, 0.55, 0)
+AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+AutoTFloatingBtn.TextColor3 = Color3.fromRGB(255, 100, 0)
+AutoTFloatingBtn.Text = "🕹️"
+AutoTFloatingBtn.TextSize = 24
+AutoTFloatingBtn.Font = Enum.Font.GothamBold
+AutoTFloatingBtn.Draggable = true
+AutoTFloatingBtn.Visible = false
+AutoTFloatingBtn.Parent = ScreenGui
 
-local _0x13 = Instance.new("UICorner")
-_0x13.CornerRadius = UDim.new(1, 0)
-_0x13.Parent = _0x12
+local cornerAutoTFloat = Instance.new("UICorner")
+cornerAutoTFloat.CornerRadius = UDim.new(1, 0)
+cornerAutoTFloat.Parent = AutoTFloatingBtn
 
-local _0x14 = Instance.new("UIStroke")
-_0x14.Color = Color3.fromRGB(255, 100, 0)
-_0x14.Thickness = 2
-_0x14.Parent = _0x12
+local strokeAutoTFloat = Instance.new("UIStroke")
+strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
+strokeAutoTFloat.Thickness = 2
+strokeAutoTFloat.Parent = AutoTFloatingBtn
 
-local _0x15 = Instance.new("Frame")
-_0x15.Size = UDim2.new(0, 440, 0, 380)
-_0x15.Position = UDim2.new(0.5, -220, 0.5, -190)
-_0x15.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-_0x15.BorderSizePixel = 0
-_0x15.Active = true
-_0x15.Draggable = true
-_0x15.Visible = true
-_0x15.Parent = _0x7
+-- BẢNG HƯỚNG DẪN SỬ DỤNG (Hiện đúng 1 lần duy nhất khi execute)
+local GuideFrame = Instance.new("Frame")
+GuideFrame.Size = UDim2.new(0, 440, 0, 380)
+GuideFrame.Position = UDim2.new(0.5, -220, 0.5, -190)
+GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+GuideFrame.BorderSizePixel = 0
+GuideFrame.Active = true
+GuideFrame.Draggable = true
+GuideFrame.Visible = true
+GuideFrame.Parent = ScreenGui
 
-local _0x16 = Instance.new("UICorner")
-_0x16.CornerRadius = UDim.new(0, 14)
-_0x16.Parent = _0x15
+local cornerGuide = Instance.new("UICorner")
+cornerGuide.CornerRadius = UDim.new(0, 14)
+cornerGuide.Parent = GuideFrame
 
-local _0x17 = Instance.new("UIStroke")
-_0x17.Color = Color3.fromRGB(255, 215, 0)
-_0x17.Thickness = 1.8
-_0x17.Parent = _0x15
+local strokeGuide = Instance.new("UIStroke")
+strokeGuide.Color = Color3.fromRGB(255, 215, 0)
+strokeGuide.Thickness = 1.8
+strokeGuide.Parent = GuideFrame
 
-local _0x18 = Instance.new("TextLabel")
-_0x18.Size = UDim2.new(1, 0, 0, 45)
-_0x18.BackgroundTransparency = 1
-_0x18.Text = "\xF0\x9F\x93\x9C H\xC6\xB0\xE1\xBB\x94NG D\xE1\xBA\xAAN S\xC4\xB0 D\xE1\xBB\xA4NG - KHANG L\xC3\x8A TUNER"
-_0x18.TextColor3 = Color3.fromRGB(255, 215, 0)
-_0x18.TextSize = 13
-_0x18.Font = Enum.Font.GothamBold
-_0x18.Parent = _0x15
+local GuideTitle = Instance.new("TextLabel")
+GuideTitle.Size = UDim2.new(1, 0, 0, 45)
+GuideTitle.BackgroundTransparency = 1
+GuideTitle.Text = "📜 HƯỚNG DẪN SỬ DỤNG - KHANG LÊ TUNER"
+GuideTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+GuideTitle.TextSize = 13
+GuideTitle.Font = Enum.Font.GothamBold
+GuideTitle.Parent = GuideFrame
 
-local _0x19 = Instance.new("ScrollingFrame")
-_0x19.Size = UDim2.new(0.92, 0, 0, 260)
-_0x19.Position = UDim2.new(0.04, 0, 0, 48)
-_0x19.BackgroundTransparency = 1
-_0x19.BorderSizePixel = 0
-_0x19.CanvasSize = UDim2.new(0, 0, 0, 680)
-_0x19.ScrollBarThickness = 4
-_0x19.Parent = _0x15
+local ScrollGuide = Instance.new("ScrollingFrame")
+ScrollGuide.Size = UDim2.new(0.92, 0, 0, 260)
+ScrollGuide.Position = UDim2.new(0.04, 0, 0, 48)
+ScrollGuide.BackgroundTransparency = 1
+ScrollGuide.BorderSizePixel = 0
+ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 680)
+ScrollGuide.ScrollBarThickness = 4
+ScrollGuide.Parent = GuideFrame
 
-local _0x20 = Instance.new("TextLabel")
-_0x20.Size = UDim2.new(1, 0, 0, 680)
-_0x20.BackgroundTransparency = 1
-_0x20.Text = "H\xC6\xB0\xE1\xBB\x93ng d\xE1\xBA\xABn x\xC3\xA0i - \xC4\x91\xE1\xBB\x8Dc k\xC4\xA9 tr\xC6\xB0\xE1\xBB\x9Bc khi s\xE1\xBB\xAD d\xE1\xBB\xA5ng:\nm\xE1\xBB\x8Di ng\xC6\xB0\xE1\xBB\x9Di h\xC3\xA3y \xC4\x91\xE1\xBB\x83 nguyen m\xE1\xBA\xB7c \xC4\x91\xE1\xBB\x8Bnh x\xC3\xA0i v\xEC do m\xC3\xACnh \xC4\x91\xC3\xA3 test v\xC3\xA0 set nh\xC6\xB0 v\xE1\xBA\xADy m\xE1\xBB\x8Di ng\xC6\xB0\xE1\xBB\x9Di c\xC3\xB3 th\xE1\xBB\x83 t\xC3\xB9y ch\xE1\xBB\x89nh nh\xC6\xB0ng c\xE1\xBA\xA7n \xC4\x91\xE1\xBB\x8Dc k\xC4\xA9 nh\xE1\xBB\xAFng c\xC3\xA1i sau \xC4\x91\xC3\xA2y:\n\nm\xC3\xA3 l\xE1\xBB\xB1c: t\xE1\xBB\x91c \xC4\x91\xE1\xBB\x99 \xC4\x91\xE1\xBB\x81 pa gia t\xE1\xBB\x91c m\xE1\xBA\xA1nh h\xC6\xA1n m\xC3\xA3 l\xE1\xBB\xB1c c\xC3\xA0ng nhi\xE1\xBB\x81u \xC4\x91\xE1\xBB\x81 pa c\xC3\xA0ng m\xE1\xBA\xA1nh ( L\xC6\xB0u \xC3\x9D : \xC4\x91\xE1\xBB\x83 \xC3\xadt th\xC3\xB4i n\xC3\xB3 xo\xC3\xA1y b\xC3\xA1nh tr\xC6\xA1n kh\xC3\xB4ng ch\xE1\xBA\xA1y \xC4\x91\xC6\xB0\xE1\xBB\xA3c )\n\nrpm: tua m\xC3\xA1y ng\xE1\xBA\xAFn l\xE1\xBA\xA1i ho\xE1\xBA\xB7c d\xC3\xA0i ra c\xC3\xB3 ngh\xC4\xA9a l\xE1\xBA\xA5 khi m\xE1\xBB\x8Di ng\xC6\xB0\xE1\xBB\x9Di ch\xE1\xBB\x89nh tua th\xE1\xBA\xA5p xu\xE1\xBB\x91ng qu\xC3\xA1 v\xC3\xA0 final drive \xC4\x91\xE1\xBB\x83 th\xE1\xBA\xA5p th\xEC max speed n\xC3\xB3 s\xE1\xBA\xBD kh\xC3\xB4ng nhanh h\xC6\xA1n t\xED nào \xC4\x91\xC3\xA2y m\xE1\xBB\x81 c\xC3\xB2n ch\xE1\xBA\xADm l\xE1\xBA\xA1i n\xE1\xBB\xAF\x61..."
-_0x20.TextColor3 = Color3.fromRGB(220, 220, 220)
-_0x20.TextSize = 12
-_0x20.Font = Enum.Font.GothamMedium
-_0x20.TextXAlignment = Enum.TextXAlignment.Left
-_0x20.TextYAlignment = Enum.TextYAlignment.Top
-_0x20.TextWrapped = true
-_0x20.Parent = _0x19
+local GuideContent = Instance.new("TextLabel")
+GuideContent.Size = UDim2.new(1, 0, 0, 680)
+GuideContent.BackgroundTransparency = 1
+GuideContent.Text = [[Hướng dẫn xài - đọc kĩ trước khi sử dụng:
+mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:
 
-local _0x21 = Instance.new("TextButton")
-_0x21.Size = UDim2.new(0.92, 0, 0, 36)
-_0x21.Position = UDim2.new(0.04, 0, 0, 320)
-_0x21.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-_0x21.TextColor3 = Color3.fromRGB(15, 15, 15)
-_0x21.Text = "\xE2\x9C\x96 \xC4\x90\xC3\x83 HI\xE1\xBB\x82U - V\xC3\x80O GIAO DI\xE1\xBB\x86N CH\xC3\x8DNH"
-_0x21.TextSize = 12
-_0x21.Font = Enum.Font.GothamBold
-_0x21.Parent = _0x15
+mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )
 
-local _0x22 = Instance.new("UICorner")
-_0x22.CornerRadius = UDim.new(0, 8)
-_0x22.Parent = _0x21
+rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy
 
-local _0x23 = Instance.new("Frame")
-_0x23.Size = UDim2.new(0, 340, 0, 424)
-_0x23.Position = UDim2.new(0.5, -170, 0.5, -212)
-_0x23.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
-_0x23.BorderSizePixel = 0
-_0x23.Active = true
-_0x23.Draggable = true
-_0x23.Visible = false
-_0x23.Parent = _0x7
+tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha
 
-local _0x24 = Instance.new("UICorner")
-_0x24.CornerRadius = UDim.new(0, 14)
-_0x24.Parent = _0x23
+ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )
 
-local _0x25 = Instance.new("UIStroke")
-_0x25.Color = Color3.fromRGB(50, 50, 60)
-_0x25.Thickness = 1.5
-_0x25.Parent = _0x23
+final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha ) 
 
-_0x21.MouseButton1Click:Connect(function()
-    _0x15.Visible = false
-    _0x23.Visible = true
+Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha 
+
+Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.
+
+Auto T: tự động bốc đầu cho ai muốn múa lửa 
+cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê
+
+lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại.]]
+GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
+GuideContent.TextSize = 12
+GuideContent.Font = Enum.Font.GothamMedium
+GuideContent.TextXAlignment = Enum.TextXAlignment.Left
+GuideContent.TextYAlignment = Enum.TextYAlignment.Top
+GuideContent.TextWrapped = true
+GuideContent.Parent = ScrollGuide
+
+local CloseGuideBtn = Instance.new("TextButton")
+CloseGuideBtn.Size = UDim2.new(0.92, 0, 0, 36)
+CloseGuideBtn.Position = UDim2.new(0.04, 0, 0, 320)
+CloseGuideBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+CloseGuideBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
+CloseGuideBtn.Text = "✖ ĐÃ HIỂU - VÀO GIAO DIỆN CHÍNH"
+CloseGuideBtn.TextSize = 12
+CloseGuideBtn.Font = Enum.Font.GothamBold
+CloseGuideBtn.Parent = GuideFrame
+
+local cornerCloseGuide = Instance.new("UICorner")
+cornerCloseGuide.CornerRadius = UDim.new(0, 8)
+cornerCloseGuide.Parent = CloseGuideBtn
+
+-- Khung Giao Diện Chính
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 340, 0, 424)
+MainFrame.Position = UDim2.new(0.5, -170, 0.5, -212)
+MainFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+
+local corner2 = Instance.new("UICorner")
+corner2.CornerRadius = UDim.new(0, 14)
+corner2.Parent = MainFrame
+
+local stroke2 = Instance.new("UIStroke")
+stroke2.Color = Color3.fromRGB(50, 50, 60)
+stroke2.Thickness = 1.5
+stroke2.Parent = MainFrame
+
+CloseGuideBtn.MouseButton1Click:Connect(function()
+    GuideFrame.Visible = false
+    MainFrame.Visible = true
 end)
 
-_0x8.MouseButton1Click:Connect(function()
-    _0x23.Visible = not _0x23.Visible
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
 end)
 
-local _0x26 = Instance.new("TextLabel")
-_0x26.Size = UDim2.new(1, 0, 0, 48)
-_0x26.BackgroundTransparency = 1
-_0x26.Text = "\xF0\x9F\x91\x91 Khang L\xC3\x8A Custom Tuner"
-_0x26.TextColor3 = Color3.fromRGB(255, 215, 0)
-_0x26.TextSize = 15
-_0x26.Font = Enum.Font.GothamBold
-_0x26.Parent = _0x23
+-- Tiêu đề Menu Chính
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 48)
+Title.BackgroundTransparency = 1
+Title.Text = "👑 Khang Lê Custom Tuner"
+Title.TextColor3 = Color3.fromRGB(255, 215, 0)
+Title.TextSize = 15
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
 
-local _0x27 = Instance.new("TextButton")
-_0x27.Size = UDim2.new(0, 32, 0, 32)
-_0x27.Position = UDim2.new(1, -38, 0, 8)
-_0x27.BackgroundTransparency = 1
-_0x27.TextColor3 = Color3.fromRGB(180, 180, 180)
-_0x27.Text = "\xE2\x95\xAE"
-_0x27.TextSize = 16
-_0x27.Font = Enum.Font.GothamBold
-_0x27.Parent = _0x23
+-- Nút Đóng Menu (Dấu X)
+local CloseMenuBtn = Instance.new("TextButton")
+CloseMenuBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseMenuBtn.Position = UDim2.new(1, -38, 0, 8)
+CloseMenuBtn.BackgroundTransparency = 1
+CloseMenuBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+CloseMenuBtn.Text = "✕"
+CloseMenuBtn.TextSize = 16
+CloseMenuBtn.Font = Enum.Font.GothamBold
+CloseMenuBtn.Parent = MainFrame
 
-_0x27.MouseButton1Click:Connect(function()
-    _0x23.Visible = false
+CloseMenuBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
 end)
 
-local function _0x28(_0x29, _0x30, _0x31)
-    local _0x32 = Instance.new("TextLabel")
-    _0x32.Size = UDim2.new(0.9, 0, 0, 18)
-    _0x32.Position = UDim2.new(0.05, 0, 0, _0x31)
-    _0x32.BackgroundTransparency = 1
-    _0x32.Text = _0x29
-    _0x32.TextColor3 = Color3.fromRGB(210, 210, 210)
-    _0x32.TextSize = 11
-    _0x32.Font = Enum.Font.GothamMedium
-    _0x32.TextXAlignment = Enum.TextXAlignment.Left
-    _0x32.Parent = _0x23
+-- Hàm tạo ô nhập liệu tinh chỉnh
+local function createInput(name, defaultVal, posY)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.9, 0, 0, 18)
+    lbl.Position = UDim2.new(0.05, 0, 0, posY)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(210, 210, 210)
+    lbl.TextSize = 11
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = MainFrame
 
-    local _0x33 = Instance.new("TextBox")
-    _0x33.Size = UDim2.new(0.9, 0, 0, 30)
-    _0x33.Position = UDim2.new(0.05, 0, 0, _0x31 + 18)
-    _0x33.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-    _0x33.TextColor3 = Color3.fromRGB(255, 255, 255)
-    _0x33.Text = tostring(_0x30)
-    _0x33.TextSize = 13
-    _0x33.Font = Enum.Font.GothamBold
-    _0x33.BorderSizePixel = 0
-    _0x33.Parent = _0x23
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.9, 0, 0, 30)
+    box.Position = UDim2.new(0.05, 0, 0, posY + 18)
+    box.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Text = tostring(defaultVal)
+    box.TextSize = 13
+    box.Font = Enum.Font.GothamBold
+    box.BorderSizePixel = 0
+    box.Parent = MainFrame
 
-    local _0x34 = Instance.new("UICorner")
-    _0x34.CornerRadius = UDim.new(0, 8)
-    _0x34.Parent = _0x33
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = box
 
-    local _0x35 = Instance.new("UIStroke")
-    _0x35.Color = Color3.fromRGB(60, 60, 75)
-    _0x35.Thickness = 1
-    _0x35.Parent = _0x33
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 75)
+    stroke.Thickness = 1
+    stroke.Parent = box
 
-    return _0x33
+    return box
 end
 
-local _0x36 = _0x28("\xF0\x9F\x92\xAA H\xE1\xBB\x87 s\xE1\xBB\x91 M\xC3\xA3 l\xE1\xBB\xAB\x63 (M\xE1\xBA\xB7\x63 \xC4\x91\xE1\xBB\x8Bnh: 5.0)", "5.0", 48)
-local _0x37 = _0x28("\xF0\x9F\x94\xA5 C\xE1\xBB\x99ng th\xC3\xAAm Tua m\xC3\xA1y - RPM (M\xE1\xBA\xB7\x63 \xC4\x91\xE1\xBB\x8Bnh: 3500)", "3500", 112)
-local _0x38 = _0x28("\xE2\x9A\x99\xEF\xB8\x8F T\xE1\xBB\xB7 s\xE1\xBB\x91 truy\xE1\xBB\x81n s\xE1\xBB\x91 - Ratio Gear (M\xE1\xBA\xB7\x63 \xC4\x91\xE1\xBB\x8Bnh: 0.8)", "0.8", 176)
-local _0x39 = _0x28("\xE2\x9A\x93 T\xE1\xBB\xB7 s\xE1\xBB\x91 truy\xE1\xBB\x81n cu\xE1\xBB\x91i - Final Drive (M\xE1\xBA\xB7\x63 \xC4\x91\xE1\xBB\x8Bnh: 0.8)", "0.8", 240)
+-- Thiết lập: Mã lực, RPM (Mặc định 3500), Ratio Gear, Final Drive
+local hpBox = createInput("💪 Hệ số Mã lực (Mặc định: 5.0)", "5.0", 48)
+local rpmBox = createInput("🔥 Cộng thêm Tua máy - RPM (Mặc định: 3500)", "3500", 112)
+local gearRatioBox = createInput("⚙️ Tỷ số truyền số - Ratio Gear (Mặc định: 0.8)", "0.8", 176)
+local finalDriveBox = createInput("⛓️ Tỷ số truyền cuối - Final Drive (Mặc định: 0.8)", "0.8", 240)
 
-local _0x40 = Instance.new("TextLabel")
-_0x40.Size = UDim2.new(0.9, 0, 0, 22)
-_0x40.Position = UDim2.new(0.05, 0, 0, 304)
-_0x40.BackgroundTransparency = 1
-_0x40.Text = "Tr\xE1\xBA\xA1ng th\xC3\xA1i: S\xE1\xBA\xB5n s\xE1\xBB\x81n \xC4\x91\xE1\xBB\x99 xe tr\xE1\xBB\xB1c ti\xE1\xBA\xBFp."
-_0x40.TextColor3 = Color3.fromRGB(255, 200, 0)
-_0x40.TextSize = 11
-_0x40.Font = Enum.Font.GothamBold
-_0x40.TextXAlignment = Enum.TextXAlignment.Center
-_0x40.Parent = _0x23
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(0.9, 0, 0, 22)
+Status.Position = UDim2.new(0.05, 0, 0, 304)
+Status.BackgroundTransparency = 1
+Status.Text = "Trạng thái: Sẵn sàng độ xe trực tiếp."
+Status.TextColor3 = Color3.fromRGB(255, 200, 0)
+Status.TextSize = 11
+Status.Font = Enum.Font.GothamBold
+Status.TextXAlignment = Enum.TextXAlignment.Center
+Status.Parent = MainFrame
 
-local _0x41 = Instance.new("TextButton")
-_0x41.Size = UDim2.new(0.9, 0, 0, 34)
-_0x41.Position = UDim2.new(0.05, 0, 0, 330)
-_0x41.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-_0x41.TextColor3 = Color3.fromRGB(255, 255, 255)
-_0x41.Text = "\xE2\x9A\xA1 \xC3\x81P D\xE1\xBB\xA4NG TUNER (T\xC6\xA8C TH\xC3\x8C)"
-_0x41.TextSize = 11
-_0x41.Font = Enum.Font.GothamBold
-_0x41.Parent = _0x23
+-- Nút Áp Dụng Độ Xe
+local InjectBtn = Instance.new("TextButton")
+InjectBtn.Size = UDim2.new(0.9, 0, 0, 34)
+InjectBtn.Position = UDim2.new(0.05, 0, 0, 330)
+InjectBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+InjectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+InjectBtn.Text = "⚡ ÁP DỤNG TUNER (TỨC THÌ)"
+InjectBtn.TextSize = 11
+InjectBtn.Font = Enum.Font.GothamBold
+InjectBtn.Parent = MainFrame
 
-local _0x42 = Instance.new("UICorner")
-_0x42.CornerRadius = UDim.new(0, 8)
-_0x42.Parent = _0x41
+local corner4 = Instance.new("UICorner")
+corner4.CornerRadius = UDim.new(0, 8)
+corner4.Parent = InjectBtn
 
-local _0x43 = false
-local _0x44 = Instance.new("TextButton")
-_0x44.Size = UDim2.new(0.9, 0, 0, 34)
-_0x44.Position = UDim2.new(0.05, 0, 0, 372)
-_0x44.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-_0x44.TextColor3 = Color3.fromRGB(255, 255, 255)
-_0x44.Text = "\xF0\x9F\x8E\xAE N\xC3\x9AT N\xE1\xBB\x94I AUTO T: \xC4\x90ANG T\xE1\xBA\xAFT"
-_0x44.TextSize = 11
-_0x44.Font = Enum.Font.GothamBold
-_0x44.Parent = _0x23
+-- Nút bật/tắt hiển thị nút nổi Auto T trong menu
+local showAutoTFloat = false
+local ToggleFloatMenuBtn = Instance.new("TextButton")
+ToggleFloatMenuBtn.Size = UDim2.new(0.9, 0, 0, 34)
+ToggleFloatMenuBtn.Position = UDim2.new(0.05, 0, 0, 372)
+ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+ToggleFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG TẮT"
+ToggleFloatMenuBtn.TextSize = 11
+ToggleFloatMenuBtn.Font = Enum.Font.GothamBold
+ToggleFloatMenuBtn.Parent = MainFrame
 
-local _0x45 = Instance.new("UICorner")
-_0x45.CornerRadius = UDim.new(0, 8)
-_0x45.Parent = _0x44
+local cornerFloatMenu = Instance.new("UICorner")
+cornerFloatMenu.CornerRadius = UDim.new(0, 8)
+cornerFloatMenu.Parent = ToggleFloatMenuBtn
 
-local _0x46 = false
+local autoTActive = false
 
-_0x44.MouseButton1Click:Connect(function()
-    _0x43 = not _0x43
-    _0x12.Visible = _0x43
-    if _0x43 then
-        _0x44.Text = "\xF0\x9F\x8E\xAE N\xC3\x9AT N\xE1\xBB\x94I AUTO T: \xC4\x90ANG B\xBA\xAcT"
-        _0x44.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+ToggleFloatMenuBtn.MouseButton1Click:Connect(function()
+    showAutoTFloat = not showAutoTFloat
+    AutoTFloatingBtn.Visible = showAutoTFloat
+    if showAutoTFloat then
+        ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG BẬT"
+        ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
     else
-        _0x44.Text = "\xF0\x9F\x8E\xAE N\xC3\x9AT N\xE1\xBB\x94I AUTO T: \xC4\x90ANG T\xE1\xBA\xAFT"
-        _0x44.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        _0x46 = false
-        _0x12.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        _0x14.Color = Color3.fromRGB(255, 100, 0)
+        ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG TẮT"
+        ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        autoTActive = false
+        AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
         pcall(function()
-            _0x4:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
         end)
     end
 end)
 
-_0x12.MouseButton1Click:Connect(function()
-    _0x46 = not _0x46
-    if _0x46 then
-        _0x12.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        _0x14.Color = Color3.fromRGB(0, 255, 120)
+-- Xử lý khi bấm vào nút nổi Auto T (🕹️) trên màn hình
+AutoTFloatingBtn.MouseButton1Click:Connect(function()
+    autoTActive = not autoTActive
+    if autoTActive then
+        AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        strokeAutoTFloat.Color = Color3.fromRGB(0, 255, 120)
         pcall(function()
-            _0x4:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
         end)
     else
-        _0x12.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        _0x14.Color = Color3.fromRGB(255, 100, 0)
+        AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
         pcall(function()
-            _0x4:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
         end)
     end
 end)
 
-_0x3.Heartbeat:Connect(function()
-    local _0x47 = _0x5.Character
-    local _0x48 = _0x47 and _0x47:FindFirstChildOfClass("Humanoid")
-    local _0x49 = _0x48 and _0x48.SeatPart
-    local _0x50 = (_0x49 and (_0x49:IsA("VehicleSeat") or _0x49:IsA("Seat")))
+-- Vòng lặp giám sát thông minh: Tự động tắt Auto T nếu bị té hoặc xuống xe
+RunService.Heartbeat:Connect(function()
+    local c = LocalPlayer.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    local s = h and h.SeatPart
+    local isInVehicle = (s and (s:IsA("VehicleSeat") or s:IsA("Seat")))
 
-    if _0x46 then
-        if _0x50 then
+    if autoTActive then
+        if isInVehicle then
             pcall(function()
-                _0x4:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
             end)
         else
-            _0x46 = false
-            _0x12.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            _0x14.Color = Color3.fromRGB(255, 100, 0)
+            autoTActive = false
+            AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+            strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
             pcall(function()
-                _0x4:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
             end)
         end
     end
 end)
 
-_0x41.MouseButton1Click:Connect(function()
-    local _0x51 = tonumber(_0x36.Text) or 5.0
-    local _0x52 = tonumber(_0x37.Text) or 3500
-    local _0x53 = tonumber(_0x38.Text) or 0.8
-    local _0x54 = tonumber(_0x39.Text) or 0.8
-    local _0x55 = 0
+InjectBtn.MouseButton1Click:Connect(function()
+    local hpMult = tonumber(hpBox.Text) or 5.0
+    local rpmAdd = tonumber(rpmBox.Text) or 3500
+    local gearMult = tonumber(gearRatioBox.Text) or 0.8
+    local finalMult = tonumber(finalDriveBox.Text) or 0.8
+    local count = 0
 
+    -- 1. Quét RAM getgc
     if typeof(getgc) == "function" then
-        for _, _0x56 in pairs(getgc(true)) do
-            if typeof(_0x56) == "table" then
+        for _, obj in pairs(getgc(true)) do
+            if typeof(obj) == "table" then
                 pcall(function()
-                    for _0x57, _0x58 in pairs(_0x56) do
-                        if type(_0x57) == "string" then
-                            if _0x57 == "Horsepower" or _0x57 == "Torque" or _0x57 == "MaxPower" then
-                                if type(_0x58) == "number" then
-                                    _0x56[_0x57] = _0x58 * _0x51
-                                    _0x55 = _0x55 + 1
+                    for k, v in pairs(obj) do
+                        if type(k) == "string" then
+                            if k == "Horsepower" or k == "Torque" or k == "MaxPower" then
+                                if type(v) == "number" then
+                                    obj[k] = v * hpMult
+                                    count = count + 1
                                 end
-                            elseif _0x57 == "Redline" or _0x57 == "MaxRPM" or _0x57 == "RPM" then
-                                if type(_0x58) == "number" then
-                                    _0x56[_0x57] = _0x58 + _0x52
-                                    _0x55 = _0x55 + 1
+                            elseif k == "Redline" or k == "MaxRPM" or k == "RPM" then
+                                if type(v) == "number" then
+                                    obj[k] = v + rpmAdd
+                                    count = count + 1
                                 end
-                            elseif _0x57 == "GearRatio" or _0x57 == "FinalDrive" then
-                                local _0x59 = (_0x57 == "FinalDrive") and _0x54 or _0x53
-                                if type(_0x58) == "number" and _0x58 > 0 then
-                                    _0x56[_0x57] = _0x58 * _0x59
-                                    _0x55 = _0x55 + 1
+                            elseif k == "GearRatio" or k == "FinalDrive" then
+                                local mult = (k == "FinalDrive") and finalMult or gearMult
+                                if type(v) == "number" and v > 0 then
+                                    obj[k] = v * mult
+                                    count = count + 1
                                 end
-                            elseif _0x57 == "GearRatios" or _0x57 == "Gears" then
-                                if type(_0x58) == "table" then
-                                    for _0x60, _0x61 in pairs(_0x58) do
-                                        if type(_0x61) == "number" then
-                                            _0x58[_0x60] = _0x61 * _0x53
-                                            _0x55 = _0x55 + 1
+                            elseif k == "GearRatios" or k == "Gears" then
+                                if type(v) == "table" then
+                                    for i, gVal in pairs(v) do
+                                        if type(gVal) == "number" then
+                                            v[i] = gVal * gearMult
+                                            count = count + 1
                                         end
                                     end
                                 end
@@ -377,46 +401,47 @@ _0x41.MouseButton1Click:Connect(function()
         end
     end
 
-    local _0x62 = _0x5.Character
-    local _0x63 = _0x62 and _0x62:FindFirstChildOfClass("Humanoid")
-    local _0x64 = _0x63 and _0x63.SeatPart
-    if _0x64 and (_0x64:IsA("VehicleSeat") or _0x64:IsA("Seat")) then
-        local _0x65 = _0x64.Parent
-        for _, _0x66 in pairs(_0x65:GetDescendants()) do
-            if _0x66:IsA("NumberValue") or _0x66:IsA("IntValue") then
+    -- 2. Quét trực tiếp chiếc xe đang ngồi
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local seat = hum and hum.SeatPart
+    if seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat")) then
+        local vehicleModel = seat.Parent
+        for _, obj in pairs(vehicleModel:GetDescendants()) do
+            if obj:IsA("NumberValue") or obj:IsA("IntValue") then
                 pcall(function()
-                    local _0x67 = _0x66.Name:lower()
-                    if _0x67:find("horsepower") or _0x67:find("power") then
-                        _0x66.Value = _0x66.Value * _0x51
-                        _0x55 = _0x55 + 1
-                    elseif _0x67:find("rpm") or _0x67:find("redline") then
-                        _0x66.Value = _0x66.Value + _0x52
-                        _0x55 = _0x55 + 1
-                    elseif _0x67:find("gear") or _0x67:find("ratio") then
-                        _0x66.Value = _0x66.Value * _0x53
-                        _0x55 = _0x55 + 1
-                    elseif _0x67:find("drive") then
-                        _0x66.Value = _0x66.Value * _0x54
-                        _0x55 = _0x55 + 1
+                    local name = obj.Name:lower()
+                    if name:find("horsepower") or name:find("power") then
+                        obj.Value = obj.Value * hpMult
+                        count = count + 1
+                    elseif name:find("rpm") or name:find("redline") then
+                        obj.Value = obj.Value + rpmAdd
+                        count = count + 1
+                    elseif name:find("gear") or name:find("ratio") then
+                        obj.Value = obj.Value * gearMult
+                        count = count + 1
+                    elseif name:find("drive") then
+                        obj.Value = obj.Value * finalMult
+                        count = count + 1
                     end
                 end)
             end
         end
     end
 
-    if _0x55 > 0 or _0x64 then
-        _0x40.Text = "\xE2\x9C\x94 \x44\xC3\xA3 \xC3\xA1p d\xE1\xBB\xA5ng th\xC3\xA0nh c\xC3\xB4ng (xu\xE1\xBB\x91ng xe l\xC3\xAAn l\xE1\xBA\xA1i)!"
-        _0x40.TextColor3 = Color3.fromRGB(0, 255, 120)
+    if count > 0 or seat then
+        Status.Text = "✔ Đã áp dụng thành công (xuống xe lên lại)!"
+        Status.TextColor3 = Color3.fromRGB(0, 255, 120)
     else
-        _0x40.Text = "\xE2\x9D\x8C H\xC3\xA3y ng\xE1\xBB\x93i l\xC3\xAAn xe r\xE1\xBB\x93i b\xE1\xBA\xबली \xC3\xA1p d\xE1\xBB\xA5ng nh\xC3\xA9!"
-        _0x40.TextColor3 = Color3.fromRGB(255, 50, 50)
+        Status.Text = "❌ Hãy ngồi lên xe rồi bấm áp dụng nhé!"
+        Status.TextColor3 = Color3.fromRGB(255, 50, 50)
     end
 
+    -- Tự động quay về trạng thái sẵn sàng sau 3 giây
     task.delay(3, function()
-        if _0x40 and _0x40.Parent then
-            _0x40.Text = "Tr\xE1\xBA\xA1ng th\xC3\xA1i: S\xE1\xBA\xB5n s\xE1\xBB\x81n."
-            _0x40.TextColor3 = Color3.fromRGB(255, 200, 0)
+        if Status and Status.Parent then
+            Status.Text = "Trạng thái: Sẵn sàng."
+            Status.TextColor3 = Color3.fromRGB(255, 200, 0)
         end
     end)
 end)
-    
