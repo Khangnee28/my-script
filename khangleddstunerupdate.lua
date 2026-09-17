@@ -1,7 +1,12 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v3
--- v3: fix menu trong / go vuong / guide xuong dong / muc CHUNG cuon duoc
---     + statPanel trong suot vien LED khi bat farm + LED nut noi
+-- KHANGLE DDS HUB — 4080 REMIX v4
+-- v4: bo 2 nut "NUT NOI" thua (bat feature tu hien nut noi)
+--     bo status trong card farm (chi con bang trong suot khi farm)
+--     sua cong tach farm het bi nguoc / guide xuong dong kep
+--     bo tron goc duoi menu + goc bang status
+--     nut noi LED DUOI RGB (vong segment chay quanh)
+--     them SETTINGS (mau menu, FPS/Ping, LED, AntiAFK, doi goc)
+--     them TOI UU (fix lag nhe/nhieu, bay mau, toi uu fps, tang chat luong)
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -11,6 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
 local camera = workspace.CurrentCamera
@@ -75,46 +81,92 @@ local function makeHeaderDraggable(header, frame)
     end)
 end
 
--- ============ THEME + LED RGB ============
+-- ============ THEME + LED DUOI ============
 local HUB_BG    = Color3.fromRGB(10, 14, 22)
 local HUB_SIDE  = Color3.fromRGB(14, 20, 32)
 local CARD_BG   = Color3.fromRGB(18, 26, 40)
-local ACCENT    = Color3.fromRGB(0, 229, 160)
+local themeColor = Color3.fromRGB(0, 229, 160)
 local ACCENT2   = Color3.fromRGB(56, 189, 248)
-local TXT_MAIN  = Color3.fromRGB(235, 240, 248)
 local TXT_DIM   = Color3.fromRGB(150, 165, 185)
 
-local floatBtns = {}
-local function addLED(btn)
-    local led = Instance.new("UIStroke", btn)
-    led.Name = "LED"
-    led.Thickness = 2.5
-    led.Enabled = true
-    led.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    led.Transparency = 0
-    table.insert(floatBtns, btn)
-    return led
-end
-local function makeSquare(btn)
-    local c = btn:FindFirstChildOfClass("UICorner")
-    if c then c.CornerRadius = UDim.new(0, 7) end
+local RAINBOW = {
+    Color3.fromRGB(255, 60, 60),
+    Color3.fromRGB(255, 160, 40),
+    Color3.fromRGB(255, 230, 60),
+    Color3.fromRGB(90, 230, 90),
+    Color3.fromRGB(70, 160, 255),
+    Color3.fromRGB(125, 90, 220),
+    Color3.fromRGB(225, 80, 220),
+}
+local function rainbowAt(pos)
+    local idx = math.floor(pos) + 1
+    local f = pos - (idx - 1)
+    local a = RAINBOW[idx]
+    local b = RAINBOW[(idx % 7) + 1]
+    return a:Lerp(b, f)
 end
 
--- ============ TAY NAM (handle) KHAI BAO TRUOC ============
+local allRings = {}
+local ledOn = true
+local function makeChaseRing(par, W, H, inset, T, n1, n2)
+    local segs = {}
+    local innerW = W - 2 * inset
+    local innerH = H - 2 * inset
+    local function add(px, py, w, h)
+        local f = Instance.new("Frame")
+        f.Position = UDim2.new(0, px, 0, py)
+        f.Size = UDim2.new(0, w, 0, h)
+        f.BorderSizePixel = 0
+        f.ZIndex = 6
+        f.Parent = par
+        table.insert(segs, f)
+    end
+    local sw = innerW / n1
+    local sh = innerH / n2
+    for i = 0, n1 - 1 do
+        add(inset + i * sw, inset, sw + (i == n1 - 1 and 1 or 0), T)
+    end
+    for i = 0, n2 - 1 do
+        add(W - inset - T, inset + i * sh, T, sh + (i == n2 - 1 and 1 or 0))
+    end
+    for i = n1 - 1, 0, -1 do
+        add(inset + i * sw, H - inset - T, sw + (i == n1 - 1 and 1 or 0), T)
+    end
+    for i = n2 - 1, 0, -1 do
+        add(inset, inset + i * sh, T, sh + (i == n2 - 1 and 1 or 0))
+    end
+    table.insert(allRings, { segs = segs, n = #segs })
+    return segs
+end
+task.spawn(function()
+    local t = 0
+    while true do
+        t = t + 0.06
+        if ledOn then
+            for r, ring in ipairs(allRings) do
+                for i, seg in ipairs(ring.segs) do
+                    seg.BackgroundColor3 = rainbowAt((t + (i - 1) * 7 / ring.n + r * 1.7) % 7)
+                end
+            end
+        end
+        task.wait(0.03)
+    end
+end)
+
+-- ============ TAY NAM KHAI BAO TRUOC ============
 local ControlPanel, freecamMenuFrame, hideFloatBtn, GuideFrame
-local HubFrame, hubClose, statPanel
-local farmSwitch, farmStatLbl, farmStatusLbl
+local HubFrame, hubClose, hubHeader, hubStroke, statPanel
+local farmSwitch, farmStatLbl
 local bodyOpenBtn, fcOpenBtn, guideOpenBtn
-local ToggleFloatMenuBtn, ToggleBodyFloatMenuBtn, ToggleFreecamMenuBtn
+local ToggleFloatMenuBtn
 local lblMode, lblStat1, lblStat2, lblTime, lblWork
 local showAutoTFloat = false
-local showBodyManagerFloat = false
-local showFreecamFloat = false
 local farmOffice = false
 local ofAnswers = 0
 local ofPrints = 0
 local activeMode = nil
 local farmStart = 0
+local antiAfk = true
 
 pcall(function()
     player.Kicked:Connect(function(reason)
@@ -139,12 +191,12 @@ task.spawn(function()
     end
 end)
 
--- ============ NUT NOI (VUONG + LED) ============
+-- ============ NUT NOI (VUONG) ============
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 48, 0, 48)
 ToggleBtn.Position = UDim2.new(0, 25, 0.4, 0)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-ToggleBtn.TextColor3 = ACCENT
+ToggleBtn.TextColor3 = themeColor
 ToggleBtn.Text = "👑"
 ToggleBtn.TextSize = 22
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -153,7 +205,7 @@ ToggleBtn.Parent = ScreenGui
 local corner1 = Instance.new("UICorner", ToggleBtn)
 corner1.CornerRadius = UDim.new(0, 7)
 local stroke1 = Instance.new("UIStroke", ToggleBtn)
-stroke1.Color = ACCENT
+stroke1.Color = themeColor
 stroke1.Thickness = 2
 
 local AutoTFloatingBtn = Instance.new("TextButton")
@@ -208,9 +260,7 @@ local strokeFreecamFloat = Instance.new("UIStroke", FreecamFloatingBtn)
 strokeFreecamFloat.Color = Color3.fromRGB(100, 150, 255)
 strokeFreecamFloat.Thickness = 2
 
--- ============================================================
--- KHOI 0: BANG STATUS TRONG SUOT + VIEN LED (hien khi bat farm)
--- ============================================================
+-- ============ BANG STATUS TRONG SUOT (chi hien khi farm) ============
 do
     statPanel = Instance.new("Frame")
     statPanel.Size = UDim2.new(0, 250, 0, 134)
@@ -222,70 +272,8 @@ do
     statPanel.Draggable = true
     statPanel.Visible = false
     statPanel.Parent = ScreenGui
-    Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 6)
-    local RAINBOW = {
-        Color3.fromRGB(255, 60, 60),
-        Color3.fromRGB(255, 160, 40),
-        Color3.fromRGB(255, 230, 60),
-        Color3.fromRGB(90, 230, 90),
-        Color3.fromRGB(70, 160, 255),
-        Color3.fromRGB(125, 90, 220),
-        Color3.fromRGB(225, 80, 220),
-    }
-    local LED_N1 = 14
-    local LED_N2 = 7
-    local LED_T = 3
-    local ledSegs = {}
-    local function addSeg(pos, size)
-        local f = Instance.new("Frame")
-        f.Position = pos
-        f.Size = size
-        f.BorderSizePixel = 0
-        f.ZIndex = 5
-        f.Parent = statPanel
-        table.insert(ledSegs, f)
-        return f
-    end
-    local function wSize(i)
-        if i == LED_N1 - 1 then
-            return UDim2.new(1 / LED_N1, 0, 0, LED_T)
-        end
-        return UDim2.new(1 / LED_N1, 1, 0, LED_T)
-    end
-    local function hSize(i)
-        if i == LED_N2 - 1 then
-            return UDim2.new(0, LED_T, 1 / LED_N2, 0)
-        end
-        return UDim2.new(0, LED_T, 1 / LED_N2, 1)
-    end
-    for i = 0, LED_N1 - 1 do
-        addSeg(UDim2.new(i / LED_N1, 0, 0, 0), wSize(i))
-    end
-    for i = 0, LED_N2 - 1 do
-        addSeg(UDim2.new(1, -LED_T, i / LED_N2, 0), hSize(i))
-    end
-    for i = LED_N1 - 1, 0, -1 do
-        addSeg(UDim2.new(i / LED_N1, 0, 1, -LED_T), wSize(i))
-    end
-    for i = LED_N2 - 1, 0, -1 do
-        addSeg(UDim2.new(0, 0, i / LED_N2, 0), hSize(i))
-    end
-    task.spawn(function()
-        local t = 0
-        local n = #ledSegs
-        while true do
-            t = t + 0.08
-            for i, seg in ipairs(ledSegs) do
-                local pos = (t + (i - 1) * 7 / n) % 7
-                local idx = math.floor(pos) + 1
-                local f = pos - (idx - 1)
-                local a = RAINBOW[idx]
-                local b = RAINBOW[(idx % 7) + 1]
-                seg.BackgroundColor3 = a:Lerp(b, f)
-            end
-            task.wait(0.03)
-        end
-    end)
+    Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 10)
+    makeChaseRing(statPanel, 250, 134, 4, 3, 14, 7)
     local function statLabel(text, y, size, color)
         local l = Instance.new("TextLabel")
         l.Size = UDim2.new(1, -24, 0, size or 16)
@@ -296,23 +284,20 @@ do
         l.Font = Enum.Font.Code
         l.TextSize = size or 15
         l.TextXAlignment = Enum.TextXAlignment.Left
-        l.ZIndex = 6
+        l.ZIndex = 7
         l.Parent = statPanel
         return l
     end
-    lblMode  = statLabel("—", 10, 17, Color3.fromRGB(255, 200, 80))
-    lblStat1 = statLabel("", 36, 15, Color3.fromRGB(140, 255, 140))
-    lblStat2 = statLabel("", 57, 15, Color3.fromRGB(140, 220, 255))
-    lblTime  = statLabel("thời gian farm: 00:00", 78, 14, Color3.fromRGB(255, 220, 140))
-    lblWork  = statLabel("status: tạm nghỉ", 102, 13, Color3.fromRGB(200, 200, 200))
+    lblMode  = statLabel("—", 12, 17, Color3.fromRGB(255, 200, 80))
+    lblStat1 = statLabel("", 38, 15, Color3.fromRGB(140, 255, 140))
+    lblStat2 = statLabel("", 59, 15, Color3.fromRGB(140, 220, 255))
+    lblTime  = statLabel("thời gian farm: 00:00", 80, 14, Color3.fromRGB(255, 220, 140))
+    lblWork  = statLabel("status: tạm nghỉ", 104, 13, Color3.fromRGB(200, 200, 200))
 end
 
 local function setStatus(t)
     if lblWork then
         lblWork.Text = "status: " .. t
-    end
-    if farmStatusLbl then
-        farmStatusLbl.Text = "status: " .. t
     end
 end
 local function fmtTime(s)
@@ -349,14 +334,63 @@ task.spawn(function()
     end
 end)
 
+-- ============ FPS / PING OVERLAY ============
+local perfOn = false
+local perfFrame = Instance.new("Frame")
+perfFrame.Size = UDim2.new(0, 150, 0, 40)
+perfFrame.Position = UDim2.new(1, -160, 0, 96)
+perfFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+perfFrame.BackgroundTransparency = 0.35
+perfFrame.BorderSizePixel = 0
+perfFrame.Visible = false
+perfFrame.ZIndex = 20
+perfFrame.Parent = ScreenGui
+Instance.new("UICorner", perfFrame).CornerRadius = UDim.new(0, 8)
+local perfLabel = Instance.new("TextLabel")
+perfLabel.Size = UDim2.new(1, -12, 1, -8)
+perfLabel.Position = UDim2.new(0, 6, 0, 4)
+perfLabel.BackgroundTransparency = 1
+perfLabel.Text = "FPS: -- | Ping: --"
+perfLabel.TextColor3 = Color3.fromRGB(140, 255, 140)
+perfLabel.TextSize = 11
+perfLabel.Font = Enum.Font.GothamBold
+perfLabel.TextXAlignment = Enum.TextXAlignment.Left
+perfLabel.ZIndex = 21
+perfLabel.Parent = perfFrame
+local perfCorners = {
+    UDim2.new(1, -160, 0, 96),
+    UDim2.new(0, 10, 0, 96),
+    UDim2.new(0, 10, 1, -50),
+    UDim2.new(1, -160, 1, -50),
+}
+local perfCornerIdx = 1
+local fpsFrames = 0
+RunService.RenderStepped:Connect(function()
+    fpsFrames = fpsFrames + 1
+end)
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local fps = fpsFrames
+        fpsFrames = 0
+        local ping = 0
+        pcall(function()
+            ping = math.floor(StatsService:GetNetworkPing())
+        end)
+        if perfOn then
+            perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, ping)
+        end
+    end
+end)
+
 -- ============================================================
--- KHOI 1: HUB UI (sidebar + pages + guide)
+-- KHOI 1: HUB UI
 -- ============================================================
 do
     HubFrame = Instance.new("Frame")
     HubFrame.Size = UDim2.new(0, 480, 0, 350)
     HubFrame.Position = UDim2.new(0.5, -240, 0.5, -175)
-    HubFrame.BackgroundColor3 = HUB_BG
+    HubFrame.BackgroundColor3 = HUB_SIDE
     HubFrame.BorderSizePixel = 0
     HubFrame.Active = true
     HubFrame.Draggable = false
@@ -364,17 +398,17 @@ do
     HubFrame.ClipsDescendants = true
     HubFrame.Parent = ScreenGui
     Instance.new("UICorner", HubFrame).CornerRadius = UDim.new(0, 12)
-    local hubStroke = Instance.new("UIStroke", HubFrame)
-    hubStroke.Color = ACCENT
+    hubStroke = Instance.new("UIStroke", HubFrame)
+    hubStroke.Color = themeColor
     hubStroke.Thickness = 1.5
     hubStroke.Transparency = 0.25
 
-    local hubHeader = Instance.new("TextLabel")
+    hubHeader = Instance.new("TextLabel")
     hubHeader.Size = UDim2.new(1, -40, 0, 34)
     hubHeader.Position = UDim2.new(0, 12, 0, 0)
     hubHeader.BackgroundTransparency = 1
     hubHeader.Text = "👑 KHANGLE DDS HUB — 4080 REMIX"
-    hubHeader.TextColor3 = ACCENT
+    hubHeader.TextColor3 = themeColor
     hubHeader.TextSize = 13
     hubHeader.Font = Enum.Font.GothamBold
     hubHeader.TextXAlignment = Enum.TextXAlignment.Left
@@ -394,27 +428,26 @@ do
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 96, 1, -34)
     sidebar.Position = UDim2.new(0, 0, 0, 34)
-    sidebar.BackgroundColor3 = HUB_SIDE
+    sidebar.BackgroundTransparency = 1
     sidebar.BorderSizePixel = 0
     sidebar.Parent = HubFrame
 
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -96, 1, -34)
-    content.Position = UDim2.new(0, 96, 0, 34)
+    content.Size = UDim2.new(1, -104, 1, -42)
+    content.Position = UDim2.new(0, 100, 0, 38)
     content.BackgroundColor3 = HUB_BG
     content.BorderSizePixel = 0
     content.ClipsDescendants = true
     content.Parent = HubFrame
+    Instance.new("UICorner", content).CornerRadius = UDim.new(0, 12)
 
     local pages = {}
     local navBtns = {}
+    local currentPageName = nil
     local function addPage(name)
-        if pages[name] then
-            return pages[name]
-        end
+        if pages[name] then return pages[name] end
         local pg = Instance.new("Frame")
-        pg.Size = UDim2.new(1, -16, 1, -16)
-        pg.Position = UDim2.new(0, 8, 0, 8)
+        pg.Size = UDim2.new(1, 0, 1, 0)
         pg.BackgroundTransparency = 1
         pg.Visible = false
         pg.Parent = content
@@ -422,13 +455,14 @@ do
         return pg
     end
     local function selectPage(name)
+        currentPageName = name
         for n, pg in pairs(pages) do
             pg.Visible = (n == name)
         end
         for n, b in pairs(navBtns) do
             if n == name then
                 b.BackgroundColor3 = Color3.fromRGB(24, 36, 54)
-                b.TextColor3 = ACCENT
+                b.TextColor3 = themeColor
             else
                 b.BackgroundColor3 = Color3.fromRGB(18, 26, 40)
                 b.TextColor3 = TXT_DIM
@@ -438,8 +472,8 @@ do
     local navIndex = 0
     local function addNav(name, icon)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(1, -12, 0, 42)
-        b.Position = UDim2.new(0, 6, 0, 8 + navIndex * 46)
+        b.Size = UDim2.new(1, -12, 0, 40)
+        b.Position = UDim2.new(0, 6, 0, 6 + navIndex * 44)
         b.BackgroundColor3 = Color3.fromRGB(18, 26, 40)
         b.Text = icon .. " " .. name
         b.TextColor3 = TXT_DIM
@@ -458,12 +492,16 @@ do
 
     addNav("TUNER", "🎛️")
     addNav("CHUNG", "🧰")
+    addNav("SETTINGS", "⚙️")
+    addNav("TỐI ƯU", "🚀")
     addNav("GUIDE", "📜")
     local tunerPage = pages["TUNER"]
     local chungPage = pages["CHUNG"]
+    local settingsPage = pages["SETTINGS"]
+    local optPage = pages["TỐI ƯU"]
     local guidePage = pages["GUIDE"]
 
-    -- PAGE TUNER (co Auto T ben trong)
+    -- TUNER
     local function createInput(name, defaultVal, posY, pg)
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.9, 0, 0, 14)
@@ -624,7 +662,7 @@ do
         end)
     end)
 
-    -- PAGE CHUNG: ScrollingFrame + 3 card tach roi
+    -- CHUNG (scroll, 3 card, KHONG con nut "NUT NOI")
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -634,7 +672,7 @@ do
     scroll.Parent = chungPage
     local function makeCard(y, title, desc, strokeColor)
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -8, 0, 120)
+        card.Size = UDim2.new(1, -8, 0, 110)
         card.Position = UDim2.new(0, 4, 0, y)
         card.BackgroundColor3 = CARD_BG
         card.BorderSizePixel = 0
@@ -670,7 +708,7 @@ do
     local cardFarm = makeCard(0, "🌾 OFFICE AUTOFARM — farm văn phòng", "Tự ngồi ghế, giải toán & in ấn.\nBật/tắt bằng công tắc bên phải.", ACCENT2)
     farmStatLbl = Instance.new("TextLabel")
     farmStatLbl.Size = UDim2.new(1, -80, 0, 16)
-    farmStatLbl.Position = UDim2.new(0, 12, 0, 62)
+    farmStatLbl.Position = UDim2.new(0, 12, 0, 66)
     farmStatLbl.BackgroundTransparency = 1
     farmStatLbl.Text = "lượt giải: 0 | lượt in: 0"
     farmStatLbl.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -678,16 +716,6 @@ do
     farmStatLbl.Font = Enum.Font.GothamBold
     farmStatLbl.TextXAlignment = Enum.TextXAlignment.Left
     farmStatLbl.Parent = cardFarm
-    farmStatusLbl = Instance.new("TextLabel")
-    farmStatusLbl.Size = UDim2.new(1, -80, 0, 16)
-    farmStatusLbl.Position = UDim2.new(0, 12, 0, 82)
-    farmStatusLbl.BackgroundTransparency = 1
-    farmStatusLbl.Text = "status: tạm nghỉ"
-    farmStatusLbl.TextColor3 = TXT_DIM
-    farmStatusLbl.TextSize = 10
-    farmStatusLbl.Font = Enum.Font.GothamMedium
-    farmStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
-    farmStatusLbl.Parent = cardFarm
     local function makeSwitch(par, posY)
         local track = Instance.new("TextButton")
         track.Size = UDim2.new(0, 52, 0, 26)
@@ -705,59 +733,216 @@ do
         local on = false
         local function set(v)
             on = v
-            track.BackgroundColor3 = v and ACCENT or Color3.fromRGB(60, 60, 70)
+            track.BackgroundColor3 = v and themeColor or Color3.fromRGB(60, 60, 70)
             knob.Position = v and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
         end
-        track.MouseButton1Click:Connect(function()
-            set(not on)
-        end)
         return { track = track, set = set, isOn = function() return on end }
     end
     farmSwitch = makeSwitch(cardFarm, 10)
-    local cardBody = makeCard(130, "🚗 THÁO DÀN ÁO — quản lý part xe", "Quét xe → bật soi → click part → tháo.\nMở bảng điều khiển bằng nút dưới.", Color3.fromRGB(0, 230, 180))
+    local cardBody = makeCard(120, "🚗 THÁO DÀN ÁO — quản lý part xe", "Quét xe → bật soi → click part → tháo.\nMở bảng = nút nổi tự hiện.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton")
-    bodyOpenBtn.Size = UDim2.new(0.62, 0, 0, 26)
-    bodyOpenBtn.Position = UDim2.new(0.04, 0, 0, 64)
+    bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
+    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 66)
     bodyOpenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
     bodyOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    bodyOpenBtn.Text = "🚗 MỞ BẢNG DÀN ÁO"
+    bodyOpenBtn.Text = "🚗 MỞ / ĐÓNG BẢNG DÀN ÁO"
     bodyOpenBtn.TextSize = 10
     bodyOpenBtn.Font = Enum.Font.GothamBold
     bodyOpenBtn.Parent = cardBody
     Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
-    ToggleBodyFloatMenuBtn = Instance.new("TextButton")
-    ToggleBodyFloatMenuBtn.Size = UDim2.new(0.32, 0, 0, 26)
-    ToggleBodyFloatMenuBtn.Position = UDim2.new(0.66, 0, 0, 64)
-    ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    ToggleBodyFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: TẮT"
-    ToggleBodyFloatMenuBtn.TextSize = 9
-    ToggleBodyFloatMenuBtn.Font = Enum.Font.GothamBold
-    ToggleBodyFloatMenuBtn.Parent = cardBody
-    Instance.new("UICorner", ToggleBodyFloatMenuBtn).CornerRadius = UDim.new(0, 6)
-    local cardFc = makeCard(260, "📷 FREECAM CINEMATIC — quay phim", "Quay phim chụp ảnh mượt mà.\nMở menu freecam bằng nút dưới.", Color3.fromRGB(100, 150, 255))
+    local cardFc = makeCard(240, "📷 FREECAM CINEMATIC — quay phim", "Quay phim chụp ảnh mượt mà.\nMở menu = nút nổi tự hiện.", Color3.fromRGB(100, 150, 255))
     fcOpenBtn = Instance.new("TextButton")
-    fcOpenBtn.Size = UDim2.new(0.62, 0, 0, 26)
-    fcOpenBtn.Position = UDim2.new(0.04, 0, 0, 64)
+    fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
+    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 66)
     fcOpenBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     fcOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fcOpenBtn.Text = "📷 MỞ MENU FREECAM"
+    fcOpenBtn.Text = "📷 MỞ / ĐÓNG MENU FREECAM"
     fcOpenBtn.TextSize = 10
     fcOpenBtn.Font = Enum.Font.GothamBold
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
-    ToggleFreecamMenuBtn = Instance.new("TextButton")
-    ToggleFreecamMenuBtn.Size = UDim2.new(0.32, 0, 0, 26)
-    ToggleFreecamMenuBtn.Position = UDim2.new(0.66, 0, 0, 64)
-    ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    ToggleFreecamMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleFreecamMenuBtn.Text = "NÚT NỔI: TẮT"
-    ToggleFreecamMenuBtn.TextSize = 9
-    ToggleFreecamMenuBtn.Font = Enum.Font.GothamBold
-    ToggleFreecamMenuBtn.Parent = cardFc
-    Instance.new("UICorner", ToggleFreecamMenuBtn).CornerRadius = UDim.new(0, 6)
 
-    -- PAGE GUIDE
+    -- SETTINGS
+    local setTitle = Instance.new("TextLabel")
+    setTitle.Size = UDim2.new(1, -20, 0, 20)
+    setTitle.Position = UDim2.new(0, 10, 0, 6)
+    setTitle.BackgroundTransparency = 1
+    setTitle.Text = "🎨 MÀU MENU CHÍNH"
+    setTitle.TextColor3 = themeColor
+    setTitle.TextSize = 11
+    setTitle.Font = Enum.Font.GothamBold
+    setTitle.TextXAlignment = Enum.TextXAlignment.Left
+    setTitle.Parent = settingsPage
+    local themePresets = {
+        Color3.fromRGB(0, 229, 160),
+        Color3.fromRGB(56, 189, 248),
+        Color3.fromRGB(167, 139, 250),
+        Color3.fromRGB(255, 100, 100),
+        Color3.fromRGB(255, 170, 60),
+        Color3.fromRGB(255, 110, 190),
+    }
+    for i, c in ipairs(themePresets) do
+        local sw = Instance.new("TextButton")
+        sw.Size = UDim2.new(0, 34, 0, 26)
+        sw.Position = UDim2.new(0, 10 + (i - 1) * 40, 0, 28)
+        sw.BackgroundColor3 = c
+        sw.Text = ""
+        sw.Parent = settingsPage
+        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
+        sw.MouseButton1Click:Connect(function()
+            applyTheme(c)
+        end)
+    end
+    local function makeSetSwitch(y, label, defaultOn, cb)
+        local lbl2 = Instance.new("TextLabel")
+        lbl2.Size = UDim2.new(0.6, 0, 0, 24)
+        lbl2.Position = UDim2.new(0, 10, 0, y)
+        lbl2.BackgroundTransparency = 1
+        lbl2.Text = label
+        lbl2.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lbl2.TextSize = 10
+        lbl2.Font = Enum.Font.GothamBold
+        lbl2.TextXAlignment = Enum.TextXAlignment.Left
+        lbl2.Parent = settingsPage
+        local sw2 = makeSwitch(settingsPage, y)
+        sw2.track.Position = UDim2.new(1, -62, 0, y)
+        sw2.set(defaultOn)
+        sw2.track.MouseButton1Click:Connect(function()
+            cb(sw2.isOn())
+        end)
+        return sw2
+    end
+    makeSetSwitch(64, "🌈 LED ĐUỔI RGB NÚT NỔI", true, function(v)
+        ledOn = v
+        for _, ring in ipairs(allRings) do
+            for _, seg in ipairs(ring.segs) do
+                seg.Visible = v
+            end
+        end
+    end)
+    makeSetSwitch(96, "🛡️ ANTI-AFK", true, function(v)
+        antiAfk = v
+    end)
+    makeSetSwitch(128, "📊 HIỆN FPS / PING", false, function(v)
+        perfOn = v
+        perfFrame.Visible = v
+    end)
+    local perfPosBtn = Instance.new("TextButton")
+    perfPosBtn.Size = UDim2.new(0.9, 0, 0, 28)
+    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 160)
+    perfPosBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    perfPosBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    perfPosBtn.Text = "📌 ĐỔI GÓC HIỆN FPS/PING"
+    perfPosBtn.TextSize = 10
+    perfPosBtn.Font = Enum.Font.GothamBold
+    perfPosBtn.Parent = settingsPage
+    Instance.new("UICorner", perfPosBtn).CornerRadius = UDim.new(0, 6)
+    perfPosBtn.MouseButton1Click:Connect(function()
+        perfCornerIdx = perfCornerIdx % 4 + 1
+        perfFrame.Position = perfCorners[perfCornerIdx]
+    end)
+
+    -- TOI UU
+    local function optBtn(y, text, color)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0.9, 0, 0, 30)
+        b.Position = UDim2.new(0.05, 0, 0, y)
+        b.BackgroundColor3 = color
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Text = text
+        b.TextSize = 10
+        b.Font = Enum.Font.GothamBold
+        b.Parent = optPage
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+        return b
+    end
+    local btnFixNhe = optBtn(6, "🍃 FIX LAG NHẸ", Color3.fromRGB(60, 140, 90))
+    local btnFixNhieu = optBtn(42, "🌪️ FIX LAG NHIỀU", Color3.fromRGB(180, 120, 40))
+    local btnBayMau = optBtn(78, "👻 BAY MÀU TẤT CẢ (hiệu ứng)", Color3.fromRGB(120, 60, 160))
+    local btnToiUuFPS = optBtn(114, "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
+    local btnChatLuong = optBtn(150, "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (máy mạnh)", Color3.fromRGB(200, 70, 120))
+    local function setQuality(level)
+        pcall(function()
+            UserSettings().GameSettings.SavedQualityLevel = level
+        end)
+    end
+    local function killEffects()
+        pcall(function()
+            for _, e in ipairs(Lighting:GetChildren()) do
+                if e:IsA("PostEffect") or e:IsA("Atmosphere") or e:IsA("Sky") == false and e:IsA("Effect") then
+                    e:Destroy()
+                end
+            end
+        end)
+        pcall(function()
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Sparkles") or d:IsA("Fire") or d:IsA("Smoke") then
+                    d:Destroy()
+                end
+            end
+        end)
+    end
+    btnFixNhe.MouseButton1Click:Connect(function()
+        pcall(function() Lighting.GlobalShadows = false end)
+        pcall(function()
+            local b = Lighting:FindFirstChild("KhangLeBloom")
+            if b then b.Enabled = false end
+        end)
+        setQuality(Enum.SavedQualitySetting.QualityLevel4)
+        btnFixNhe.Text = "✔ ĐÃ FIX LAG NHẸ"
+        task.wait(2)
+        btnFixNhe.Text = "🍃 FIX LAG NHẸ"
+    end)
+    btnFixNhieu.MouseButton1Click:Connect(function()
+        pcall(function() Lighting.GlobalShadows = false end)
+        pcall(function() Lighting.Brightness = 1 end)
+        killEffects()
+        setQuality(Enum.SavedQualitySetting.QualityLevel1)
+        btnFixNhieu.Text = "✔ ĐÃ FIX LAG NHIỀU"
+        task.wait(2)
+        btnFixNhieu.Text = "🌪️ FIX LAG NHIỀU"
+    end)
+    btnBayMau.MouseButton1Click:Connect(function()
+        killEffects()
+        pcall(function() Lighting.GlobalShadows = false end)
+        pcall(function() Lighting.Ambient = Color3.fromRGB(120, 120, 120) end)
+        pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120) end)
+        setQuality(Enum.SavedQualitySetting.QualityLevel2)
+        btnBayMau.Text = "✔ ĐÃ BAY MÀU HIỆU ỨNG"
+        task.wait(2)
+        btnBayMau.Text = "👻 BAY MÀU TẤT CẢ (hiệu ứng)"
+    end)
+    btnToiUuFPS.MouseButton1Click:Connect(function()
+        pcall(function() Lighting.GlobalShadows = false end)
+        killEffects()
+        setQuality(Enum.SavedQualitySetting.QualityLevel3)
+        pcall(function()
+            workspace.StreamingEnabled = true
+        end)
+        btnToiUuFPS.Text = "✔ ĐÃ TỐI ƯU FPS"
+        task.wait(2)
+        btnToiUuFPS.Text = "⚡ TỐI ƯU FPS (tự động)"
+    end)
+    btnChatLuong.MouseButton1Click:Connect(function()
+        pcall(function() Lighting.GlobalShadows = true end)
+        pcall(function() Lighting.Brightness = 2 end)
+        pcall(function()
+            if not Lighting:FindFirstChild("KhangLeBloom") then
+                local bl = Instance.new("BloomEffect", Lighting)
+                bl.Name = "KhangLeBloom"
+                bl.Intensity = 0.4
+                bl.Threshold = 0.8
+            else
+                Lighting.KhangLeBloom.Enabled = true
+            end
+        end)
+        setQuality(Enum.SavedQualitySetting.QualityLevel10)
+        btnChatLuong.Text = "✔ ĐÃ TĂNG CHẤT LƯỢNG"
+        task.wait(2)
+        btnChatLuong.Text = "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (máy mạnh)"
+    end)
+
+    -- GUIDE
     guideOpenBtn = Instance.new("TextButton")
     guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
     guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
@@ -782,7 +967,22 @@ do
 
     selectPage("TUNER")
 
-    -- BANG HUONG DAN GOC (noi dung giu nguyen, xuong dong bang \n)
+    -- applyTheme (dat o day vi can selectPage/navBtns)
+    function applyTheme(c)
+        themeColor = c
+        hubStroke.Color = c
+        hubHeader.TextColor3 = c
+        stroke1.Color = c
+        ToggleBtn.TextColor3 = c
+        if currentPageName then
+            selectPage(currentPageName)
+        end
+        if farmSwitch and farmSwitch.isOn() then
+            farmSwitch.set(true)
+        end
+    end
+
+    -- GUIDE FRAME (noi dung giu nguyen, xuong dong kep)
     local guideLines = {
         "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
         "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
@@ -837,13 +1037,13 @@ do
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
     ScrollGuide.BackgroundTransparency = 1
     ScrollGuide.BorderSizePixel = 0
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1500)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1700)
     ScrollGuide.ScrollBarThickness = 4
     ScrollGuide.Parent = GuideFrame
     local GuideContent = Instance.new("TextLabel")
-    GuideContent.Size = UDim2.new(1, -10, 0, 1500)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1700)
     GuideContent.BackgroundTransparency = 1
-    GuideContent.Text = table.concat(guideLines, "\n")
+    GuideContent.Text = table.concat(guideLines, "\n\n")
     GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
     GuideContent.TextSize = 12
     GuideContent.Font = Enum.Font.GothamMedium
@@ -868,7 +1068,7 @@ do
 end
 
 -- ============================================================
--- KHOI 2: AUTO T (logic giu nguyen)
+-- KHOI 2: AUTO T
 -- ============================================================
 do
     local autoTActive = false
@@ -887,17 +1087,6 @@ do
             pcall(function()
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
             end)
-        end
-    end)
-    ToggleBodyFloatMenuBtn.MouseButton1Click:Connect(function()
-        showBodyManagerFloat = not showBodyManagerFloat
-        BodyManagerFloatingBtn.Visible = showBodyManagerFloat
-        if showBodyManagerFloat then
-            ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: BẬT"
-            ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
-        else
-            ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: TẮT"
-            ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         end
     end)
     AutoTFloatingBtn.MouseButton1Click:Connect(function()
@@ -939,7 +1128,7 @@ do
 end
 
 -- ============================================================
--- KHOI 3: QUAN LY DAN AO (logic giu nguyen)
+-- KHOI 3: QUAN LY DAN AO
 -- ============================================================
 do
     local currentVehicle = nil
@@ -1030,8 +1219,8 @@ do
     ScanBtn.TextSize = 10
     Instance.new("UICorner", ScanBtn).CornerRadius = UDim.new(0, 6)
     local RestoreBtn   = createActionButton("Khôi Phục Toàn Bộ", 248, 15, 250, Color3.fromRGB(160, 40, 40))
-    BodyManagerFloatingBtn.MouseButton1Click:Connect(function()
-        ControlPanel.Visible = not ControlPanel.Visible
+    local function syncBodyFloat()
+        BodyManagerFloatingBtn.Visible = ControlPanel.Visible
         if ControlPanel.Visible then
             BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 100)
             strokeBodyFloat.Color = Color3.fromRGB(0, 255, 180)
@@ -1039,16 +1228,14 @@ do
             BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
             strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
         end
+    end
+    BodyManagerFloatingBtn.MouseButton1Click:Connect(function()
+        ControlPanel.Visible = not ControlPanel.Visible
+        syncBodyFloat()
     end)
     bodyOpenBtn.MouseButton1Click:Connect(function()
         ControlPanel.Visible = not ControlPanel.Visible
-        if ControlPanel.Visible then
-            BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 100)
-            strokeBodyFloat.Color = Color3.fromRGB(0, 255, 180)
-        else
-            BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
-        end
+        syncBodyFloat()
     end)
     local CloseControlBtn = Instance.new("TextButton")
     CloseControlBtn.Size = UDim2.new(0, 24, 0, 24)
@@ -1061,8 +1248,7 @@ do
     CloseControlBtn.Parent = ControlPanel
     CloseControlBtn.MouseButton1Click:Connect(function()
         ControlPanel.Visible = false
-        BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
+        syncBodyFloat()
     end)
     local SelectionBoxObj = Instance.new("SelectionBox")
     SelectionBoxObj.Color3 = Color3.fromRGB(0, 230, 180)
@@ -1352,7 +1538,7 @@ do
 end
 
 -- ============================================================
--- KHOI 4: FREECAM CINEMATIC (logic giu nguyen)
+-- KHOI 4: FREECAM CINEMATIC
 -- ============================================================
 do
     local function addStroke(par, color, thickness)
@@ -1434,7 +1620,7 @@ do
     hideFloatBtn.TextSize = 22
     hideFloatBtn.Font = Enum.Font.GothamBold
     hideFloatBtn.ZIndex = 10
-    Instance.new("UICorner", hideFloatBtn).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", hideFloatBtn).CornerRadius = UDim.new(0, 7)
     addStroke(hideFloatBtn, Color3.fromRGB(80, 80, 110), 2)
     hideFloatBtn.Visible = false
     local controlFrame = Instance.new("Frame", ScreenGui)
@@ -1506,20 +1692,12 @@ do
             freecamMenuDragging = false
         end
     end)
-    ToggleFreecamMenuBtn.MouseButton1Click:Connect(function()
-        showFreecamFloat = not showFreecamFloat
-        FreecamFloatingBtn.Visible = showFreecamFloat
-        if showFreecamFloat then
-            ToggleFreecamMenuBtn.Text = "NÚT NỔI: BẬT"
-            ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-        else
-            ToggleFreecamMenuBtn.Text = "NÚT NỔI: TẮT"
-            ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-            freecamMenuFrame.Visible = false
-        end
-    end)
+    local function syncFcFloat()
+        FreecamFloatingBtn.Visible = freecamMenuFrame.Visible
+    end
     fcOpenBtn.MouseButton1Click:Connect(function()
         freecamMenuFrame.Visible = not freecamMenuFrame.Visible
+        syncFcFloat()
     end)
     FreecamFloatingBtn.MouseButton1Click:Connect(function()
         freecamMenuFrame.Visible = not freecamMenuFrame.Visible
@@ -1729,7 +1907,7 @@ do
 end
 
 -- ============================================================
--- KHOI 5: OFFICE FARM v20 (logic giu nguyen)
+-- KHOI 5: OFFICE FARM v20
 -- ============================================================
 do
     local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
@@ -2296,7 +2474,9 @@ do
         setStatus("tạm nghỉ")
     end
     farmSwitch.track.MouseButton1Click:Connect(function()
-        if farmSwitch.isOn() then
+        local want = not farmOffice
+        farmSwitch.set(want)
+        if want then
             farmOffice = true
             activeMode = "office"
             farmStart = os.clock()
@@ -2316,9 +2496,7 @@ do
     end)
 end
 
--- ============================================================
--- NOI DAY MENU CHINH + LED RGB NUT NOI
--- ============================================================
+-- ============ NOI DAY CUOI + LED DUOI NUT NOI ============
 ToggleBtn.MouseButton1Click:Connect(function()
     HubFrame.Visible = not HubFrame.Visible
 end)
@@ -2329,25 +2507,10 @@ guideOpenBtn.MouseButton1Click:Connect(function()
     GuideFrame.Visible = true
 end)
 
-makeSquare(hideFloatBtn)
-addLED(ToggleBtn)
-addLED(AutoTFloatingBtn)
-addLED(BodyManagerFloatingBtn)
-addLED(FreecamFloatingBtn)
-addLED(hideFloatBtn)
-task.spawn(function()
-    local t = 0
-    while true do
-        t = t + 0.02
-        for i, b in ipairs(floatBtns) do
-            local led = b:FindFirstChild("LED")
-            if led then
-                led.Color = Color3.fromHSV((t * 0.15 + i * 0.13) % 1, 0.85, 1)
-                led.Transparency = (b.BackgroundTransparency == 1) and 1 or 0
-            end
-        end
-        task.wait(0.03)
-    end
-end)
+makeChaseRing(ToggleBtn, 48, 48, 3, 3, 4, 2)
+makeChaseRing(AutoTFloatingBtn, 48, 48, 3, 3, 4, 2)
+makeChaseRing(BodyManagerFloatingBtn, 48, 48, 3, 3, 4, 2)
+makeChaseRing(FreecamFloatingBtn, 48, 48, 3, 3, 4, 2)
+makeChaseRing(hideFloatBtn, 52, 52, 3, 3, 4, 2)
 
-print("[hub remix v3] san sang — menu het trong, het go vuong, muc CHUNG cuon duoc")
+print("[hub remix v4] san sang — settings + toi uu + led duoi + het loi vat")
