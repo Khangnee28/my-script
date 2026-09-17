@@ -1,4 +1,4 @@
--- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Fixed & Vietnamese)
+-- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Fixed Executor Calls)
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -105,7 +105,7 @@ local function createFloatingButton(icon, yPos, strokeColorBase)
 	btn.Parent = ScreenGui
 	
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6) -- Hình vuông bo nhẹ
+	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = btn
 	
 	local stroke = Instance.new("UIStroke")
@@ -118,7 +118,7 @@ local function createFloatingButton(icon, yPos, strokeColorBase)
 end
 
 -- 1. Nút mở menu chính (👑) - Hình vuông có icon
-local ToggleBtn = createFloatingButton("👑", 0.4, Color3.fromRGB(255, 215, 0))
+local ToggleBtn = createFloatingButton("", 0.4, Color3.fromRGB(255, 215, 0))
 
 -- 2. Nút nổi Auto T
 local AutoTFloatingBtn = createFloatingButton("🕹️", 0.53, Color3.fromRGB(255, 100, 0))
@@ -132,7 +132,7 @@ BodyManagerFloatingBtn.Visible = false
 local FreecamFloatingBtn = createFloatingButton("📷", 0.79, Color3.fromRGB(100, 150, 255))
 FreecamFloatingBtn.Visible = false
 
--- BẢNG HƯỚNG DẪN SỬ DỤNG (Giữ nguyên text và xuống dòng)
+-- BẢNG HƯỚNG DẪN SỬ DỤNG
 local GuideFrame = Instance.new("Frame")
 GuideFrame.Size = UDim2.new(0, 540, 0, 350)
 GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
@@ -156,7 +156,7 @@ strokeGuide.Parent = GuideFrame
 local GuideTitle = Instance.new("TextLabel")
 GuideTitle.Size = UDim2.new(1, 0, 0, 42)
 GuideTitle.BackgroundTransparency = 1
-GuideTitle.Text = "📜 HƯỚNG DẪN SỬ DỤNG - VUI LÒNG ĐỌC KĨ!"
+GuideTitle.Text = " HƯỚNG DẪN SỬ DỤNG - VUI LÒNG ĐỌC KĨ!"
 GuideTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
 GuideTitle.TextSize = 12
 GuideTitle.Font = Enum.Font.GothamBold
@@ -487,7 +487,7 @@ ToggleBodyFloatMenuBtn.Size = UDim2.new(1, 0, 0, 28)
 ToggleBodyFloatMenuBtn.Position = UDim2.new(0, 0, 0, 310)
 ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ToggleBodyFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBodyFloatMenuBtn.Text = "🚗 Nút nổi Dàn Áo: TẮT"
+ToggleBodyFloatMenuBtn.Text = " Nút nổi Dàn Áo: TẮT"
 ToggleBodyFloatMenuBtn.TextSize = 11
 ToggleBodyFloatMenuBtn.Font = Enum.Font.GothamBold
 ToggleBodyFloatMenuBtn.ZIndex = 17
@@ -591,7 +591,7 @@ ToggleFloatMenuBtn.MouseButton1Click:Connect(function()
 	showAutoTFloat = not showAutoTFloat
 	AutoTFloatingBtn.Visible = showAutoTFloat
 	if showAutoTFloat then
-		ToggleFloatMenuBtn.Text = "🕹️ Nút nổi Auto T: BẬT"
+		ToggleFloatMenuBtn.Text = "️ Nút nổi Auto T: BẬT"
 		ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 	else
 		ToggleFloatMenuBtn.Text = "🕹️ Nút nổi Auto T: TẮT"
@@ -790,7 +790,7 @@ ControlTitle.BackgroundTransparency = 1
 ControlTitle.Position = UDim2.new(0, 15, 0, 10)
 ControlTitle.Size = UDim2.new(1, -30, 0, 25)
 ControlTitle.Font = Enum.Font.GothamBold
-ControlTitle.Text = "🚗 QUẢN LÝ & THÁO DÀN ÁO"
+ControlTitle.Text = " QUẢN LÝ & THÁO DÀN ÁO"
 ControlTitle.TextColor3 = Color3.fromRGB(0, 230, 180)
 ControlTitle.TextSize = 12
 ControlTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1626,6 +1626,31 @@ local CHAIR_POS = Vector3.new(-5903, 4, -229)
 local UUID_PAT = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 local PATTERN = { "CHOICE", "QID" }
 
+-- Helper functions for executor compatibility
+local function safeFireSignal(signal)
+	if typeof(signal) == "RBXScriptSignal" then
+		pcall(function()
+			if type(firesignal) == "function" then
+				firesignal(signal)
+			else
+				signal:Fire()
+			end
+		end)
+	end
+end
+
+local function safeTouchPress(x, y)
+	if type(touchpress) == "function" then
+		pcall(function() touchpress(x, y) end)
+	end
+end
+
+local function safeTouchRelease(x, y)
+	if type(touchrelease) == "function" then
+		pcall(function() touchrelease(x, y) end)
+	end
+end
+
 local function of_killBV()
 	if of_activeBV then
 		pcall(function() of_activeBV.Velocity = Vector3.zero end)
@@ -1756,19 +1781,19 @@ local function of_onScreen(x, y)
 end
 
 local function of_clickButton(btn)
-	if pcall(function() firesignal(btn.MouseButton1Click) end) then
+	if pcall(function() safeFireSignal(btn.MouseButton1Click) end) then
 		return 1
 	end
-	if pcall(function() firesignal(btn.Activated) end) then
+	if pcall(function() safeFireSignal(btn.Activated) end) then
 		return 2
 	end
 	local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
 	local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
 	if of_onScreen(x, y) then
 		if pcall(function()
-			touchpress(x, y)
+			safeTouchPress(x, y)
 			task.wait(0.06)
-			touchrelease(x, y)
+			safeTouchRelease(x, y)
 		end) then
 			return 3
 		end
