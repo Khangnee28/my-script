@@ -1,6 +1,7 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v2
--- v2: goi khoi vao do...end => het loi "Out of local registers 200"
+-- KHANGLE DDS HUB — 4080 REMIX v3
+-- v3: fix menu trong / go vuong / guide xuong dong / muc CHUNG cuon duoc
+--     + statPanel trong suot vien LED khi bat farm + LED nut noi
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -87,7 +88,10 @@ local floatBtns = {}
 local function addLED(btn)
     local led = Instance.new("UIStroke", btn)
     led.Name = "LED"
-    led.Thickness = 2.4
+    led.Thickness = 2.5
+    led.Enabled = true
+    led.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    led.Transparency = 0
     table.insert(floatBtns, btn)
     return led
 end
@@ -98,27 +102,19 @@ end
 
 -- ============ TAY NAM (handle) KHAI BAO TRUOC ============
 local ControlPanel, freecamMenuFrame, hideFloatBtn, GuideFrame
-local HubFrame, hubClose
+local HubFrame, hubClose, statPanel
 local farmSwitch, farmStatLbl, farmStatusLbl
 local bodyOpenBtn, fcOpenBtn, guideOpenBtn
 local ToggleFloatMenuBtn, ToggleBodyFloatMenuBtn, ToggleFreecamMenuBtn
+local lblMode, lblStat1, lblStat2, lblTime, lblWork
 local showAutoTFloat = false
 local showBodyManagerFloat = false
 local showFreecamFloat = false
 local farmOffice = false
 local ofAnswers = 0
 local ofPrints = 0
-
-local function setStatus(t)
-    if farmStatusLbl then
-        farmStatusLbl.Text = "status: " .. t
-    end
-end
-local function refreshStatPanel()
-    if farmStatLbl then
-        farmStatLbl.Text = "lượt giải: " .. ofAnswers .. " | lượt in: " .. ofPrints
-    end
-end
+local activeMode = nil
+local farmStart = 0
 
 pcall(function()
     player.Kicked:Connect(function(reason)
@@ -213,6 +209,147 @@ strokeFreecamFloat.Color = Color3.fromRGB(100, 150, 255)
 strokeFreecamFloat.Thickness = 2
 
 -- ============================================================
+-- KHOI 0: BANG STATUS TRONG SUOT + VIEN LED (hien khi bat farm)
+-- ============================================================
+do
+    statPanel = Instance.new("Frame")
+    statPanel.Size = UDim2.new(0, 250, 0, 134)
+    statPanel.Position = UDim2.new(0, 76, 0.5, 62)
+    statPanel.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+    statPanel.BackgroundTransparency = 0.45
+    statPanel.BorderSizePixel = 0
+    statPanel.Active = true
+    statPanel.Draggable = true
+    statPanel.Visible = false
+    statPanel.Parent = ScreenGui
+    Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 6)
+    local RAINBOW = {
+        Color3.fromRGB(255, 60, 60),
+        Color3.fromRGB(255, 160, 40),
+        Color3.fromRGB(255, 230, 60),
+        Color3.fromRGB(90, 230, 90),
+        Color3.fromRGB(70, 160, 255),
+        Color3.fromRGB(125, 90, 220),
+        Color3.fromRGB(225, 80, 220),
+    }
+    local LED_N1 = 14
+    local LED_N2 = 7
+    local LED_T = 3
+    local ledSegs = {}
+    local function addSeg(pos, size)
+        local f = Instance.new("Frame")
+        f.Position = pos
+        f.Size = size
+        f.BorderSizePixel = 0
+        f.ZIndex = 5
+        f.Parent = statPanel
+        table.insert(ledSegs, f)
+        return f
+    end
+    local function wSize(i)
+        if i == LED_N1 - 1 then
+            return UDim2.new(1 / LED_N1, 0, 0, LED_T)
+        end
+        return UDim2.new(1 / LED_N1, 1, 0, LED_T)
+    end
+    local function hSize(i)
+        if i == LED_N2 - 1 then
+            return UDim2.new(0, LED_T, 1 / LED_N2, 0)
+        end
+        return UDim2.new(0, LED_T, 1 / LED_N2, 1)
+    end
+    for i = 0, LED_N1 - 1 do
+        addSeg(UDim2.new(i / LED_N1, 0, 0, 0), wSize(i))
+    end
+    for i = 0, LED_N2 - 1 do
+        addSeg(UDim2.new(1, -LED_T, i / LED_N2, 0), hSize(i))
+    end
+    for i = LED_N1 - 1, 0, -1 do
+        addSeg(UDim2.new(i / LED_N1, 0, 1, -LED_T), wSize(i))
+    end
+    for i = LED_N2 - 1, 0, -1 do
+        addSeg(UDim2.new(0, 0, i / LED_N2, 0), hSize(i))
+    end
+    task.spawn(function()
+        local t = 0
+        local n = #ledSegs
+        while true do
+            t = t + 0.08
+            for i, seg in ipairs(ledSegs) do
+                local pos = (t + (i - 1) * 7 / n) % 7
+                local idx = math.floor(pos) + 1
+                local f = pos - (idx - 1)
+                local a = RAINBOW[idx]
+                local b = RAINBOW[(idx % 7) + 1]
+                seg.BackgroundColor3 = a:Lerp(b, f)
+            end
+            task.wait(0.03)
+        end
+    end)
+    local function statLabel(text, y, size, color)
+        local l = Instance.new("TextLabel")
+        l.Size = UDim2.new(1, -24, 0, size or 16)
+        l.Position = UDim2.new(0, 14, 0, y)
+        l.BackgroundTransparency = 1
+        l.Text = text
+        l.TextColor3 = color or Color3.fromRGB(235, 235, 235)
+        l.Font = Enum.Font.Code
+        l.TextSize = size or 15
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.ZIndex = 6
+        l.Parent = statPanel
+        return l
+    end
+    lblMode  = statLabel("—", 10, 17, Color3.fromRGB(255, 200, 80))
+    lblStat1 = statLabel("", 36, 15, Color3.fromRGB(140, 255, 140))
+    lblStat2 = statLabel("", 57, 15, Color3.fromRGB(140, 220, 255))
+    lblTime  = statLabel("thời gian farm: 00:00", 78, 14, Color3.fromRGB(255, 220, 140))
+    lblWork  = statLabel("status: tạm nghỉ", 102, 13, Color3.fromRGB(200, 200, 200))
+end
+
+local function setStatus(t)
+    if lblWork then
+        lblWork.Text = "status: " .. t
+    end
+    if farmStatusLbl then
+        farmStatusLbl.Text = "status: " .. t
+    end
+end
+local function fmtTime(s)
+    s = math.floor(s)
+    local h = math.floor(s / 3600)
+    local m = math.floor((s % 3600) / 60)
+    local sec = s % 60
+    if h > 0 then
+        return string.format("%d:%02d:%02d", h, m, sec)
+    end
+    return string.format("%02d:%02d", m, sec)
+end
+local function refreshStatPanel()
+    if activeMode == "office" then
+        lblMode.Text = "OFFICE STATUS"
+        lblMode.TextColor3 = Color3.fromRGB(120, 200, 255)
+        lblStat1.Text = "lượt giải: " .. ofAnswers
+        lblStat2.Text = "lượt in: " .. ofPrints
+        if farmStatLbl then
+            farmStatLbl.Text = "lượt giải: " .. ofAnswers .. " | lượt in: " .. ofPrints
+        end
+    else
+        lblMode.Text = "—"
+        lblStat1.Text = ""
+        lblStat2.Text = ""
+    end
+end
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if activeMode and farmStart > 0 then
+            lblTime.Text = "thời gian farm: " .. fmtTime(os.clock() - farmStart)
+        end
+    end
+end)
+
+-- ============================================================
 -- KHOI 1: HUB UI (sidebar + pages + guide)
 -- ============================================================
 do
@@ -224,6 +361,7 @@ do
     HubFrame.Active = true
     HubFrame.Draggable = false
     HubFrame.Visible = false
+    HubFrame.ClipsDescendants = true
     HubFrame.Parent = ScreenGui
     Instance.new("UICorner", HubFrame).CornerRadius = UDim.new(0, 12)
     local hubStroke = Instance.new("UIStroke", HubFrame)
@@ -271,6 +409,9 @@ do
     local pages = {}
     local navBtns = {}
     local function addPage(name)
+        if pages[name] then
+            return pages[name]
+        end
         local pg = Instance.new("Frame")
         pg.Size = UDim2.new(1, -16, 1, -16)
         pg.Position = UDim2.new(0, 8, 0, 8)
@@ -315,8 +456,14 @@ do
         return b
     end
 
-    -- PAGE TUNER
-    local tunerPage = addPage("TUNER")
+    addNav("TUNER", "🎛️")
+    addNav("CHUNG", "🧰")
+    addNav("GUIDE", "📜")
+    local tunerPage = pages["TUNER"]
+    local chungPage = pages["CHUNG"]
+    local guidePage = pages["GUIDE"]
+
+    -- PAGE TUNER (co Auto T ben trong)
     local function createInput(name, defaultVal, posY, pg)
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.9, 0, 0, 14)
@@ -378,7 +525,6 @@ do
     ToggleFloatMenuBtn.Font = Enum.Font.GothamBold
     ToggleFloatMenuBtn.Parent = tunerPage
     Instance.new("UICorner", ToggleFloatMenuBtn).CornerRadius = UDim.new(0, 7)
-    -- tuner inject handler (logic giu nguyen)
     local statusThread = nil
     InjectBtn.MouseButton1Click:Connect(function()
         local char = LocalPlayer.Character
@@ -478,60 +624,70 @@ do
         end)
     end)
 
-    -- PAGE FARM
-    local farmPage = addPage("FARM")
-    local farmCard = Instance.new("Frame")
-    farmCard.Size = UDim2.new(1, -4, 0, 116)
-    farmCard.Position = UDim2.new(0, 2, 0, 4)
-    farmCard.BackgroundColor3 = CARD_BG
-    farmCard.BorderSizePixel = 0
-    farmCard.Parent = farmPage
-    Instance.new("UICorner", farmCard).CornerRadius = UDim.new(0, 10)
-    local farmCardStroke = Instance.new("UIStroke", farmCard)
-    farmCardStroke.Color = ACCENT2
-    farmCardStroke.Thickness = 1
-    farmCardStroke.Transparency = 0.4
-    local farmCardTitle = Instance.new("TextLabel")
-    farmCardTitle.Size = UDim2.new(1, -80, 0, 22)
-    farmCardTitle.Position = UDim2.new(0, 12, 0, 8)
-    farmCardTitle.BackgroundTransparency = 1
-    farmCardTitle.Text = "🌾 OFFICE AUTOFARM"
-    farmCardTitle.TextColor3 = ACCENT2
-    farmCardTitle.TextSize = 12
-    farmCardTitle.Font = Enum.Font.GothamBold
-    farmCardTitle.TextXAlignment = Enum.TextXAlignment.Left
-    farmCardTitle.Parent = farmCard
-    local farmCardDesc = Instance.new("TextLabel")
-    farmCardDesc.Size = UDim2.new(1, -80, 0, 34)
-    farmCardDesc.Position = UDim2.new(0, 12, 0, 30)
-    farmCardDesc.BackgroundTransparency = 1
-    farmCardDesc.Text = "Tự ngồi ghế, giải toán & in ấn.\nMô phỏng phím thật, chống AFK."
-    farmCardDesc.TextColor3 = TXT_DIM
-    farmCardDesc.TextSize = 10
-    farmCardDesc.Font = Enum.Font.GothamMedium
-    farmCardDesc.TextXAlignment = Enum.TextXAlignment.Left
-    farmCardDesc.TextWrapped = true
-    farmCardDesc.Parent = farmCard
+    -- PAGE CHUNG: ScrollingFrame + 3 card tach roi
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 400)
+    scroll.ScrollBarThickness = 4
+    scroll.Parent = chungPage
+    local function makeCard(y, title, desc, strokeColor)
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, -8, 0, 120)
+        card.Position = UDim2.new(0, 4, 0, y)
+        card.BackgroundColor3 = CARD_BG
+        card.BorderSizePixel = 0
+        card.Parent = scroll
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+        local cs = Instance.new("UIStroke", card)
+        cs.Color = strokeColor
+        cs.Thickness = 1
+        cs.Transparency = 0.4
+        local t = Instance.new("TextLabel")
+        t.Size = UDim2.new(1, -24, 0, 20)
+        t.Position = UDim2.new(0, 12, 0, 8)
+        t.BackgroundTransparency = 1
+        t.Text = title
+        t.TextColor3 = strokeColor
+        t.TextSize = 12
+        t.Font = Enum.Font.GothamBold
+        t.TextXAlignment = Enum.TextXAlignment.Left
+        t.Parent = card
+        local d = Instance.new("TextLabel")
+        d.Size = UDim2.new(1, -24, 0, 30)
+        d.Position = UDim2.new(0, 12, 0, 28)
+        d.BackgroundTransparency = 1
+        d.Text = desc
+        d.TextColor3 = TXT_DIM
+        d.TextSize = 10
+        d.Font = Enum.Font.GothamMedium
+        d.TextXAlignment = Enum.TextXAlignment.Left
+        d.TextWrapped = true
+        d.Parent = card
+        return card
+    end
+    local cardFarm = makeCard(0, "🌾 OFFICE AUTOFARM — farm văn phòng", "Tự ngồi ghế, giải toán & in ấn.\nBật/tắt bằng công tắc bên phải.", ACCENT2)
     farmStatLbl = Instance.new("TextLabel")
-    farmStatLbl.Size = UDim2.new(1, -24, 0, 16)
-    farmStatLbl.Position = UDim2.new(0, 12, 0, 68)
+    farmStatLbl.Size = UDim2.new(1, -80, 0, 16)
+    farmStatLbl.Position = UDim2.new(0, 12, 0, 62)
     farmStatLbl.BackgroundTransparency = 1
     farmStatLbl.Text = "lượt giải: 0 | lượt in: 0"
     farmStatLbl.TextColor3 = Color3.fromRGB(140, 255, 140)
     farmStatLbl.TextSize = 10
     farmStatLbl.Font = Enum.Font.GothamBold
     farmStatLbl.TextXAlignment = Enum.TextXAlignment.Left
-    farmStatLbl.Parent = farmCard
+    farmStatLbl.Parent = cardFarm
     farmStatusLbl = Instance.new("TextLabel")
-    farmStatusLbl.Size = UDim2.new(1, -24, 0, 16)
-    farmStatusLbl.Position = UDim2.new(0, 12, 0, 88)
+    farmStatusLbl.Size = UDim2.new(1, -80, 0, 16)
+    farmStatusLbl.Position = UDim2.new(0, 12, 0, 82)
     farmStatusLbl.BackgroundTransparency = 1
     farmStatusLbl.Text = "status: tạm nghỉ"
     farmStatusLbl.TextColor3 = TXT_DIM
     farmStatusLbl.TextSize = 10
     farmStatusLbl.Font = Enum.Font.GothamMedium
     farmStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
-    farmStatusLbl.Parent = farmCard
+    farmStatusLbl.Parent = cardFarm
     local function makeSwitch(par, posY)
         local track = Instance.new("TextButton")
         track.Size = UDim2.new(0, 52, 0, 26)
@@ -557,106 +713,51 @@ do
         end)
         return { track = track, set = set, isOn = function() return on end }
     end
-    farmSwitch = makeSwitch(farmCard, 10)
-    local farmCard2 = Instance.new("Frame")
-    farmCard2.Size = UDim2.new(1, -4, 0, 64)
-    farmCard2.Position = UDim2.new(0, 2, 0, 128)
-    farmCard2.BackgroundColor3 = CARD_BG
-    farmCard2.BorderSizePixel = 0
-    farmCard2.Parent = farmPage
-    Instance.new("UICorner", farmCard2).CornerRadius = UDim.new(0, 10)
-    local farmCard2Title = Instance.new("TextLabel")
-    farmCard2Title.Size = UDim2.new(1, -24, 0, 20)
-    farmCard2Title.Position = UDim2.new(0, 12, 0, 8)
-    farmCard2Title.BackgroundTransparency = 1
-    farmCard2Title.Text = "💡 GHI CHÚ"
-    farmCard2Title.TextColor3 = ACCENT
-    farmCard2Title.TextSize = 11
-    farmCard2Title.Font = Enum.Font.GothamBold
-    farmCard2Title.TextXAlignment = Enum.TextXAlignment.Left
-    farmCard2Title.Parent = farmCard2
-    local farmCard2Desc = Instance.new("TextLabel")
-    farmCard2Desc.Size = UDim2.new(1, -24, 0, 32)
-    farmCard2Desc.Position = UDim2.new(0, 12, 0, 28)
-    farmCard2Desc.BackgroundTransparency = 1
-    farmCard2Desc.Text = "Bật/tắt bằng công tắc bên card trên.\nTự đổi job Office Worker lần đầu."
-    farmCard2Desc.TextColor3 = TXT_DIM
-    farmCard2Desc.TextSize = 10
-    farmCard2Desc.Font = Enum.Font.GothamMedium
-    farmCard2Desc.TextXAlignment = Enum.TextXAlignment.Left
-    farmCard2Desc.TextWrapped = true
-    farmCard2Desc.Parent = farmCard2
-
-    -- PAGE DAN AO
-    local bodyPage = addPage("DÁN ÁO")
+    farmSwitch = makeSwitch(cardFarm, 10)
+    local cardBody = makeCard(130, "🚗 THÁO DÀN ÁO — quản lý part xe", "Quét xe → bật soi → click part → tháo.\nMở bảng điều khiển bằng nút dưới.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton")
-    bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
-    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
+    bodyOpenBtn.Size = UDim2.new(0.62, 0, 0, 26)
+    bodyOpenBtn.Position = UDim2.new(0.04, 0, 0, 64)
     bodyOpenBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
     bodyOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    bodyOpenBtn.Text = "🚗 MỞ / ĐÓNG BẢNG DÀN ÁO"
-    bodyOpenBtn.TextSize = 11
+    bodyOpenBtn.Text = "🚗 MỞ BẢNG DÀN ÁO"
+    bodyOpenBtn.TextSize = 10
     bodyOpenBtn.Font = Enum.Font.GothamBold
-    bodyOpenBtn.Parent = bodyPage
-    Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 7)
+    bodyOpenBtn.Parent = cardBody
+    Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
     ToggleBodyFloatMenuBtn = Instance.new("TextButton")
-    ToggleBodyFloatMenuBtn.Size = UDim2.new(0.9, 0, 0, 30)
-    ToggleBodyFloatMenuBtn.Position = UDim2.new(0.05, 0, 0, 52)
+    ToggleBodyFloatMenuBtn.Size = UDim2.new(0.32, 0, 0, 26)
+    ToggleBodyFloatMenuBtn.Position = UDim2.new(0.66, 0, 0, 64)
     ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     ToggleBodyFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleBodyFloatMenuBtn.Text = "🚗 NÚT NỔI DÀN ÁO: ĐANG TẮT"
-    ToggleBodyFloatMenuBtn.TextSize = 11
+    ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: TẮT"
+    ToggleBodyFloatMenuBtn.TextSize = 9
     ToggleBodyFloatMenuBtn.Font = Enum.Font.GothamBold
-    ToggleBodyFloatMenuBtn.Parent = bodyPage
-    Instance.new("UICorner", ToggleBodyFloatMenuBtn).CornerRadius = UDim.new(0, 7)
-    local bodyHint = Instance.new("TextLabel")
-    bodyHint.Size = UDim2.new(0.9, 0, 0, 40)
-    bodyHint.Position = UDim2.new(0.05, 0, 0, 92)
-    bodyHint.BackgroundTransparency = 1
-    bodyHint.Text = "Quét xe → bật soi → click part → tháo.\nChỉ mình bạn thấy phần đã tháo."
-    bodyHint.TextColor3 = TXT_DIM
-    bodyHint.TextSize = 10
-    bodyHint.Font = Enum.Font.GothamMedium
-    bodyHint.TextXAlignment = Enum.TextXAlignment.Left
-    bodyHint.TextWrapped = true
-    bodyHint.Parent = bodyPage
-
-    -- PAGE FREECAM
-    local fcPage = addPage("FREECAM")
+    ToggleBodyFloatMenuBtn.Parent = cardBody
+    Instance.new("UICorner", ToggleBodyFloatMenuBtn).CornerRadius = UDim.new(0, 6)
+    local cardFc = makeCard(260, "📷 FREECAM CINEMATIC — quay phim", "Quay phim chụp ảnh mượt mà.\nMở menu freecam bằng nút dưới.", Color3.fromRGB(100, 150, 255))
     fcOpenBtn = Instance.new("TextButton")
-    fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
-    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
+    fcOpenBtn.Size = UDim2.new(0.62, 0, 0, 26)
+    fcOpenBtn.Position = UDim2.new(0.04, 0, 0, 64)
     fcOpenBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
     fcOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fcOpenBtn.Text = "📷 MỞ / ĐÓNG MENU FREECAM"
-    fcOpenBtn.TextSize = 11
+    fcOpenBtn.Text = "📷 MỞ MENU FREECAM"
+    fcOpenBtn.TextSize = 10
     fcOpenBtn.Font = Enum.Font.GothamBold
-    fcOpenBtn.Parent = fcPage
-    Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 7)
+    fcOpenBtn.Parent = cardFc
+    Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
     ToggleFreecamMenuBtn = Instance.new("TextButton")
-    ToggleFreecamMenuBtn.Size = UDim2.new(0.9, 0, 0, 30)
-    ToggleFreecamMenuBtn.Position = UDim2.new(0.05, 0, 0, 52)
+    ToggleFreecamMenuBtn.Size = UDim2.new(0.32, 0, 0, 26)
+    ToggleFreecamMenuBtn.Position = UDim2.new(0.66, 0, 0, 64)
     ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     ToggleFreecamMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleFreecamMenuBtn.Text = "📷 FREECAM CINEMATIC: ĐANG TẮT"
-    ToggleFreecamMenuBtn.TextSize = 11
+    ToggleFreecamMenuBtn.Text = "NÚT NỔI: TẮT"
+    ToggleFreecamMenuBtn.TextSize = 9
     ToggleFreecamMenuBtn.Font = Enum.Font.GothamBold
-    ToggleFreecamMenuBtn.Parent = fcPage
-    Instance.new("UICorner", ToggleFreecamMenuBtn).CornerRadius = UDim.new(0, 7)
-    local fcHint = Instance.new("TextLabel")
-    fcHint.Size = UDim2.new(0.9, 0, 0, 40)
-    fcHint.Position = UDim2.new(0.05, 0, 0, 92)
-    fcHint.BackgroundTransparency = 1
-    fcHint.Text = "Quay phim chụp ảnh mượt mà.\nẨn giao diện bằng nút 👁️ nổi."
-    fcHint.TextColor3 = TXT_DIM
-    fcHint.TextSize = 10
-    fcHint.Font = Enum.Font.GothamMedium
-    fcHint.TextXAlignment = Enum.TextXAlignment.Left
-    fcHint.TextWrapped = true
-    fcHint.Parent = fcPage
+    ToggleFreecamMenuBtn.Parent = cardFc
+    Instance.new("UICorner", ToggleFreecamMenuBtn).CornerRadius = UDim.new(0, 6)
 
     -- PAGE GUIDE
-    local guidePage = addPage("GUIDE")
     guideOpenBtn = Instance.new("TextButton")
     guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
     guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
@@ -679,14 +780,36 @@ do
     guideHint.TextWrapped = true
     guideHint.Parent = guidePage
 
-    addNav("TUNER", "🎛️")
-    addNav("FARM", "🌾")
-    addNav("DÁN ÁO", "🚗")
-    addNav("FREECAM", "📷")
-    addNav("GUIDE", "📜")
     selectPage("TUNER")
 
-    -- BANG HUONG DAN GOC (giu nguyen noi dung)
+    -- BANG HUONG DAN GOC (noi dung giu nguyen, xuong dong bang \n)
+    local guideLines = {
+        "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
+        "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
+        "mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )",
+        "rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy",
+        "tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha",
+        "ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )",
+        "final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha )",
+        "Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha",
+        "Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.",
+        "Lưu Ý Về Xe: sẽ có vài xe không áp dụng được top speed chỉ có thể tăng mã lực giúp xe đề pa sẽ mạnh hơn tăng tầm 7 - 12 km/h tùy vào xe còn top speed sẽ không hoạt động nha vì admin lock thông số xe đó nên script sẽ không can thiệp để thay đổi top speed được nhưng bù lại mọi người có thể chỉnh mã lực đề pa xoáy bánh và chỉnh rpm vẫn được nha nhưng đừng chỉnh ratio gear và final drive dễ gây xung đột và lỗi, rpm mình set mặc định là 3500 mọi người thấy chạy max speed mà nó vẫn còn dư cả khúc rpm ở thanh dưới thì mọi người giảm rpm xuống đến khi nào xe nó đờn tằng tằng nha nhưng nếu mọi người thấy xe nó tự chạy bấm dừng không được thì tăng rpm lên một chút tầm 50 - 100 gì đó để nó dư một khoản nhỏ xong lại giảm nhẹ lại 10 - 20 căn đến khi nào nó đờn tua nha để tránh lỗi tiếng pô và chạy cũng sướng hơn nữa",
+        "Auto T: tự động bốc đầu cho ai muốn múa lửa",
+        "cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê",
+        "lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại",
+        "Tháo Dàn Áo: tháo mọi thứ của xe bánh xe áo xe cục máy bla bla..vv",
+        "cách dùng: bật menu lên và bật quản lý dàn áo sau đó spawn xe muốn tháo và ngồi lên xe bấm quét xe để quét xe sau đó xuống xe bật free cam và click vào chỗ muốn tháo lưu ý bộ phận của xe được gọi là part và part có nhiều cụm tùy xe admin sẽ chia nhỏ từng cụm ra rất dễ tháo còn xe gộp một đống part vào một cụm nếu mọi người bấm vào một chỗ muốn xoá mà thấy cụm đó có tới 100 hoặc hơn 200 part có nghĩa là nó k chia nhỏ cụm ra và gộp thành 1 cụm to mọi người chịu khó bấm tới chỗ mình muốn xoá ví dụ phuộc bla bla có thể tháo luôn cục máy để chụp ảnh sau khi tháo mọi người vẫn chạy bình thường nha nhưng chịu khó xíu sau khi tháo xong hết thì mọi người tắt soi và tháo đi nha là ok",
+        "lưu ý: vì xe admin không làm remote event nên khi xoá chỉ mọi người thấy được còn người khác thì không nha ai thích chụp ảnh thì dùng để tháo ra xem chi tiết rồi chụp cho đẹp nha",
+        "cách tìm part muốn xoá: khi mọi người click sẽ hiện selection box có màu và tên cụm và part nếu xe được gộp nhiều cụm lại thì rất dễ tháo nó chia nhỏ ra từng part cho mỗi cụm có tên riêng mọi người muốn xoá dàn áo thì cứ di cam lại gần dàn áo rồi bấm vô xong bấm xoá cả mục là xoá hết dàn áo ngoài luôn nếu còn hình mờ hoặc tem có nghĩa xe đó có một cụm to nữa mọi người phải bấm tìm cụm to đó rồi dò từng part để xoá , sẽ có cụm trước và cụm sau là không có gộp chung đâu nha cứ click lên cụm trước hay sau rồi tìm chỗ muốn xoá ví dụ ốp đầu hay ghi đông là ở cụm trước còn cụm giữa là cái khung và mấy part nhỏ nhỏ như ốc máy bla bla nói chung muốn xoá gì thì ngồi mò chút xíu nha là hiểu !",
+        "gợi ý: những mảnh dàn áo hay màu sơn và tem admin thường đặt tên part là (livery , paint) còn những xe khác có thể sẽ là những tên khác nhưng có selection box nên mọi người cứ đổi part đến khi nào thấy chỗ mình muốn xoá rồi xoá là được nha",
+        "Freecam: freecam này do mình làm và mọi người có thể dùng để quay phim chụp ảnh có thể tùy chỉnh tốc độ xoay camera , di chuyển , zoom , up down như pc luôn nha",
+        "cách dùng: mở menu chính lên và mở freecam sau đó mọi người tùy chỉnh tốc độ xoay camera và di chuyển freecam và trong menu có nút ẩn giao diện khi bật lên sẽ hiện nút nổi khi bấm vào sẽ ẩn toàn bộ cụm điều khiển nút nhảy nhưng vẫn bấm và di chuyển được bằng cụm điều khiển nha chỉ ẩn đi thôi chứ không mất và khi ẩn sẽ ẩn luôn nút nổi mọi người chỉ cần nhớ chỗ để nút nổi và ấn lại vị trí đó là được khi mọi người bấm ẩn mình đã cố định ở chỗ mọi người để nút nổi rồi nha",
+        "lưu ý: ẩn giao diện sẽ không ẩn được UI của game nha chỉ ẩn được của roblox thôi muốn ẩn UI của game một là mọi người bật freecam của game và bấm nút con mắt sẽ ẩn hết nhưng mà vẫn còn dấu x nha và cũng k có ích lợi gì :v",
+        "gợi ý: mọi người nên dùng quay video hoặc chụp ảnh của roblox không cần chụp bằng điện thoại mọi người bấm vô dấu 3 gạch tìm mục chụp ảnh có hình camera sau đó sẽ hiện một cái nút  nổi có thể di chuyển của roblox bấm ở trên là quay video và ở dưới là chụp ảnh và khi dùng cái đó thì không có thứ gì gây cản trở trên màn hình nữa nha nó chỉ quay trong game không vướng víu UI hay script gì đâu nha mọi người có thể thoải mái dùng freecam của mình để quay video không cần ẩn giao diện nha và khi quay hoặc chụp xong mọi người bấm vào roblox trên góc trái màn hình tìm chỗ thư viện ảnh và video của mọi người sẽ ở đó và chỉ việc lưu về nha!",
+        "Script By Khang Lê",
+        "Id Tiktok: @khangdayy215",
+        "Cảm ơn đã tin tưởng và sử dụng script của mình!.",
+    }
     GuideFrame = Instance.new("Frame")
     GuideFrame.Size = UDim2.new(0, 540, 0, 350)
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
@@ -714,37 +837,13 @@ do
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
     ScrollGuide.BackgroundTransparency = 1
     ScrollGuide.BorderSizePixel = 0
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1300)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1500)
     ScrollGuide.ScrollBarThickness = 4
     ScrollGuide.Parent = GuideFrame
     local GuideContent = Instance.new("TextLabel")
-    GuideContent.Size = UDim2.new(1, -10, 0, 1300)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1500)
     GuideContent.BackgroundTransparency = 1
-    GuideContent.Text = [[Hướng dẫn xài - đọc kĩ trước khi sử dụng:
-mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:
-mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )
-rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy
-tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha
-ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )
-final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha )
-Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha
-Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.
-Lưu Ý Về Xe: sẽ có vài xe không áp dụng được top speed chỉ có thể tăng mã lực giúp xe đề pa sẽ mạnh hơn tăng tầm 7 - 12 km/h tùy vào xe còn top speed sẽ không hoạt động nha vì admin lock thông số xe đó nên script sẽ không can thiệp để thay đổi top speed được nhưng bù lại mọi người có thể chỉnh mã lực đề pa xoáy bánh và chỉnh rpm vẫn được nha nhưng đừng chỉnh ratio gear và final drive dễ gây xung đột và lỗi, rpm mình set mặc định là 3500 mọi người thấy chạy max speed mà nó vẫn còn dư cả khúc rpm ở thanh dưới thì mọi người giảm rpm xuống đến khi nào xe nó đờn tằng tằng nha nhưng nếu mọi người thấy xe nó tự chạy bấm dừng không được thì tăng rpm lên một chút tầm 50 - 100 gì đó để nó dư một khoản nhỏ xong lại giảm nhẹ lại 10 - 20 căn đến khi nào nó đờn tua nha để tránh lỗi tiếng pô và chạy cũng sướng hơn nữa
-Auto T: tự động bốc đầu cho ai muốn múa lửa
-cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê
-lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại
-Tháo Dàn Áo: tháo mọi thứ của xe bánh xe áo xe cục máy bla bla..vv
-cách dùng: bật menu lên và bật quản lý dàn áo sau đó spawn xe muốn tháo và ngồi lên xe bấm quét xe để quét xe sau đó xuống xe bật free cam và click vào chỗ muốn tháo lưu ý bộ phận của xe được gọi là part và part có nhiều cụm tùy xe admin sẽ chia nhỏ từng cụm ra rất dễ tháo còn xe gộp một đống part vào một cụm nếu mọi người bấm vào một chỗ muốn xoá mà thấy cụm đó có tới 100 hoặc hơn 200 part có nghĩa là nó k chia nhỏ cụm ra và gộp thành 1 cụm to mọi người chịu khó bấm tới chỗ mình muốn xoá ví dụ phuộc bla bla có thể tháo luôn cục máy để chụp ảnh sau khi tháo mọi người vẫn chạy bình thường nha nhưng chịu khó xíu sau khi tháo xong hết thì mọi người tắt soi và tháo đi nha là ok
-lưu ý: vì xe admin không làm remote event nên khi xoá chỉ mọi người thấy được còn người khác thì không nha ai thích chụp ảnh thì dùng để tháo ra xem chi tiết rồi chụp cho đẹp nha
-cách tìm part muốn xoá: khi mọi người click sẽ hiện selection box có màu và tên cụm và part nếu xe được gộp nhiều cụm lại thì rất dễ tháo nó chia nhỏ ra từng part cho mỗi cụm có tên riêng mọi người muốn xoá dàn áo thì cứ di cam lại gần dàn áo rồi bấm vô xong bấm xoá cả mục là xoá hết dàn áo ngoài luôn nếu còn hình mờ hoặc tem có nghĩa xe đó có một cụm to nữa mọi người phải bấm tìm cụm to đó rồi dò từng part để xoá , sẽ có cụm trước và cụm sau là không có gộp chung đâu nha cứ click lên cụm trước hay sau rồi tìm chỗ muốn xoá ví dụ ốp đầu hay ghi đông là ở cụm trước còn cụm giữa là cái khung và mấy part nhỏ nhỏ như ốc máy bla bla nói chung muốn xoá gì thì ngồi mò chút xíu nha là hiểu !
-gợi ý: những mảnh dàn áo hay màu sơn và tem admin thường đặt tên part là (livery , paint) còn những xe khác có thể sẽ là những tên khác nhưng có selection box nên mọi người cứ đổi part đến khi nào thấy chỗ mình muốn xoá rồi xoá là được nha
-Freecam: freecam này do mình làm và mọi người có thể dùng để quay phim chụp ảnh có thể tùy chỉnh tốc độ xoay camera , di chuyển , zoom , up down như pc luôn nha
-cách dùng: mở menu chính lên và mở freecam sau đó mọi người tùy chỉnh tốc độ xoay camera và di chuyển freecam và trong menu có nút ẩn giao diện khi bật lên sẽ hiện nút nổi khi bấm vào sẽ ẩn toàn bộ cụm điều khiển nút nhảy nhưng vẫn bấm và di chuyển được bằng cụm điều khiển nha chỉ ẩn đi thôi chứ không mất và khi ẩn sẽ ẩn luôn nút nổi mọi người chỉ cần nhớ chỗ để nút nổi và ấn lại vị trí đó là được khi mọi người bấm ẩn mình đã cố định ở chỗ mọi người để nút nổi rồi nha
-lưu ý: ẩn giao diện sẽ không ẩn được UI của game nha chỉ ẩn được của roblox thôi muốn ẩn UI của game một là mọi người bật freecam của game và bấm nút con mắt sẽ ẩn hết nhưng mà vẫn còn dấu x nha và cũng k có ích lợi gì :v
-gợi ý: mọi người nên dùng quay video hoặc chụp ảnh của roblox không cần chụp bằng điện thoại mọi người bấm vô dấu 3 gạch tìm mục chụp ảnh có hình camera sau đó sẽ hiện một cái nút  nổi có thể di chuyển của roblox bấm ở trên là quay video và ở dưới là chụp ảnh và khi dùng cái đó thì không có thứ gì gây cản trở trên màn hình nữa nha nó chỉ quay trong game không vướng víu UI hay script gì đâu nha mọi người có thể thoải mái dùng freecam của mình để quay video không cần ẩn giao diện nha và khi quay hoặc chụp xong mọi người bấm vào roblox trên góc trái màn hình tìm chỗ thư viện ảnh và video của mọi người sẽ ở đó và chỉ việc lưu về nha!
-Script By Khang Lê
-Id Tiktok: @khangdayy215
-Cảm ơn đã tin tưởng và sử dụng script của mình!.]]
+    GuideContent.Text = table.concat(guideLines, "\n")
     GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
     GuideContent.TextSize = 12
     GuideContent.Font = Enum.Font.GothamMedium
@@ -794,10 +893,10 @@ do
         showBodyManagerFloat = not showBodyManagerFloat
         BodyManagerFloatingBtn.Visible = showBodyManagerFloat
         if showBodyManagerFloat then
-            ToggleBodyFloatMenuBtn.Text = "🚗 NÚT NỔI DÀN ÁO: ĐANG BẬT"
+            ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: BẬT"
             ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
         else
-            ToggleBodyFloatMenuBtn.Text = "🚗 NÚT NỔI DÀN ÁO: ĐANG TẮT"
+            ToggleBodyFloatMenuBtn.Text = "NÚT NỔI: TẮT"
             ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         end
     end)
@@ -1411,10 +1510,10 @@ do
         showFreecamFloat = not showFreecamFloat
         FreecamFloatingBtn.Visible = showFreecamFloat
         if showFreecamFloat then
-            ToggleFreecamMenuBtn.Text = "📷 FREECAM CINEMATIC: ĐANG BẬT"
+            ToggleFreecamMenuBtn.Text = "NÚT NỔI: BẬT"
             ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
         else
-            ToggleFreecamMenuBtn.Text = "📷 FREECAM CINEMATIC: ĐANG TẮT"
+            ToggleFreecamMenuBtn.Text = "NÚT NỔI: TẮT"
             ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
             freecamMenuFrame.Visible = false
         end
@@ -2189,11 +2288,18 @@ do
     local function stopOffice()
         farmOffice = false
         of_killBV()
+        if activeMode == "office" then
+            activeMode = nil
+            statPanel.Visible = false
+        end
+        refreshStatPanel()
         setStatus("tạm nghỉ")
     end
     farmSwitch.track.MouseButton1Click:Connect(function()
         if farmSwitch.isOn() then
             farmOffice = true
+            activeMode = "office"
+            farmStart = os.clock()
             if not of_jobFired then
                 TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
                 of_jobFired = true
@@ -2201,6 +2307,7 @@ do
             end
             local char = player.Character
             of_enableSit(char)
+            statPanel.Visible = true
             refreshStatPanel()
             setStatus("khởi động office")
         else
@@ -2210,7 +2317,7 @@ do
 end
 
 -- ============================================================
--- NOI DAY MENU CHINH + LED RGB
+-- NOI DAY MENU CHINH + LED RGB NUT NOI
 -- ============================================================
 ToggleBtn.MouseButton1Click:Connect(function()
     HubFrame.Visible = not HubFrame.Visible
@@ -2243,4 +2350,4 @@ task.spawn(function()
     end
 end)
 
-print("[hub remix v2] san sang — het loi tran local registers")
+print("[hub remix v3] san sang — menu het trong, het go vuong, muc CHUNG cuon duoc")
