@@ -771,7 +771,7 @@ SelectionBoxObj.Color3 = Color3.fromRGB(0, 230, 180)
 SelectionBoxObj.LineThickness = 0.05
 SelectionBoxObj.Adornee = nil
 pcall(function() SelectionBoxObj.Parent = CoreGui end)
-if SelectionBoxObj.Parent \~= CoreGui then SelectionBoxObj.Parent = ScreenGui end
+if SelectionBoxObj.Parent ~= CoreGui then SelectionBoxObj.Parent = ScreenGui end
 
 ScanBtn.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
