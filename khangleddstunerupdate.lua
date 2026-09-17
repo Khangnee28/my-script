@@ -1,4 +1,4 @@
--- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Fixed Executor Calls)
+-- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Delta Fixed)
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,7 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- Tăng chất lượng đồ họa & Cinematic Lighting cho Freecam
 pcall(function()
 	Lighting.GlobalShadows = true
 	Lighting.Brightness = 2
@@ -39,7 +38,6 @@ ScreenGui.Name = "KhangLeCustomTuner"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parent
 
--- Hàm kéo thả độc lập chỉ dành riêng cho thanh tiêu đề
 local function makeHeaderDraggable(header, frame)
 	header.Active = true
 	local dragging = false
@@ -72,7 +70,6 @@ local function makeHeaderDraggable(header, frame)
 	end)
 end
 
--- RGB Animation for Floating Buttons
 local rgbStrokes = {}
 task.spawn(function()
 	local t = 0
@@ -103,36 +100,25 @@ local function createFloatingButton(icon, yPos, strokeColorBase)
 	btn.Draggable = true
 	btn.ZIndex = 10
 	btn.Parent = ScreenGui
-	
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = btn
-	
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = strokeColorBase
 	stroke.Thickness = 2.5
 	stroke.Parent = btn
 	table.insert(rgbStrokes, stroke)
-	
 	return btn
 end
 
--- 1. Nút mở menu chính (👑) - Hình vuông có icon
 local ToggleBtn = createFloatingButton("", 0.4, Color3.fromRGB(255, 215, 0))
-
--- 2. Nút nổi Auto T
 local AutoTFloatingBtn = createFloatingButton("🕹️", 0.53, Color3.fromRGB(255, 100, 0))
 AutoTFloatingBtn.Visible = false
-
--- 3. Nút nổi Quản Lý Dàn Áo
-local BodyManagerFloatingBtn = createFloatingButton("🚗", 0.66, Color3.fromRGB(0, 230, 180))
+local BodyManagerFloatingBtn = createFloatingButton("", 0.66, Color3.fromRGB(0, 230, 180))
 BodyManagerFloatingBtn.Visible = false
-
--- 4. Nút nổi Freecam
-local FreecamFloatingBtn = createFloatingButton("📷", 0.79, Color3.fromRGB(100, 150, 255))
+local FreecamFloatingBtn = createFloatingButton("", 0.79, Color3.fromRGB(100, 150, 255))
 FreecamFloatingBtn.Visible = false
 
--- BẢNG HƯỚNG DẪN SỬ DỤNG
 local GuideFrame = Instance.new("Frame")
 GuideFrame.Size = UDim2.new(0, 540, 0, 350)
 GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
@@ -143,16 +129,13 @@ GuideFrame.Draggable = false
 GuideFrame.Visible = true
 GuideFrame.ZIndex = 20
 GuideFrame.Parent = ScreenGui
-
 local cornerGuide = Instance.new("UICorner")
 cornerGuide.CornerRadius = UDim.new(0, 12)
 cornerGuide.Parent = GuideFrame
-
 local strokeGuide = Instance.new("UIStroke")
 strokeGuide.Color = Color3.fromRGB(255, 215, 0)
 strokeGuide.Thickness = 1.8
 strokeGuide.Parent = GuideFrame
-
 local GuideTitle = Instance.new("TextLabel")
 GuideTitle.Size = UDim2.new(1, 0, 0, 42)
 GuideTitle.BackgroundTransparency = 1
@@ -162,7 +145,6 @@ GuideTitle.TextSize = 12
 GuideTitle.Font = Enum.Font.GothamBold
 GuideTitle.Parent = GuideFrame
 makeHeaderDraggable(GuideTitle, GuideFrame)
-
 local ScrollGuide = Instance.new("ScrollingFrame")
 ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
 ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
@@ -171,7 +153,6 @@ ScrollGuide.BorderSizePixel = 0
 ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1300)
 ScrollGuide.ScrollBarThickness = 4
 ScrollGuide.Parent = GuideFrame
-
 local GuideContent = Instance.new("TextLabel")
 GuideContent.Size = UDim2.new(1, -10, 0, 1300)
 GuideContent.BackgroundTransparency = 1
@@ -207,7 +188,6 @@ GuideContent.TextXAlignment = Enum.TextXAlignment.Left
 GuideContent.TextYAlignment = Enum.TextYAlignment.Top
 GuideContent.TextWrapped = true
 GuideContent.Parent = ScrollGuide
-
 local CloseGuideBtn = Instance.new("TextButton")
 CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
 CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
@@ -221,7 +201,6 @@ local cornerCloseGuide = Instance.new("UICorner")
 cornerCloseGuide.CornerRadius = UDim.new(0, 8)
 cornerCloseGuide.Parent = CloseGuideBtn
 
--- KHUNG MENU CHÍNH (SIDEBAR LAYOUT)
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 400, 0, 320)
 MainFrame.Position = UDim2.new(0.5, -200, 0.5, -160)
@@ -232,28 +211,22 @@ MainFrame.Draggable = false
 MainFrame.Visible = false
 MainFrame.ZIndex = 15
 MainFrame.Parent = ScreenGui
-
 local corner2 = Instance.new("UICorner")
 corner2.CornerRadius = UDim.new(0, 12)
 corner2.Parent = MainFrame
-
 local stroke2 = Instance.new("UIStroke")
 stroke2.Color = Color3.fromRGB(50, 50, 60)
 stroke2.Thickness = 1.5
 stroke2.Parent = MainFrame
-
--- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 100, 1, 0)
 Sidebar.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
 Sidebar.BorderSizePixel = 0
 Sidebar.ZIndex = 16
 Sidebar.Parent = MainFrame
-
 local sideCorner = Instance.new("UICorner")
 sideCorner.CornerRadius = UDim.new(0, 12)
 sideCorner.Parent = Sidebar
-
 local sideClip = Instance.new("Frame")
 sideClip.Size = UDim2.new(0, 12, 1, 0)
 sideClip.Position = UDim2.new(1, -12, 0, 0)
@@ -261,8 +234,6 @@ sideClip.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
 sideClip.BorderSizePixel = 0
 sideClip.ZIndex = 17
 sideClip.Parent = Sidebar
-
--- Content Area
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -100, 1, 0)
 ContentArea.Position = UDim2.new(0, 100, 0, 0)
@@ -271,23 +242,18 @@ ContentArea.BorderSizePixel = 0
 ContentArea.ClipsDescendants = true
 ContentArea.ZIndex = 16
 ContentArea.Parent = MainFrame
-
 local contentCorner = Instance.new("UICorner")
 contentCorner.CornerRadius = UDim.new(0, 12)
 contentCorner.Parent = ContentArea
-
--- Title Bar
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 TitleBar.BorderSizePixel = 0
 TitleBar.ZIndex = 18
 TitleBar.Parent = MainFrame
-
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = TitleBar
-
 local titleClip = Instance.new("Frame")
 titleClip.Size = UDim2.new(1, 0, 0, 12)
 titleClip.Position = UDim2.new(0, 0, 1, -12)
@@ -295,7 +261,6 @@ titleClip.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 titleClip.BorderSizePixel = 0
 titleClip.ZIndex = 19
 titleClip.Parent = TitleBar
-
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 0, 40)
 Title.BackgroundTransparency = 1
@@ -307,7 +272,6 @@ Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 20
 Title.Parent = TitleBar
 makeHeaderDraggable(Title, MainFrame)
-
 local CloseMenuBtn = Instance.new("TextButton")
 CloseMenuBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseMenuBtn.Position = UDim2.new(1, -35, 0, 5)
@@ -321,20 +285,16 @@ CloseMenuBtn.Parent = TitleBar
 CloseMenuBtn.MouseButton1Click:Connect(function()
 	MainFrame.Visible = false
 end)
-
 CloseGuideBtn.MouseButton1Click:Connect(function()
 	GuideFrame.Visible = false
 	MainFrame.Visible = true
 end)
-
 ToggleBtn.MouseButton1Click:Connect(function()
 	MainFrame.Visible = not MainFrame.Visible
 end)
 
--- Tab System (Fixed Logic)
 local pages = {}
 local tabBtns = {}
-
 local function createPage(name)
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.new(1, 0, 1, -50)
@@ -346,7 +306,6 @@ local function createPage(name)
 	pages[name] = frame
 	return frame
 end
-
 local function createTabBtn(text, yPos, pageName, activeColor)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(1, -10, 0, 36)
@@ -358,18 +317,14 @@ local function createTabBtn(text, yPos, pageName, activeColor)
 	btn.Font = Enum.Font.GothamBold
 	btn.ZIndex = 20
 	btn.Parent = Sidebar
-	
 	local btnCorner = Instance.new("UICorner")
 	btnCorner.CornerRadius = UDim.new(0, 6)
 	btnCorner.Parent = btn
-	
 	local btnStroke = Instance.new("UIStroke")
 	btnStroke.Color = Color3.fromRGB(40, 40, 50)
 	btnStroke.Thickness = 1
 	btnStroke.Parent = btn
-	
 	tabBtns[pageName] = {btn = btn, stroke = btnStroke, color = activeColor}
-	
 	btn.MouseButton1Click:Connect(function()
 		for pName, frame in pairs(pages) do
 			frame.Visible = (pName == pageName)
@@ -387,16 +342,13 @@ local function createTabBtn(text, yPos, pageName, activeColor)
 		end
 	end)
 end
-
 createTabBtn("Tuner", 10, "tuner", Color3.fromRGB(255, 215, 0))
 createTabBtn("Dàn Áo", 52, "body", Color3.fromRGB(0, 230, 180))
 createTabBtn("Freecam", 94, "freecam", Color3.fromRGB(100, 150, 255))
 createTabBtn("Auto Farm", 136, "farm", Color3.fromRGB(45, 100, 160))
 
--- ================= TUNER TAB =================
 local tunerTab = createPage("tuner")
 tunerTab.Visible = true
-
 local function createInput(name, defaultVal, posY, parentFrame)
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 0, 14)
@@ -409,7 +361,6 @@ local function createInput(name, defaultVal, posY, parentFrame)
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.ZIndex = 17
 	lbl.Parent = parentFrame
-	
 	local box = Instance.new("TextBox")
 	box.Size = UDim2.new(1, 0, 0, 28)
 	box.Position = UDim2.new(0, 0, 0, posY + 16)
@@ -421,24 +372,19 @@ local function createInput(name, defaultVal, posY, parentFrame)
 	box.BorderSizePixel = 0
 	box.ZIndex = 17
 	box.Parent = parentFrame
-	
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = box
-	
 	local stroke = Instance.new("UIStroke")
 	stroke.Color = Color3.fromRGB(50, 50, 65)
 	stroke.Thickness = 1
 	stroke.Parent = box
-	
 	return box
 end
-
-local hpBox = createInput("💪 Hệ số Mã lực (Mặc định: 5.0)", "5.0", 10, tunerTab)
-local rpmBox = createInput("🔥 Cộng thêm Tua máy - RPM (Mặc định: 3500)", "3500", 60, tunerTab)
+local hpBox = createInput(" Hệ số Mã lực (Mặc định: 5.0)", "5.0", 10, tunerTab)
+local rpmBox = createInput(" Cộng thêm Tua máy - RPM (Mặc định: 3500)", "3500", 60, tunerTab)
 local gearRatioBox = createInput("⚙️ Tỷ số truyền số - Ratio Gear (Mặc định: 0.9)", "0.9", 110, tunerTab)
 local finalDriveBox = createInput("⛓️ Tỷ số truyền cuối - Final Drive (Mặc định: 0.9)", "0.9", 160, tunerTab)
-
 local Status = Instance.new("TextLabel")
 Status.Size = UDim2.new(1, 0, 0, 20)
 Status.Position = UDim2.new(0, 0, 0, 210)
@@ -450,7 +396,6 @@ Status.Font = Enum.Font.GothamBold
 Status.TextXAlignment = Enum.TextXAlignment.Center
 Status.ZIndex = 17
 Status.Parent = tunerTab
-
 local InjectBtn = Instance.new("TextButton")
 InjectBtn.Size = UDim2.new(1, 0, 0, 32)
 InjectBtn.Position = UDim2.new(0, 0, 0, 235)
@@ -464,8 +409,6 @@ InjectBtn.Parent = tunerTab
 local corner4 = Instance.new("UICorner")
 corner4.CornerRadius = UDim.new(0, 7)
 corner4.Parent = InjectBtn
-
--- Floating button toggles in Tuner Tab
 local showAutoTFloat = false
 local ToggleFloatMenuBtn = Instance.new("TextButton")
 ToggleFloatMenuBtn.Size = UDim2.new(1, 0, 0, 28)
@@ -480,7 +423,6 @@ ToggleFloatMenuBtn.Parent = tunerTab
 local cornerFloatMenu = Instance.new("UICorner")
 cornerFloatMenu.CornerRadius = UDim.new(0, 7)
 cornerFloatMenu.Parent = ToggleFloatMenuBtn
-
 local showBodyManagerFloat = false
 local ToggleBodyFloatMenuBtn = Instance.new("TextButton")
 ToggleBodyFloatMenuBtn.Size = UDim2.new(1, 0, 0, 28)
@@ -495,14 +437,13 @@ ToggleBodyFloatMenuBtn.Parent = tunerTab
 local cornerBodyFloatMenu = Instance.new("UICorner")
 cornerBodyFloatMenu.CornerRadius = UDim.new(0, 7)
 cornerBodyFloatMenu.Parent = ToggleBodyFloatMenuBtn
-
 local showFreecamFloat = false
 local ToggleFreecamMenuBtn = Instance.new("TextButton")
 ToggleFreecamMenuBtn.Size = UDim2.new(1, 0, 0, 28)
 ToggleFreecamMenuBtn.Position = UDim2.new(0, 0, 0, 345)
 ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ToggleFreecamMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleFreecamMenuBtn.Text = "📷 Freecam Cinematic: TẮT"
+ToggleFreecamMenuBtn.Text = " Freecam Cinematic: TẮT"
 ToggleFreecamMenuBtn.TextSize = 11
 ToggleFreecamMenuBtn.Font = Enum.Font.GothamBold
 ToggleFreecamMenuBtn.ZIndex = 17
@@ -511,7 +452,6 @@ local cornerFreecamFloatMenu = Instance.new("UICorner")
 cornerFreecamFloatMenu.CornerRadius = UDim.new(0, 7)
 cornerFreecamFloatMenu.Parent = ToggleFreecamMenuBtn
 
--- ================= BODY TAB =================
 local bodyTab = createPage("body")
 local bodyInfo = Instance.new("TextLabel")
 bodyInfo.Size = UDim2.new(1, 0, 0, 100)
@@ -526,7 +466,6 @@ bodyInfo.TextXAlignment = Enum.TextXAlignment.Left
 bodyInfo.ZIndex = 17
 bodyInfo.Parent = bodyTab
 
--- ================= FREECAM TAB =================
 local freecamTab = createPage("freecam")
 local freecamInfo = Instance.new("TextLabel")
 freecamInfo.Size = UDim2.new(1, 0, 0, 100)
@@ -541,9 +480,7 @@ freecamInfo.TextXAlignment = Enum.TextXAlignment.Left
 freecamInfo.ZIndex = 17
 freecamInfo.Parent = freecamTab
 
--- ================= AUTO FARM TAB (OFFICE ONLY) =================
 local farmTab = createPage("farm")
-
 local farmStatus = Instance.new("TextLabel")
 farmStatus.Size = UDim2.new(1, 0, 0, 20)
 farmStatus.Position = UDim2.new(0, 0, 0, 10)
@@ -555,7 +492,6 @@ farmStatus.Font = Enum.Font.GothamBold
 farmStatus.TextXAlignment = Enum.TextXAlignment.Center
 farmStatus.ZIndex = 17
 farmStatus.Parent = farmTab
-
 local farmStats = Instance.new("TextLabel")
 farmStats.Size = UDim2.new(1, 0, 0, 40)
 farmStats.Position = UDim2.new(0, 0, 0, 35)
@@ -568,7 +504,6 @@ farmStats.TextWrapped = true
 farmStats.TextXAlignment = Enum.TextXAlignment.Center
 farmStats.ZIndex = 17
 farmStats.Parent = farmTab
-
 local ToggleFarmBtn = Instance.new("TextButton")
 ToggleFarmBtn.Size = UDim2.new(1, 0, 0, 36)
 ToggleFarmBtn.Position = UDim2.new(0, 0, 0, 85)
@@ -584,17 +519,17 @@ farmBtnCorner.CornerRadius = UDim.new(0, 8)
 farmBtnCorner.Parent = ToggleFarmBtn
 
 -- ==========================================
--- LOGIC: TUNER & FLOATING BUTTONS (ORIGINAL)
+-- LOGIC: TUNER & FLOATING BUTTONS
 -- ==========================================
 local autoTActive = false
 ToggleFloatMenuBtn.MouseButton1Click:Connect(function()
 	showAutoTFloat = not showAutoTFloat
 	AutoTFloatingBtn.Visible = showAutoTFloat
 	if showAutoTFloat then
-		ToggleFloatMenuBtn.Text = "️ Nút nổi Auto T: BẬT"
+		ToggleFloatMenuBtn.Text = "🕹️ Nút nổi Auto T: BẬT"
 		ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
 	else
-		ToggleFloatMenuBtn.Text = "🕹️ Nút nổi Auto T: TẮT"
+		ToggleFloatMenuBtn.Text = "️ Nút nổi Auto T: TẮT"
 		ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 		autoTActive = false
 		AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -603,7 +538,6 @@ ToggleFloatMenuBtn.MouseButton1Click:Connect(function()
 		end)
 	end
 end)
-
 ToggleBodyFloatMenuBtn.MouseButton1Click:Connect(function()
 	showBodyManagerFloat = not showBodyManagerFloat
 	BodyManagerFloatingBtn.Visible = showBodyManagerFloat
@@ -611,11 +545,10 @@ ToggleBodyFloatMenuBtn.MouseButton1Click:Connect(function()
 		ToggleBodyFloatMenuBtn.Text = "🚗 Nút nổi Dàn Áo: BẬT"
 		ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
 	else
-		ToggleBodyFloatMenuBtn.Text = "🚗 Nút nổi Dàn Áo: TẮT"
+		ToggleBodyFloatMenuBtn.Text = " Nút nổi Dàn Áo: TẮT"
 		ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 	end
 end)
-
 AutoTFloatingBtn.MouseButton1Click:Connect(function()
 	autoTActive = not autoTActive
 	if autoTActive then
@@ -630,7 +563,6 @@ AutoTFloatingBtn.MouseButton1Click:Connect(function()
 		end)
 	end
 end)
-
 RunService.Heartbeat:Connect(function()
 	local c = LocalPlayer.Character
 	local h = c and c:FindFirstChildOfClass("Humanoid")
@@ -650,7 +582,6 @@ RunService.Heartbeat:Connect(function()
 		end
 	end
 end)
-
 local statusThread = nil
 InjectBtn.MouseButton1Click:Connect(function()
 	local char = LocalPlayer.Character
@@ -685,28 +616,16 @@ InjectBtn.MouseButton1Click:Connect(function()
 						for k, v in pairs(obj) do
 							if type(k) == "string" then
 								if k == "Horsepower" or k == "Torque" or k == "MaxPower" then
-									if type(v) == "number" then
-										obj[k] = v * hpMult
-										count = count + 1
-									end
+									if type(v) == "number" then obj[k] = v * hpMult; count = count + 1 end
 								elseif k == "Redline" or k == "MaxRPM" or k == "RPM" then
-									if type(v) == "number" then
-										obj[k] = v + rpmAdd
-										count = count + 1
-									end
+									if type(v) == "number" then obj[k] = v + rpmAdd; count = count + 1 end
 								elseif k == "GearRatio" or k == "FinalDrive" then
 									local mult = (k == "FinalDrive") and finalMult or gearMult
-									if type(v) == "number" and v > 0 then
-										obj[k] = v * mult
-										count = count + 1
-									end
+									if type(v) == "number" and v > 0 then obj[k] = v * mult; count = count + 1 end
 								elseif k == "GearRatios" or k == "Gears" then
 									if type(v) == "table" then
 										for i, gVal in pairs(v) do
-											if type(gVal) == "number" then
-												v[i] = gVal * gearMult
-												count = count + 1
-											end
+											if type(gVal) == "number" then v[i] = gVal * gearMult; count = count + 1 end
 										end
 									end
 								end
@@ -723,18 +642,10 @@ InjectBtn.MouseButton1Click:Connect(function()
 			if obj:IsA("NumberValue") or obj:IsA("IntValue") then
 				pcall(function()
 					local name = obj.Name:lower()
-					if name:find("horsepower") or name:find("power") then
-						obj.Value = obj.Value * hpMult
-						count = count + 1
-					elseif name:find("rpm") or name:find("redline") then
-						obj.Value = obj.Value + rpmAdd
-						count = count + 1
-					elseif name:find("gear") or name:find("ratio") then
-						obj.Value = obj.Value * gearMult
-						count = count + 1
-					elseif name:find("drive") then
-						obj.Value = obj.Value * finalMult
-						count = count + 1
+					if name:find("horsepower") or name:find("power") then obj.Value = obj.Value * hpMult; count = count + 1
+					elseif name:find("rpm") or name:find("redline") then obj.Value = obj.Value + rpmAdd; count = count + 1
+					elseif name:find("gear") or name:find("ratio") then obj.Value = obj.Value * gearMult; count = count + 1
+					elseif name:find("drive") then obj.Value = obj.Value * finalMult; count = count + 1
 					end
 				end)
 			end
@@ -751,7 +662,7 @@ InjectBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- LOGIC: BODY MANAGER (ORIGINAL)
+-- LOGIC: BODY MANAGER
 -- ==========================================
 local currentVehicle = nil
 local selectedPart = nil
@@ -765,7 +676,6 @@ local originalDecalTransparencies = {}
 local modelPartsList = {}
 local currentIndex = 1
 local lastSelectedPart = nil
-
 local ControlPanel = Instance.new("Frame")
 ControlPanel.Name = "ControlPanel"
 ControlPanel.Parent = ScreenGui
@@ -783,7 +693,6 @@ local ControlStroke = Instance.new("UIStroke")
 ControlStroke.Color = Color3.fromRGB(0, 230, 180)
 ControlStroke.Thickness = 1.5
 ControlStroke.Parent = ControlPanel
-
 local ControlTitle = Instance.new("TextLabel")
 ControlTitle.Parent = ControlPanel
 ControlTitle.BackgroundTransparency = 1
@@ -796,7 +705,6 @@ ControlTitle.TextSize = 12
 ControlTitle.TextXAlignment = Enum.TextXAlignment.Left
 ControlTitle.ZIndex = 16
 makeHeaderDraggable(ControlTitle, ControlPanel)
-
 local ToggleModeBtn = Instance.new("TextButton")
 ToggleModeBtn.Parent = ControlPanel
 ToggleModeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
@@ -810,7 +718,6 @@ ToggleModeBtn.ZIndex = 16
 local ModeCorner = Instance.new("UICorner")
 ModeCorner.CornerRadius = UDim.new(0, 8)
 ModeCorner.Parent = ToggleModeBtn
-
 local StatusText = Instance.new("TextLabel")
 StatusText.Parent = ControlPanel
 StatusText.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
@@ -826,7 +733,6 @@ StatusText.ZIndex = 16
 local StatusCorner = Instance.new("UICorner")
 StatusCorner.CornerRadius = UDim.new(0, 6)
 StatusCorner.Parent = StatusText
-
 local function createActionButton(name, posY, posX, sizeX, color)
 	local btn = Instance.new("TextButton")
 	btn.Parent = ControlPanel
@@ -844,7 +750,6 @@ local function createActionButton(name, posY, posX, sizeX, color)
 	corner.Parent = btn
 	return btn
 end
-
 local HidePartBtn = createActionButton("Tháo Part Này", 140, 15, 120, Color3.fromRGB(50, 50, 65))
 local HideCompBtn = createActionButton("Tháo Cả Cụm", 140, 145, 120, Color3.fromRGB(50, 50, 65))
 local PrevPartBtn  = createActionButton("◀ Mảnh Trước", 176, 15, 120, Color3.fromRGB(40, 90, 110))
@@ -863,8 +768,7 @@ ScanBtn.ZIndex = 16
 local ScanCorner = Instance.new("UICorner")
 ScanCorner.CornerRadius = UDim.new(0, 6)
 ScanCorner.Parent = ScanBtn
-local RestoreBtn   = createActionButton("Khôi Phục Toàn Bộ", 248, 15, 250, Color3.fromRGB(160, 40, 40))
-
+local RestoreBtn = createActionButton("Khôi Phục Toàn Bộ", 248, 15, 250, Color3.fromRGB(160, 40, 40))
 BodyManagerFloatingBtn.MouseButton1Click:Connect(function()
 	ControlPanel.Visible = not ControlPanel.Visible
 	if ControlPanel.Visible then
@@ -873,7 +777,6 @@ BodyManagerFloatingBtn.MouseButton1Click:Connect(function()
 		BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 	end
 end)
-
 local CloseControlBtn = Instance.new("TextButton")
 CloseControlBtn.Size = UDim2.new(0, 24, 0, 24)
 CloseControlBtn.Position = UDim2.new(1, -28, 0, 6)
@@ -888,33 +791,21 @@ CloseControlBtn.MouseButton1Click:Connect(function()
 	ControlPanel.Visible = false
 	BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 end)
-
 local SelectionBoxObj = Instance.new("SelectionBox")
 SelectionBoxObj.Color3 = Color3.fromRGB(0, 230, 180)
 SelectionBoxObj.LineThickness = 0.05
 SelectionBoxObj.Adornee = nil
-pcall(function()
-	SelectionBoxObj.Parent = CoreGui
-end)
-if SelectionBoxObj.Parent ~= CoreGui then
-	SelectionBoxObj.Parent = ScreenGui
-end
-
+pcall(function() SelectionBoxObj.Parent = CoreGui end)
+if SelectionBoxObj.Parent ~= CoreGui then SelectionBoxObj.Parent = ScreenGui end
 ScanBtn.MouseButton1Click:Connect(function()
 	local char = LocalPlayer.Character
 	if not char or not char:FindFirstChild("Humanoid") then
-		ScanBtn.Text = "Không tìm thấy nhân vật!"
-		task.wait(1.5)
-		ScanBtn.Text = "Quét Lại Xe"
-		return
+		ScanBtn.Text = "Không tìm thấy nhân vật!"; task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"; return
 	end
 	local humanoid = char.Humanoid
 	local seatPart = humanoid.SeatPart
 	if not seatPart then
-		ScanBtn.Text = "Hãy ngồi lên xe!"
-		task.wait(1.5)
-		ScanBtn.Text = "Quét Lại Xe"
-		return
+		ScanBtn.Text = "Hãy ngồi lên xe!"; task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"; return
 	end
 	local model = seatPart.Parent
 	while model and model ~= workspace and not model:FindFirstChildOfClass("Humanoid") do
@@ -923,16 +814,11 @@ ScanBtn.MouseButton1Click:Connect(function()
 	end
 	if model then
 		currentVehicle = model
-		ScanBtn.Text = "Quét Thành Công!"
-		task.wait(1.5)
-		ScanBtn.Text = "Quét Lại Xe"
+		ScanBtn.Text = "Quét Thành Công!"; task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"
 	else
-		ScanBtn.Text = "Không nhận diện!"
-		task.wait(1.5)
-		ScanBtn.Text = "Quét Lại Xe"
+		ScanBtn.Text = "Không nhận diện!"; task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"
 	end
 end)
-
 local function restorePartAppearance()
 	if lastSelectedPart and originalTransparencies[lastSelectedPart] then
 		lastSelectedPart.Transparency = originalTransparencies[lastSelectedPart]
@@ -943,20 +829,14 @@ local function restorePartAppearance()
 		originalMaterials[lastSelectedPart] = nil
 	end
 	for decal, trans in pairs(originalDecalTransparencies) do
-		if decal and decal.Parent then
-			decal.Transparency = trans
-		end
+		if decal and decal.Parent then decal.Transparency = trans end
 	end
 	originalDecalTransparencies = {}
 	SelectionBoxObj.Adornee = nil
 end
-
 ToggleModeBtn.MouseButton1Click:Connect(function()
 	if not currentVehicle then
-		ToggleModeBtn.Text = "Hãy Quét Xe Trước!"
-		task.wait(1.5)
-		ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"
-		return
+		ToggleModeBtn.Text = "Hãy Quét Xe Trước!"; task.wait(1.5); ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"; return
 	end
 	modeActive = not modeActive
 	if modeActive then
@@ -966,19 +846,13 @@ ToggleModeBtn.MouseButton1Click:Connect(function()
 		ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"
 		ToggleModeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 		restorePartAppearance()
-		selectedPart = nil
-		selectedParentContainer = nil
-		modelPartsList = {}
-		lastSelectedPart = nil
+		selectedPart = nil; selectedParentContainer = nil; modelPartsList = {}; lastSelectedPart = nil
 	end
 end)
-
 local function updateSelectionInfo()
 	restorePartAppearance()
 	if not selectedPart or not selectedPart.Parent or not currentVehicle then
-		StatusText.Text = " Part: Chưa chọn\nCụm: Chưa chọn\nSố part trong cụm: 0"
-		lastSelectedPart = nil
-		return
+		StatusText.Text = " Part: Chưa chọn\nCụm: Chưa chọn\nSố part trong cụm: 0"; lastSelectedPart = nil; return
 	end
 	lastSelectedPart = selectedPart
 	originalTransparencies[selectedPart] = selectedPart.Transparency
@@ -997,7 +871,6 @@ local function updateSelectionInfo()
 	StatusText.Text = string.format(" Part: %s\nCụm: %s\nSố part trong cụm: %d", selectedPart.Name, containerName, #modelPartsList)
 	SelectionBoxObj.Adornee = selectedPart
 end
-
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if not modeActive or not currentVehicle then return end
 	if gameProcessed then return end
@@ -1025,12 +898,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 					currentOrigin = raycastResult.Position + (unitRay.Direction.Unit * 0.2)
 					currentDir = (unitRay.Origin + unitRay.Direction * 600) - currentOrigin
 				else
-					targetPart = hit
-					break
+					targetPart = hit; break
 				end
-			else
-				break
-			end
+			else break end
 		end
 		if targetPart and targetPart:IsA("BasePart") then
 			selectedPart = targetPart
@@ -1038,44 +908,30 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			modelPartsList = {}
 			if selectedParentContainer and (selectedParentContainer:IsA("Model") or selectedParentContainer:IsA("Folder")) then
 				for _, child in ipairs(selectedParentContainer:GetDescendants()) do
-					if child:IsA("BasePart") then
-						table.insert(modelPartsList, child)
-					end
+					if child:IsA("BasePart") then table.insert(modelPartsList, child) end
 				end
 			else
 				table.insert(modelPartsList, selectedPart)
 			end
 			for i, p in ipairs(modelPartsList) do
-				if p == targetPart then
-					currentIndex = i
-					break
-				end
+				if p == targetPart then currentIndex = i; break end
 			end
 			updateSelectionInfo()
 		end
 	end
 end)
-
 local function hideSinglePart(part)
 	if not part or not part:IsA("BasePart") then return end
 	if part == lastSelectedPart then
-		originalTransparencies[part] = nil
-		originalColors[part] = nil
-		originalMaterials[part] = nil
-		lastSelectedPart = nil
+		originalTransparencies[part] = nil; originalColors[part] = nil; originalMaterials[part] = nil; lastSelectedPart = nil
 	end
 	for _, descendant in ipairs(part:GetDescendants()) do
-		if descendant:IsA("Decal") or descendant:IsA("Texture") then
-			originalDecalTransparencies[descendant] = nil
-		end
+		if descendant:IsA("Decal") or descendant:IsA("Texture") then originalDecalTransparencies[descendant] = nil end
 	end
-	if not originalParents[part] then
-		originalParents[part] = part.Parent
-	end
+	if not originalParents[part] then originalParents[part] = part.Parent end
 	part.Parent = nil
 	SelectionBoxObj.Adornee = nil
 end
-
 HidePartBtn.MouseButton1Click:Connect(function()
 	if selectedPart and selectedPart:IsA("BasePart") then
 		hideSinglePart(selectedPart)
@@ -1084,63 +940,38 @@ HidePartBtn.MouseButton1Click:Connect(function()
 			for count = 1, #modelPartsList do
 				currentIndex = currentIndex % #modelPartsList + 1
 				local p = modelPartsList[currentIndex]
-				if p and p.Parent ~= nil then
-					selectedPart = p
-					foundNext = true
-					break
-				end
+				if p and p.Parent ~= nil then selectedPart = p; foundNext = true; break end
 			end
 		end
-		if foundNext then
-			updateSelectionInfo()
+		if foundNext then updateSelectionInfo()
 		else
 			restorePartAppearance()
-			selectedPart = nil
-			selectedParentContainer = nil
-			modelPartsList = {}
-			lastSelectedPart = nil
+			selectedPart = nil; selectedParentContainer = nil; modelPartsList = {}; lastSelectedPart = nil
 			updateSelectionInfo()
 		end
 	end
 end)
-
 HideCompBtn.MouseButton1Click:Connect(function()
 	if selectedParentContainer then
 		for _, child in ipairs(selectedParentContainer:GetDescendants()) do
-			if child:IsA("BasePart") then
-				hideSinglePart(child)
-			end
+			if child:IsA("BasePart") then hideSinglePart(child) end
 		end
 		restorePartAppearance()
-		selectedPart = nil
-		selectedParentContainer = nil
-		modelPartsList = {}
-		lastSelectedPart = nil
+		selectedPart = nil; selectedParentContainer = nil; modelPartsList = {}; lastSelectedPart = nil
 		updateSelectionInfo()
 	end
 end)
-
 NextPartBtn.MouseButton1Click:Connect(function()
 	if #modelPartsList > 0 then
 		local found = false
 		for count = 1, #modelPartsList do
 			currentIndex = currentIndex % #modelPartsList + 1
 			local p = modelPartsList[currentIndex]
-			if p and p.Parent ~= nil then
-				selectedPart = p
-				found = true
-				break
-			end
+			if p and p.Parent ~= nil then selectedPart = p; found = true; break end
 		end
-		if found then
-			updateSelectionInfo()
-		else
-			selectedPart = nil
-			SelectionBoxObj.Adornee = nil
-		end
+		if found then updateSelectionInfo() else selectedPart = nil; SelectionBoxObj.Adornee = nil end
 	end
 end)
-
 PrevPartBtn.MouseButton1Click:Connect(function()
 	if #modelPartsList > 0 then
 		local found = false
@@ -1148,47 +979,28 @@ PrevPartBtn.MouseButton1Click:Connect(function()
 			currentIndex = currentIndex - 1
 			if currentIndex < 1 then currentIndex = #modelPartsList end
 			local p = modelPartsList[currentIndex]
-			if p and p.Parent ~= nil then
-				selectedPart = p
-				found = true
-				break
-			end
+			if p and p.Parent ~= nil then selectedPart = p; found = true; break end
 		end
-		if found then
-			updateSelectionInfo()
-		else
-			selectedPart = nil
-			SelectionBoxObj.Adornee = nil
-		end
+		if found then updateSelectionInfo() else selectedPart = nil; SelectionBoxObj.Adornee = nil end
 	end
 end)
-
 DeselectBtn.MouseButton1Click:Connect(function()
 	restorePartAppearance()
-	selectedPart = nil
-	selectedParentContainer = nil
-	modelPartsList = {}
-	lastSelectedPart = nil
+	selectedPart = nil; selectedParentContainer = nil; modelPartsList = {}; lastSelectedPart = nil
 	updateSelectionInfo()
 end)
-
 RestoreBtn.MouseButton1Click:Connect(function()
 	for part, originalParent in pairs(originalParents) do
-		if part and originalParent and originalParent.Parent then
-			part.Parent = originalParent
-		end
+		if part and originalParent and originalParent.Parent then part.Parent = originalParent end
 	end
 	originalParents = {}
 	restorePartAppearance()
-	selectedPart = nil
-	selectedParentContainer = nil
-	modelPartsList = {}
-	lastSelectedPart = nil
+	selectedPart = nil; selectedParentContainer = nil; modelPartsList = {}; lastSelectedPart = nil
 	updateSelectionInfo()
 end)
 
 -- ==========================================
--- LOGIC: FREECAM (ORIGINAL)
+-- LOGIC: FREECAM
 -- ==========================================
 local function addStroke(parent, color, thickness)
 	local stroke = Instance.new("UIStroke", parent)
@@ -1196,7 +1008,6 @@ local function addStroke(parent, color, thickness)
 	stroke.Thickness = thickness or 1.5
 	return stroke
 end
-
 local freecamMenuFrame = Instance.new("Frame", ScreenGui)
 freecamMenuFrame.Size = UDim2.new(0, 280, 0, 310)
 freecamMenuFrame.Position = UDim2.new(0.5, -140, 0.5, -155)
@@ -1206,7 +1017,6 @@ freecamMenuFrame.Visible = false
 freecamMenuFrame.ZIndex = 15
 Instance.new("UICorner", freecamMenuFrame).CornerRadius = UDim.new(0, 14)
 addStroke(freecamMenuFrame, Color3.fromRGB(70, 70, 95), 1.5)
-
 local freecamMenuTitle = Instance.new("TextLabel", freecamMenuFrame)
 freecamMenuTitle.Size = UDim2.new(1, 0, 0, 45)
 freecamMenuTitle.BackgroundTransparency = 1
@@ -1215,7 +1025,6 @@ freecamMenuTitle.TextColor3 = Color3.fromRGB(230, 230, 240)
 freecamMenuTitle.TextSize = 15
 freecamMenuTitle.Font = Enum.Font.GothamBold
 freecamMenuTitle.ZIndex = 16
-
 local function createFreecamMenuBtn(posY, text, color)
 	local btn = Instance.new("TextButton", freecamMenuFrame)
 	btn.Size = UDim2.new(0.88, 0, 0, 36)
@@ -1230,10 +1039,8 @@ local function createFreecamMenuBtn(posY, text, color)
 	addStroke(btn, Color3.fromRGB(80, 80, 100), 0.8)
 	return btn
 end
-
 local freecamToggleBtn = createFreecamMenuBtn(45, "Freecam: OFF", Color3.fromRGB(45, 45, 58))
 local hideAllBtn = createFreecamMenuBtn(90, "Ẩn Giao Diện: OFF", Color3.fromRGB(50, 50, 68))
-
 local speedLabel = Instance.new("TextLabel", freecamMenuFrame)
 speedLabel.Size = UDim2.new(0.88, 0, 0, 22)
 speedLabel.Position = UDim2.new(0.06, 0, 0, 135)
@@ -1243,14 +1050,12 @@ speedLabel.TextSize = 12
 speedLabel.Font = Enum.Font.GothamBold
 speedLabel.Text = "Tốc độ di chuyển: 25.0"
 speedLabel.ZIndex = 16
-
 local speedIncBtn = createFreecamMenuBtn(160, "Tăng Tốc (+)", Color3.fromRGB(50, 50, 68))
 speedIncBtn.Size = UDim2.new(0.42, 0, 0, 32)
 speedIncBtn.Position = UDim2.new(0.06, 0, 0, 160)
 local speedDecBtn = createFreecamMenuBtn(160, "Giảm Tốc (-)", Color3.fromRGB(50, 50, 68))
 speedDecBtn.Size = UDim2.new(0.42, 0, 0, 32)
 speedDecBtn.Position = UDim2.new(0.52, 0, 0, 160)
-
 local rotLabel = Instance.new("TextLabel", freecamMenuFrame)
 rotLabel.Size = UDim2.new(0.88, 0, 0, 22)
 rotLabel.Position = UDim2.new(0.06, 0, 0, 200)
@@ -1260,20 +1065,18 @@ rotLabel.TextSize = 12
 rotLabel.Font = Enum.Font.GothamBold
 rotLabel.Text = "Tốc độ xoay: 1.0x"
 rotLabel.ZIndex = 16
-
 local rotIncBtn = createFreecamMenuBtn(225, "Xoay Nhanh (+)", Color3.fromRGB(50, 50, 68))
 rotIncBtn.Size = UDim2.new(0.42, 0, 0, 32)
 rotIncBtn.Position = UDim2.new(0.06, 0, 0, 225)
 local rotDecBtn = createFreecamMenuBtn(225, "Xoay Chậm (-)", Color3.fromRGB(50, 50, 68))
 rotDecBtn.Size = UDim2.new(0.42, 0, 0, 32)
 rotDecBtn.Position = UDim2.new(0.52, 0, 0, 225)
-
 local hideFloatBtn = Instance.new("TextButton", ScreenGui)
 hideFloatBtn.Size = UDim2.new(0, 52, 0, 52)
 hideFloatBtn.Position = UDim2.new(0, 80, 0, 150)
 hideFloatBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
 hideFloatBtn.BackgroundTransparency = 0.2
-hideFloatBtn.Text = "👁️"
+hideFloatBtn.Text = "️"
 hideFloatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 hideFloatBtn.TextSize = 22
 hideFloatBtn.Font = Enum.Font.GothamBold
@@ -1281,32 +1084,25 @@ hideFloatBtn.ZIndex = 10
 Instance.new("UICorner", hideFloatBtn).CornerRadius = UDim.new(1, 0)
 addStroke(hideFloatBtn, Color3.fromRGB(80, 80, 110), 2)
 hideFloatBtn.Visible = false
-
 local controlFrame = Instance.new("Frame", ScreenGui)
 controlFrame.Size = UDim2.new(0, 205, 0, 195)
 controlFrame.Position = UDim2.new(0, 20, 1, -200)
 controlFrame.BackgroundTransparency = 1
 controlFrame.Visible = false
 controlFrame.ZIndex = 1
-
 local controlButtons = {}
 local function createPadBtn(text, size, pos)
 	local btn = Instance.new("TextButton", controlFrame)
-	btn.Size = size
-	btn.Position = pos
+	btn.Size = size; btn.Position = pos
 	btn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
 	btn.BackgroundTransparency = 0.35
-	btn.Text = text
-	btn.TextColor3 = Color3.fromRGB(240, 240, 250)
-	btn.TextSize = 15
-	btn.Font = Enum.Font.GothamBold
-	btn.ZIndex = 2
+	btn.Text = text; btn.TextColor3 = Color3.fromRGB(240, 240, 250)
+	btn.TextSize = 15; btn.Font = Enum.Font.GothamBold; btn.ZIndex = 2
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 	addStroke(btn, Color3.fromRGB(70, 70, 95), 1)
 	table.insert(controlButtons, btn)
 	return btn
 end
-
 local btnW = createPadBtn("▲", UDim2.new(0, 44, 0, 44), UDim2.new(0, 48, 0, 0))
 local btnS = createPadBtn("▼", UDim2.new(0, 44, 0, 44), UDim2.new(0, 48, 0, 96))
 local btnA = createPadBtn("◀", UDim2.new(0, 44, 0, 44), UDim2.new(0, 0, 0, 48))
@@ -1315,13 +1111,10 @@ local btnUp = createPadBtn("+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 0)
 local btnDown = createPadBtn("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
 local btnZoomIn = createPadBtn("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 100))
 local btnZoomOut = createPadBtn("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 148))
-
 local hideDragging, hideDragStart, hideStartPos
 hideFloatBtn.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		hideDragging = true
-		hideDragStart = input.Position
-		hideStartPos = hideFloatBtn.Position
+		hideDragging = true; hideDragStart = input.Position; hideStartPos = hideFloatBtn.Position
 	end
 end)
 UserInputService.InputChanged:Connect(function(input)
@@ -1331,17 +1124,12 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		hideDragging = false
-	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then hideDragging = false end
 end)
-
 local freecamMenuDragging, freecamMenuDragStart, freecamMenuStartPos
 freecamMenuTitle.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		freecamMenuDragging = true
-		freecamMenuDragStart = input.Position
-		freecamMenuStartPos = freecamMenuFrame.Position
+		freecamMenuDragging = true; freecamMenuDragStart = input.Position; freecamMenuStartPos = freecamMenuFrame.Position
 	end
 end)
 UserInputService.InputChanged:Connect(function(input)
@@ -1351,11 +1139,8 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		freecamMenuDragging = false
-	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then freecamMenuDragging = false end
 end)
-
 ToggleFreecamMenuBtn.MouseButton1Click:Connect(function()
 	showFreecamFloat = not showFreecamFloat
 	FreecamFloatingBtn.Visible = showFreecamFloat
@@ -1368,69 +1153,53 @@ ToggleFreecamMenuBtn.MouseButton1Click:Connect(function()
 		freecamMenuFrame.Visible = false
 	end
 end)
-
 FreecamFloatingBtn.MouseButton1Click:Connect(function()
 	freecamMenuFrame.Visible = not freecamMenuFrame.Visible
 end)
-
 local function setRobloxTouchGuiTransparency(transparency)
 	local touchGui = LocalPlayer.PlayerGui:FindFirstChild("TouchGui")
 	if touchGui then
 		local descTable = touchGui:GetDescendants()
 		for i = 1, #descTable do
 			local descendant = descTable[i]
-			if descendant:IsA("ImageLabel") or descendant:IsA("ImageButton") then
-				descendant.ImageTransparency = transparency
-			elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
-				descendant.TextTransparency = transparency
-			end
+			if descendant:IsA("ImageLabel") or descendant:IsA("ImageButton") then descendant.ImageTransparency = transparency
+			elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") then descendant.TextTransparency = transparency end
 		end
 	end
 end
-
 local hideModeActive = false
 local isUiHidden = false
 hideAllBtn.MouseButton1Click:Connect(function()
 	hideModeActive = not hideModeActive
 	if hideModeActive then
-		hideAllBtn.Text = "Ẩn Giao Diện: ON"
-		hideAllBtn.BackgroundColor3 = Color3.fromRGB(150, 45, 45)
-		hideFloatBtn.Visible = true
-		hideFloatBtn.BackgroundTransparency = 0.2
-		hideFloatBtn.TextTransparency = 0
+		hideAllBtn.Text = "Ẩn Giao Diện: ON"; hideAllBtn.BackgroundColor3 = Color3.fromRGB(150, 45, 45)
+		hideFloatBtn.Visible = true; hideFloatBtn.BackgroundTransparency = 0.2; hideFloatBtn.TextTransparency = 0
 		local stroke = hideFloatBtn:FindFirstChildOfClass("UIStroke")
 		if stroke then stroke.Transparency = 0 end
 		freecamMenuFrame.Visible = false
 	else
-		hideAllBtn.Text = "Ẩn Giao Diện: OFF"
-		hideAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
-		hideFloatBtn.Visible = false
-		isUiHidden = false
-		FreecamFloatingBtn.Visible = true
+		hideAllBtn.Text = "Ẩn Giao Diện: OFF"; hideAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
+		hideFloatBtn.Visible = false; isUiHidden = false; FreecamFloatingBtn.Visible = true
 		for i = 1, #controlButtons do
 			local btn = controlButtons[i]
-			btn.BackgroundTransparency = 0.35
-			btn.TextTransparency = 0
+			btn.BackgroundTransparency = 0.35; btn.TextTransparency = 0
 			local stroke = btn:FindFirstChildOfClass("UIStroke")
 			if stroke then stroke.Transparency = 0 end
 		end
 		setRobloxTouchGuiTransparency(0)
 	end
 end)
-
 hideFloatBtn.MouseButton1Click:Connect(function()
 	isUiHidden = not isUiHidden
 	if isUiHidden then
 		FreecamFloatingBtn.Visible = false
 		for i = 1, #controlButtons do
 			local btn = controlButtons[i]
-			btn.BackgroundTransparency = 1
-			btn.TextTransparency = 1
+			btn.BackgroundTransparency = 1; btn.TextTransparency = 1
 			local stroke = btn:FindFirstChildOfClass("UIStroke")
 			if stroke then stroke.Transparency = 1 end
 		end
-		hideFloatBtn.BackgroundTransparency = 1
-		hideFloatBtn.TextTransparency = 1
+		hideFloatBtn.BackgroundTransparency = 1; hideFloatBtn.TextTransparency = 1
 		local hideStroke = hideFloatBtn:FindFirstChildOfClass("UIStroke")
 		if hideStroke then hideStroke.Transparency = 1 end
 		setRobloxTouchGuiTransparency(1)
@@ -1438,19 +1207,16 @@ hideFloatBtn.MouseButton1Click:Connect(function()
 		FreecamFloatingBtn.Visible = true
 		for i = 1, #controlButtons do
 			local btn = controlButtons[i]
-			btn.BackgroundTransparency = 0.35
-			btn.TextTransparency = 0
+			btn.BackgroundTransparency = 0.35; btn.TextTransparency = 0
 			local stroke = btn:FindFirstChildOfClass("UIStroke")
 			if stroke then stroke.Transparency = 0 end
 		end
-		hideFloatBtn.BackgroundTransparency = 0.2
-		hideFloatBtn.TextTransparency = 0
+		hideFloatBtn.BackgroundTransparency = 0.2; hideFloatBtn.TextTransparency = 0
 		local hideStroke = hideFloatBtn:FindFirstChildOfClass("UIStroke")
 		if hideStroke then hideStroke.Transparency = 0 end
 		setRobloxTouchGuiTransparency(0)
 	end
 end)
-
 local speed = 25.0
 speedIncBtn.MouseButton1Click:Connect(function()
 	local step = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
@@ -1462,7 +1228,6 @@ speedDecBtn.MouseButton1Click:Connect(function()
 	speed = math.clamp(speed - step, 0.3, 150)
 	speedLabel.Text = string.format("Tốc độ di chuyển: %.1f", speed)
 end)
-
 local rotSensitivity = 1.0
 rotIncBtn.MouseButton1Click:Connect(function()
 	rotSensitivity = math.clamp(rotSensitivity + 0.1, 0.05, 3.0)
@@ -1472,62 +1237,43 @@ rotDecBtn.MouseButton1Click:Connect(function()
 	rotSensitivity = math.clamp(rotSensitivity - 0.1, 0.05, 3.0)
 	rotLabel.Text = string.format("Tốc độ xoay: %.2fx", rotSensitivity)
 end)
-
 local freecamActive = false
 local camPos = camera.CFrame.Position
 local camAngles = Vector2.new(0, 0)
 local targetCamAngles = Vector2.new(0, 0)
 local currentFOV = camera.FieldOfView
 local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false}
-
 local function bindTouch(btn, key)
 	btn.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			moveStates[key] = true
-		end
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = true end
 	end)
 	btn.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-			moveStates[key] = false
-		end
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = false end
 	end)
 end
-bindTouch(btnW, "W")
-bindTouch(btnS, "S")
-bindTouch(btnA, "A")
-bindTouch(btnD, "D")
-bindTouch(btnUp, "Up")
-bindTouch(btnDown, "Down")
-
+bindTouch(btnW, "W"); bindTouch(btnS, "S"); bindTouch(btnA, "A"); bindTouch(btnD, "D"); bindTouch(btnUp, "Up"); bindTouch(btnDown, "Down")
 local zoomInActive, zoomOutActive = false, false
 btnZoomIn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomInActive = true end end)
 btnZoomIn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomInActive = false end end)
 btnZoomOut.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomOutActive = true end end)
 btnZoomOut.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomOutActive = false end end)
-
 local function toggleFreecam()
 	freecamActive = not freecamActive
 	if freecamActive then
 		camPos = camera.CFrame.Position
 		local rx, ry, rz = camera.CFrame:ToOrientation()
-		camAngles = Vector2.new(ry, rx)
-		targetCamAngles = camAngles
+		camAngles = Vector2.new(ry, rx); targetCamAngles = camAngles
 		currentFOV = camera.FieldOfView
 		camera.CameraType = Enum.CameraType.Scriptable
-		freecamToggleBtn.Text = "Freecam: ON"
-		freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
-		controlFrame.Visible = true
-		freecamMenuFrame.Visible = false
+		freecamToggleBtn.Text = "Freecam: ON"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
+		controlFrame.Visible = true; freecamMenuFrame.Visible = false
 	else
-		camera.CameraType = Enum.CameraType.Custom
-		camera.FieldOfView = 70
-		freecamToggleBtn.Text = "Freecam: OFF"
-		freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+		camera.CameraType = Enum.CameraType.Custom; camera.FieldOfView = 70
+		freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
 		controlFrame.Visible = false
 	end
 end
 freecamToggleBtn.MouseButton1Click:Connect(toggleFreecam)
-
 local activeTouch = nil
 local lastTouchPos = nil
 local function isPointInsideFrame(point, frame)
@@ -1536,22 +1282,19 @@ local function isPointInsideFrame(point, frame)
 	local absSize = frame.AbsoluteSize
 	return point.X >= absPos.X and point.X <= absPos.X + absSize.X and point.Y >= absPos.Y and point.Y <= absPos.Y + absSize.Y
 end
-
 UserInputService.TouchStarted:Connect(function(touch)
 	if not freecamActive then return end
 	local pos = touch.Position
 	local touchingUI = isPointInsideFrame(pos, controlFrame)
-	or isPointInsideFrame(pos, freecamMenuFrame)
-	or isPointInsideFrame(pos, FreecamFloatingBtn)
-	or isPointInsideFrame(pos, MainFrame)
-	or isPointInsideFrame(pos, ToggleBtn)
-	or (hideFloatBtn.Visible and isPointInsideFrame(pos, hideFloatBtn))
+		or isPointInsideFrame(pos, freecamMenuFrame)
+		or isPointInsideFrame(pos, FreecamFloatingBtn)
+		or isPointInsideFrame(pos, MainFrame)
+		or isPointInsideFrame(pos, ToggleBtn)
+		or (hideFloatBtn.Visible and isPointInsideFrame(pos, hideFloatBtn))
 	if not touchingUI and not activeTouch then
-		activeTouch = touch
-		lastTouchPos = touch.Position
+		activeTouch = touch; lastTouchPos = touch.Position
 	end
 end)
-
 UserInputService.TouchMoved:Connect(function(touch)
 	if freecamActive and touch == activeTouch and lastTouchPos then
 		local delta = touch.Position - lastTouchPos
@@ -1559,23 +1302,15 @@ UserInputService.TouchMoved:Connect(function(touch)
 		lastTouchPos = touch.Position
 	end
 end)
-
 UserInputService.TouchEnded:Connect(function(touch)
-	if touch == activeTouch then
-		activeTouch = nil
-		lastTouchPos = nil
-	end
+	if touch == activeTouch then activeTouch = nil; lastTouchPos = nil end
 end)
-
 RunService.RenderStepped:Connect(function(dt)
 	if not freecamActive then return end
 	local smoothFactor = math.clamp(dt * 16, 0, 1)
 	camAngles = camAngles:Lerp(targetCamAngles, smoothFactor)
-	if zoomInActive then
-		currentFOV = math.clamp(currentFOV - 35 * dt, 10, 120)
-	elseif zoomOutActive then
-		currentFOV = math.clamp(currentFOV + 35 * dt, 10, 120)
-	end
+	if zoomInActive then currentFOV = math.clamp(currentFOV - 35 * dt, 10, 120)
+	elseif zoomOutActive then currentFOV = math.clamp(currentFOV + 35 * dt, 10, 120) end
 	camera.FieldOfView = currentFOV
 	local moveDir = Vector3.new()
 	if moveStates.W then moveDir = moveDir + Vector3.new(0, 0, -1) end
@@ -1590,14 +1325,14 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 -- ==========================================
--- LOGIC: AUTO FARM OFFICE (INTEGRATED)
+-- LOGIC: AUTO FARM OFFICE (Delta-safe)
 -- ==========================================
 local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
 local TeamChangeRequest = JobEvents:WaitForChild("TeamChangeRequest", 5)
 local GenerateQuestion = JobEvents:WaitForChild("GenerateQuestion")
-local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
-local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
-local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
+local CorrectAnswer = JobEvents:WaitForChild("CorrectAnswer")
+local AssignPrintJob = JobEvents:WaitForChild("AssignPrintJob")
+local ClearPrintJob = JobEvents:WaitForChild("ClearPrintJob")
 local Computers = workspace:WaitForChild("Computers")
 
 local farmOffice = false
@@ -1626,30 +1361,10 @@ local CHAIR_POS = Vector3.new(-5903, 4, -229)
 local UUID_PAT = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 local PATTERN = { "CHOICE", "QID" }
 
--- Helper functions for executor compatibility
-local function safeFireSignal(signal)
-	if typeof(signal) == "RBXScriptSignal" then
-		pcall(function()
-			if type(firesignal) == "function" then
-				firesignal(signal)
-			else
-				signal:Fire()
-			end
-		end)
-	end
-end
-
-local function safeTouchPress(x, y)
-	if type(touchpress) == "function" then
-		pcall(function() touchpress(x, y) end)
-	end
-end
-
-local function safeTouchRelease(x, y)
-	if type(touchrelease) == "function" then
-		pcall(function() touchrelease(x, y) end)
-	end
-end
+-- Delta-safe helpers: chỉ dùng firesignal/touchpress nếu executor hỗ trợ
+local has_firesignal = (type(firesignal) == "function")
+local has_touchpress = (type(touchpress) == "function")
+local has_touchrelease = (type(touchrelease) == "function")
 
 local function of_killBV()
 	if of_activeBV then
@@ -1672,9 +1387,7 @@ RunService.Stepped:Connect(function()
 		end
 	elseif next(of_savedCollide) then
 		for p in pairs(of_savedCollide) do
-			if p.Parent then
-				p.CanCollide = true
-			end
+			if p.Parent then p.CanCollide = true end
 		end
 		table.clear(of_savedCollide)
 	end
@@ -1683,9 +1396,7 @@ end)
 local function of_grabBaseSpeed()
 	local char = LocalPlayer.Character
 	local h = char and char:FindFirstChildOfClass("Humanoid")
-	if h and h.WalkSpeed > 0 then
-		of_baseSpeed = h.WalkSpeed
-	end
+	if h and h.WalkSpeed > 0 then of_baseSpeed = h.WalkSpeed end
 end
 of_grabBaseSpeed()
 
@@ -1696,21 +1407,14 @@ LocalPlayer.CharacterAdded:Connect(function()
 	of_grabBaseSpeed()
 end)
 
-local function of_setSpeed(h, v)
-	pcall(function() h.WalkSpeed = v end)
-end
-
+local function of_setSpeed(h, v) pcall(function() h.WalkSpeed = v end) end
 local function of_ensureSprint(h)
 	of_boosted = false
 	of_setSpeed(h, of_baseSpeed * 2.3)
 	of_boosted = true
 end
-
 local function of_endSprint(h)
-	if of_boosted then
-		of_setSpeed(h, of_baseSpeed)
-		of_boosted = false
-	end
+	if of_boosted then of_setSpeed(h, of_baseSpeed); of_boosted = false end
 end
 
 GenerateQuestion.OnClientEvent:Connect(function(...)
@@ -1729,14 +1433,11 @@ GenerateQuestion.OnClientEvent:Connect(function(...)
 	of_pendingQuestion = q
 	of_lastKnownQuestion = q
 	of_questionArrivedAt = os.clock()
-	if farmOffice then
-		farmStatus.Text = "Trạng thái: Đang giải"
-	end
+	if farmOffice then farmStatus.Text = "Trạng thái: Đang giải" end
 end)
 
 CorrectAnswer.OnClientEvent:Connect(function(status)
-	of_awaitingAck = false
-	of_refired = false
+	of_awaitingAck = false; of_refired = false
 	local s = type(status) == "string" and status:lower() or ""
 	if s == "success" then
 		ofAnswers = ofAnswers + 1
@@ -1744,10 +1445,7 @@ CorrectAnswer.OnClientEvent:Connect(function(status)
 	end
 end)
 
-AssignPrintJob.OnClientEvent:Connect(function(name)
-	of_printAssigned = name
-end)
-
+AssignPrintJob.OnClientEvent:Connect(function(name) of_printAssigned = name end)
 ClearPrintJob.OnClientEvent:Connect(function()
 	of_printAssigned = nil
 	ofPrints = ofPrints + 1
@@ -1758,16 +1456,12 @@ local function of_findButton(text)
 	local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
 	if not pg then return nil end
 	for _, d in ipairs(pg:GetDescendants()) do
-		if d:IsA("TextButton") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then
-			return d
-		end
+		if d:IsA("TextButton") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then return d end
 	end
 	for _, d in ipairs(pg:GetDescendants()) do
 		if d:IsA("TextLabel") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then
 			local p = d.Parent
-			if p and (p:IsA("TextButton") or p:IsA("ImageButton")) then
-				return p
-			end
+			if p and (p:IsA("TextButton") or p:IsA("ImageButton")) then return p end
 		end
 	end
 	return nil
@@ -1780,23 +1474,20 @@ local function of_onScreen(x, y)
 	return x >= 0 and y >= 0 and x <= vp.X and y <= vp.Y
 end
 
+-- Delta-safe click: chỉ gọi firesignal/touchpress nếu executor hỗ trợ
 local function of_clickButton(btn)
-	if pcall(function() safeFireSignal(btn.MouseButton1Click) end) then
-		return 1
-	end
-	if pcall(function() safeFireSignal(btn.Activated) end) then
-		return 2
+	if has_firesignal then
+		if pcall(function() firesignal(btn.MouseButton1Click) end) then return 1 end
+		if pcall(function() firesignal(btn.Activated) end) then return 2 end
 	end
 	local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
 	local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-	if of_onScreen(x, y) then
+	if of_onScreen(x, y) and has_touchpress and has_touchrelease then
 		if pcall(function()
-			safeTouchPress(x, y)
+			touchpress(x, y)
 			task.wait(0.06)
-			safeTouchRelease(x, y)
-		end) then
-			return 3
-		end
+			touchrelease(x, y)
+		end) then return 3 end
 	end
 	return nil
 end
@@ -1805,22 +1496,16 @@ local function of_root()
 	local c = LocalPlayer.Character
 	return c and c:FindFirstChild("HumanoidRootPart")
 end
-
 local function of_humanoid()
 	local c = LocalPlayer.Character
 	return c and c:FindFirstChildOfClass("Humanoid")
 end
-
 local function of_seatsNear(pos, radius)
 	local out = {}
-	local ok, parts = pcall(function()
-		return workspace:GetPartBoundsInRadius(pos, radius)
-	end)
+	local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, radius) end)
 	if not ok or not parts then return out end
 	for _, p in ipairs(parts) do
-		if p:IsA("Seat") or p:IsA("VehicleSeat") then
-			table.insert(out, p)
-		end
+		if p:IsA("Seat") or p:IsA("VehicleSeat") then table.insert(out, p) end
 	end
 	return out
 end
@@ -1846,32 +1531,22 @@ local function of_flyTo(target, stopDist, timeout)
 			local delta = target - hrp.Position
 			if delta.Magnitude <= stopDist then break end
 			local dir = Vector3.new(delta.X, math.clamp(delta.Y, -8, 8), delta.Z)
-			if dir.Magnitude > 0.01 then
-				bv.Velocity = dir.Unit * OF_FLY_SPEED
-			end
+			if dir.Magnitude > 0.01 then bv.Velocity = dir.Unit * OF_FLY_SPEED end
 			if os.clock() - prevTime >= 0.5 then
-				if prevPos and (hrp.Position - prevPos).Magnitude < 1 then
-					stuck += 1
-				else
-					stuck = 0
-				end
-				prevPos = hrp.Position
-				prevTime = os.clock()
+				if prevPos and (hrp.Position - prevPos).Magnitude < 1 then stuck += 1 else stuck = 0 end
+				prevPos = hrp.Position; prevTime = os.clock()
 				if stuck >= 6 then break end
 			end
 			task.wait(0.1)
 		end
 	end)
-	if not ok then
-		warn("[farm] fly loi, ha canh di bo")
-	end
+	if not ok then warn("[farm] fly loi") end
 	of_killBV()
 	task.wait(0.3)
 end
 
 local function of_standUp()
-	local h = of_humanoid()
-	local hrp = of_root()
+	local h = of_humanoid(); local hrp = of_root()
 	if not h or not hrp then return end
 	if not h.Sit and h:GetState() ~= Enum.HumanoidStateType.Seated then return end
 	local tries = 0
@@ -1886,8 +1561,7 @@ local function of_standUp()
 			bv.Velocity = Vector3.new(0, 22, 0)
 			bv.Parent = hrp
 			task.wait(0.22)
-			bv.Velocity = Vector3.zero
-			bv:Destroy()
+			bv.Velocity = Vector3.zero; bv:Destroy()
 		end)
 		task.wait(0.4)
 	end
@@ -1898,50 +1572,30 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
 	local deadline = os.clock() + (timeout or 120)
 	local h0 = of_humanoid()
 	if h0 then of_ensureSprint(h0) end
-	if useNoclip then
-		of_phasing = true
-	end
+	if useNoclip then of_phasing = true end
 	local holdBV = nil
 	local prevPos = of_root() and of_root().Position
 	local prevTime = os.clock()
-	local stuckTime = 0
-	local slip = 0
-	local pulses = 0
+	local stuckTime = 0; local slip = 0; local pulses = 0
 	local ok = pcall(function()
 		while os.clock() < deadline and farmOffice do
-			local h = of_humanoid()
-			local hrp = of_root()
+			local h = of_humanoid(); local hrp = of_root()
 			if not h or not hrp then break end
 			if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-				if allowSit then
-					break
-				else
-					of_standUp()
-				end
+				if allowSit then break else of_standUp() end
 			end
 			local delta = target - hrp.Position
 			local flat = Vector3.new(delta.X, 0, delta.Z)
 			if flat.Magnitude <= stopDist then break end
 			h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
 			if hrp.Position.Y < target.Y - 120 then
-				warn("[farm] rot void — tu respawn de tiep tuc")
-				pcall(function() h.Health = 0 end)
-				break
+				warn("[farm] rot void"); pcall(function() h.Health = 0 end); break
 			end
 			if not useNoclip and os.clock() - prevTime >= 0.6 then
 				local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
-				if moved < 0.4 then
-					stuckTime = stuckTime + 0.6
-				else
-					stuckTime = 0
-				end
-				prevPos = hrp.Position
-				prevTime = os.clock()
-				if stuckTime >= 0.8 and slip <= 0 and pulses < 8 then
-					slip = 0.5
-					pulses += 1
-					stuckTime = 0
-				end
+				if moved < 0.4 then stuckTime = stuckTime + 0.6 else stuckTime = 0 end
+				prevPos = hrp.Position; prevTime = os.clock()
+				if stuckTime >= 0.8 and slip <= 0 and pulses < 8 then slip = 0.5; pulses += 1; stuckTime = 0 end
 			end
 			if slip > 0 then
 				of_phasing = true
@@ -1950,44 +1604,28 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
 					holdBV.MaxForce = Vector3.new(0, 1e5, 0)
 					holdBV.Velocity = Vector3.zero
 					holdBV.Parent = hrp
-				elseif holdBV.Parent ~= hrp then
-					holdBV.Parent = hrp
-				end
+				elseif holdBV.Parent ~= hrp then holdBV.Parent = hrp end
 				slip = slip - 0.1
 				if slip <= 0 then
 					if not useNoclip then of_phasing = false end
-					if holdBV then
-						pcall(function() holdBV:Destroy() end)
-						holdBV = nil
-					end
+					if holdBV then pcall(function() holdBV:Destroy() end); holdBV = nil end
 				end
 			end
 			task.wait(0.1)
 		end
 	end)
-	if holdBV then
-		pcall(function() holdBV:Destroy() end)
-	end
+	if holdBV then pcall(function() holdBV:Destroy() end) end
 	of_phasing = false
-	local h = of_humanoid()
-	local hrp = of_root()
-	if h and hrp then
-		h:MoveTo(hrp.Position)
-		of_endSprint(h)
-	end
-	if not ok then
-		warn("[farm] walk loi")
-	end
+	local h = of_humanoid(); local hrp = of_root()
+	if h and hrp then h:MoveTo(hrp.Position); of_endSprint(h) end
+	if not ok then warn("[farm] walk loi") end
 end
 
 local function of_forceSit(h)
 	for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
 		if seat.Occupant == nil then
 			local okSit = pcall(function() seat:Sit(h) end)
-			if okSit then
-				task.wait(0.3)
-				if h.Sit then return true end
-			end
+			if okSit then task.wait(0.3); if h.Sit then return true end end
 		end
 	end
 	return false
@@ -1995,10 +1633,7 @@ end
 
 local function of_sitAtChair()
 	local h = of_humanoid()
-	if h and h.Sit then
-		of_killBV()
-		return true
-	end
+	if h and h.Sit then of_killBV(); return true end
 	local hrp = of_root()
 	if hrp and (hrp.Position - CHAIR_POS).Magnitude > OF_FLY_ONLY_DIST then
 		farmStatus.Text = "Trạng thái: Bay tới văn phòng"
@@ -2007,17 +1642,11 @@ local function of_sitAtChair()
 	farmStatus.Text = "Trạng thái: Đi bộ vào ghế"
 	of_walkTo(CHAIR_POS, 2, 60, true, false)
 	h = of_humanoid()
-	if h and h.Sit then
-		of_killBV()
-		return true
-	end
+	if h and h.Sit then of_killBV(); return true end
 	local t0 = os.clock()
 	while os.clock() - t0 < 2 and farmOffice do
 		h = of_humanoid()
-		if h and h.Sit then
-			of_killBV()
-			return true
-		end
+		if h and h.Sit then of_killBV(); return true end
 		task.wait(0.2)
 	end
 	if farmOffice then
@@ -2027,15 +1656,12 @@ local function of_sitAtChair()
 			of_forceSit(h)
 		end
 	end
-	h = of_humanoid()
-	of_killBV()
+	h = of_humanoid(); of_killBV()
 	return (h and h.Sit) or false
 end
 
 local function of_solve(q)
-	if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then
-		return nil
-	end
+	if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then return nil end
 	local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
 	if not a then return nil end
 	a, b = tonumber(a), tonumber(b)
@@ -2043,15 +1669,10 @@ local function of_solve(q)
 	if op == "+" then r = a + b
 	elseif op == "-" then r = a - b
 	elseif op == "*" or op:lower() == "x" then r = a * b
-	elseif op == "/" then
-		if b == 0 then return nil end
-		r = a / b
-	end
+	elseif op == "/" then if b == 0 then return nil end; r = a / b end
 	for _, c in ipairs(q.choices) do
 		local v = tonumber(c.Text)
-		if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then
-			return c
-		end
+		if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then return c end
 	end
 	return nil
 end
@@ -2076,9 +1697,7 @@ local function of_fireAnswer(q)
 	local btn = of_findButton(choice.Text)
 	local how = btn and of_clickButton(btn) or nil
 	if not how then
-		pcall(function()
-			CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice)))
-		end)
+		pcall(function() CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice))) end)
 	end
 	of_awaitingAck = true
 	of_lastFireAt = os.clock()
@@ -2087,10 +1706,7 @@ end
 
 local function of_doPrint(name)
 	local model = Computers:FindFirstChild(name)
-	if not model then
-		warn("[farm] khong thay may in: " .. tostring(name))
-		return
-	end
+	if not model then warn("[farm] khong thay may in: " .. tostring(name)); return end
 	local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
 	if not part then return end
 	of_standUp()
@@ -2104,16 +1720,12 @@ local function of_doPrint(name)
 		if prompt then
 			pcall(function() prompt:InputHoldBegin() end)
 			local t1 = os.clock()
-			while of_printAssigned and farmOffice and os.clock() - t1 < 4 do
-				task.wait(0.2)
-			end
+			while of_printAssigned and farmOffice and os.clock() - t1 < 4 do task.wait(0.2) end
 			pcall(function() prompt:InputHoldEnd() end)
 		end
 	end
 	local t2 = os.clock()
-	while of_printAssigned and farmOffice and os.clock() - t2 < 6 do
-		task.wait(0.2)
-	end
+	while of_printAssigned and farmOffice and os.clock() - t2 < 6 do task.wait(0.2) end
 	farmStatus.Text = "Trạng thái: Đã in"
 end
 
@@ -2124,9 +1736,7 @@ local function of_runCycle()
 	end
 	if not farmOffice then return end
 	if not of_sitAtChair() then
-		if farmOffice then
-			task.wait(2)
-		end
+		if farmOffice then task.wait(2) end
 		return
 	end
 	farmStatus.Text = "Trạng thái: Ngồi ghế, chờ câu hỏi"
@@ -2143,40 +1753,27 @@ local function of_runCycle()
 		end
 		if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
 			of_refired = true
-			if of_lastKnownQuestion then
-				of_fireAnswer(of_lastKnownQuestion)
-				farmStatus.Text = "Trạng thái: Đã giải"
-			end
+			if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); farmStatus.Text = "Trạng thái: Đã giải" end
 			idleStart = os.clock()
 		end
 		if os.clock() - idleStart > 60 then break end
 		task.wait(0.2)
 	end
-	if farmOffice and of_printAssigned then
-		of_doPrint(of_printAssigned)
-	end
+	if farmOffice and of_printAssigned then of_doPrint(of_printAssigned) end
 end
 
 task.spawn(function()
 	while true do
 		if farmOffice then
 			local ok, err = pcall(of_runCycle)
-			if not ok then
-				of_killBV()
-				warn("[farm] LOOP ERR: " .. tostring(err))
-				task.wait(1)
-			end
-		else
-			task.wait(0.3)
-		end
+			if not ok then of_killBV(); warn("[farm] LOOP ERR: " .. tostring(err)); task.wait(1) end
+		else task.wait(0.3) end
 	end
 end)
 
--- Toggle Farm Button Logic
 ToggleFarmBtn.MouseButton1Click:Connect(function()
 	if farmOffice then
-		farmOffice = false
-		of_killBV()
+		farmOffice = false; of_killBV()
 		ToggleFarmBtn.Text = "BẮT ĐẦU AUTO FARM OFFICE"
 		ToggleFarmBtn.BackgroundColor3 = Color3.fromRGB(45, 100, 160)
 		farmStatus.Text = "Trạng thái: Tạm nghỉ"
@@ -2184,8 +1781,7 @@ ToggleFarmBtn.MouseButton1Click:Connect(function()
 		farmOffice = true
 		if not of_jobFired then
 			TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
-			of_jobFired = true
-			of_resetUntil = os.clock() + 5
+			of_jobFired = true; of_resetUntil = os.clock() + 5
 		end
 		ToggleFarmBtn.Text = "DỪNG AUTO FARM OFFICE"
 		ToggleFarmBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
