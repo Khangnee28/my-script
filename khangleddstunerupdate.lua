@@ -1,4 +1,4 @@
--- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Fixed)
+-- KhangLe Custom Tuner - Sidebar UI Overhaul + Office Farm Integration (Fixed & Vietnamese)
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,6 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -118,19 +117,19 @@ local function createFloatingButton(icon, yPos, strokeColorBase)
 	return btn
 end
 
--- 1. Nút mở menu chính () - Hình vuông có icon
+-- 1. Nút mở menu chính (👑) - Hình vuông có icon
 local ToggleBtn = createFloatingButton("👑", 0.4, Color3.fromRGB(255, 215, 0))
 
--- 2. Nút nổi Auto T (️)
+-- 2. Nút nổi Auto T
 local AutoTFloatingBtn = createFloatingButton("🕹️", 0.53, Color3.fromRGB(255, 100, 0))
 AutoTFloatingBtn.Visible = false
 
--- 3. Nút nổi Quản Lý Dàn Áo (🚗)
+-- 3. Nút nổi Quản Lý Dàn Áo
 local BodyManagerFloatingBtn = createFloatingButton("🚗", 0.66, Color3.fromRGB(0, 230, 180))
 BodyManagerFloatingBtn.Visible = false
 
--- 4. Nút nổi Freecam (📷)
-local FreecamFloatingBtn = createFloatingButton("", 0.79, Color3.fromRGB(100, 150, 255))
+-- 4. Nút nổi Freecam
+local FreecamFloatingBtn = createFloatingButton("📷", 0.79, Color3.fromRGB(100, 150, 255))
 FreecamFloatingBtn.Visible = false
 
 -- BẢNG HƯỚNG DẪN SỬ DỤNG (Giữ nguyên text và xuống dòng)
@@ -473,7 +472,7 @@ ToggleFloatMenuBtn.Size = UDim2.new(1, 0, 0, 28)
 ToggleFloatMenuBtn.Position = UDim2.new(0, 0, 0, 275)
 ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ToggleFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleFloatMenuBtn.Text = "️ Nút nổi Auto T: TẮT"
+ToggleFloatMenuBtn.Text = "🕹️ Nút nổi Auto T: TẮT"
 ToggleFloatMenuBtn.TextSize = 11
 ToggleFloatMenuBtn.Font = Enum.Font.GothamBold
 ToggleFloatMenuBtn.ZIndex = 17
@@ -503,7 +502,7 @@ ToggleFreecamMenuBtn.Size = UDim2.new(1, 0, 0, 28)
 ToggleFreecamMenuBtn.Position = UDim2.new(0, 0, 0, 345)
 ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 ToggleFreecamMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleFreecamMenuBtn.Text = " Freecam Cinematic: TẮT"
+ToggleFreecamMenuBtn.Text = "📷 Freecam Cinematic: TẮT"
 ToggleFreecamMenuBtn.TextSize = 11
 ToggleFreecamMenuBtn.Font = Enum.Font.GothamBold
 ToggleFreecamMenuBtn.ZIndex = 17
@@ -612,7 +611,7 @@ ToggleBodyFloatMenuBtn.MouseButton1Click:Connect(function()
 		ToggleBodyFloatMenuBtn.Text = "🚗 Nút nổi Dàn Áo: BẬT"
 		ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
 	else
-		ToggleBodyFloatMenuBtn.Text = " Nút nổi Dàn Áo: TẮT"
+		ToggleBodyFloatMenuBtn.Text = "🚗 Nút nổi Dàn Áo: TẮT"
 		ToggleBodyFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 	end
 end)
@@ -791,7 +790,7 @@ ControlTitle.BackgroundTransparency = 1
 ControlTitle.Position = UDim2.new(0, 15, 0, 10)
 ControlTitle.Size = UDim2.new(1, -30, 0, 25)
 ControlTitle.Font = Enum.Font.GothamBold
-ControlTitle.Text = " QUẢN LÝ & THÁO DÀN ÁO"
+ControlTitle.Text = "🚗 QUẢN LÝ & THÁO DÀN ÁO"
 ControlTitle.TextColor3 = Color3.fromRGB(0, 230, 180)
 ControlTitle.TextSize = 12
 ControlTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -848,7 +847,7 @@ end
 
 local HidePartBtn = createActionButton("Tháo Part Này", 140, 15, 120, Color3.fromRGB(50, 50, 65))
 local HideCompBtn = createActionButton("Tháo Cả Cụm", 140, 145, 120, Color3.fromRGB(50, 50, 65))
-local PrevPartBtn  = createActionButton(" Mảnh Trước", 176, 15, 120, Color3.fromRGB(40, 90, 110))
+local PrevPartBtn  = createActionButton("◀ Mảnh Trước", 176, 15, 120, Color3.fromRGB(40, 90, 110))
 local NextPartBtn  = createActionButton("Mảnh Sau ▶", 176, 145, 120, Color3.fromRGB(40, 90, 110))
 local DeselectBtn  = createActionButton("Bỏ Chọn", 212, 15, 120, Color3.fromRGB(50, 50, 65))
 local ScanBtn = Instance.new("TextButton")
@@ -1364,7 +1363,7 @@ ToggleFreecamMenuBtn.MouseButton1Click:Connect(function()
 		ToggleFreecamMenuBtn.Text = "📷 Freecam Cinematic: BẬT"
 		ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 	else
-		ToggleFreecamMenuBtn.Text = " Freecam Cinematic: TẮT"
+		ToggleFreecamMenuBtn.Text = "📷 Freecam Cinematic: TẮT"
 		ToggleFreecamMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 		freecamMenuFrame.Visible = false
 	end
