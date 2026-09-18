@@ -1,8 +1,10 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v8
--- v8: FIX trang TRONG (ZIndex Sibling + moi phan tu ZIndex 12-13)
---     BO cong tac BAT/TAT LED trong Settings
---     Anti-AFK + FPS/PING = nut ON/OF ro rang
+-- KHANGLE DDS HUB — 4080 REMIX v9
+-- v9: BO 3 nut fix lag (giu TOI UU FPS + TANG CHAT LUONG)
+--     Them PRESET DO HOA / MAU TROI (Tram / Hoang hon / Dem / PC)
+--     Guide nhung thang vao trang GUIDE trong menu
+--     FPS/PING hien du ping; khung FPS keo tha + nut KHOA VI TRI
+--     Doi mau menu bang ma HEX
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -194,7 +196,7 @@ end)
 local ControlPanel, freecamMenuFrame, hideFloatBtn, GuideFrame
 local HubFrame, hubClose, hubHeader, hubStroke, statPanel
 local farmSwitch, farmStatLbl
-local bodyOpenBtn, fcOpenBtn, guideOpenBtn
+local bodyOpenBtn, fcOpenBtn
 local ToggleFloatMenuBtn
 local lblMode, lblStat1, lblStat2, lblTime, lblWork
 local showAutoTFloat = false
@@ -367,16 +369,19 @@ task.spawn(function()
     end
 end)
 
--- ============ FPS / PING OVERLAY ============
+-- ============ FPS / PING OVERLAY (keo tha + khoa) ============
 local perfOn = false
+local perfLocked = false
 local perfFrame = Instance.new("Frame")
-perfFrame.Size = UDim2.new(0, 150, 0, 40)
-perfFrame.Position = UDim2.new(1, -160, 0, 96)
+perfFrame.Size = UDim2.new(0, 160, 0, 40)
+perfFrame.Position = UDim2.new(1, -170, 0, 96)
 perfFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 perfFrame.BackgroundTransparency = 0.35
 perfFrame.BorderSizePixel = 0
 perfFrame.Visible = false
 perfFrame.ZIndex = 50
+perfFrame.Active = true
+perfFrame.Draggable = true
 perfFrame.Parent = ScreenGui
 Instance.new("UICorner", perfFrame).CornerRadius = UDim.new(0, 8)
 local perfLabel = Instance.new("TextLabel")
@@ -390,13 +395,18 @@ perfLabel.Font = Enum.Font.GothamBold
 perfLabel.TextXAlignment = Enum.TextXAlignment.Left
 perfLabel.ZIndex = 51
 perfLabel.Parent = perfFrame
-local perfCorners = {
-    UDim2.new(1, -160, 0, 96),
-    UDim2.new(0, 10, 0, 96),
-    UDim2.new(0, 10, 1, -50),
-    UDim2.new(1, -160, 1, -50),
-}
-local perfCornerIdx = 1
+
+local function getPing()
+    local p = 0
+    pcall(function() p = StatsService:GetNetworkPing() end)
+    if (not p) or p <= 0 then
+        pcall(function() p = player:GetNetworkPing() end)
+    end
+    if p and p > 0 and p < 1 then
+        p = p * 1000
+    end
+    return math.floor(p or 0)
+end
 local fpsFrames = 0
 RunService.RenderStepped:Connect(function()
     fpsFrames = fpsFrames + 1
@@ -406,18 +416,44 @@ task.spawn(function()
         task.wait(1)
         local fps = fpsFrames
         fpsFrames = 0
-        local ping = 0
-        pcall(function()
-            ping = math.floor(StatsService:GetNetworkPing())
-        end)
         if perfOn then
-            perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, ping)
+            perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, getPing())
         end
     end
 end)
 
+-- ============ NOI DUNG GUIDE (dung chung cho popup + trang GUIDE) ============
+local guideLines = {
+    "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
+    "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
+    "mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )",
+    "rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy",
+    "tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha",
+    "ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )",
+    "final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha )",
+    "Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha",
+    "Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.",
+    "Lưu Ý Về Xe: sẽ có vài xe không áp dụng được top speed chỉ có thể tăng mã lực giúp xe đề pa sẽ mạnh hơn tăng tầm 7 - 12 km/h tùy vào xe còn top speed sẽ không hoạt động nha vì admin lock thông số xe đó nên script sẽ không can thiệp để thay đổi top speed được nhưng bù lại mọi người có thể chỉnh mã lực đề pa xoáy bánh và chỉnh rpm vẫn được nha nhưng đừng chỉnh ratio gear và final drive dễ gây xung đột và lỗi, rpm mình set mặc định là 3500 mọi người thấy chạy max speed mà nó vẫn còn dư cả khúc rpm ở thanh dưới thì mọi người giảm rpm xuống đến khi nào xe nó đờn tằng tằng nha nhưng nếu mọi người thấy xe nó tự chạy bấm dừng không được thì tăng rpm lên một chút tầm 50 - 100 gì đó để nó dư một khoản nhỏ xong lại giảm nhẹ lại 10 - 20 căn đến khi nào nó đờn tua nha để tránh lỗi tiếng pô và chạy cũng sướng hơn nữa",
+    "Auto T: tự động bốc đầu cho ai muốn múa lửa",
+    "cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê",
+    "lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại",
+    "Tháo Dàn Áo: tháo mọi thứ của xe bánh xe áo xe cục máy bla bla..vv",
+    "cách dùng: bật menu lên và bật quản lý dàn áo sau đó spawn xe muốn tháo và ngồi lên xe bấm quét xe để quét xe sau đó xuống xe bật free cam và click vào chỗ muốn tháo lưu ý bộ phận của xe được gọi là part và part có nhiều cụm tùy xe admin sẽ chia nhỏ từng cụm ra rất dễ tháo còn xe gộp một đống part vào một cụm nếu mọi người bấm vào một chỗ muốn xoá mà thấy cụm đó có tới 100 hoặc hơn 200 part có nghĩa là nó k chia nhỏ cụm ra và gộp thành 1 cụm to mọi người chịu khó bấm tới chỗ mình muốn xoá ví dụ phuộc bla bla có thể tháo luôn cục máy để chụp ảnh sau khi tháo mọi người vẫn chạy bình thường nha nhưng chịu khó xíu sau khi tháo xong hết thì mọi người tắt soi và tháo đi nha là ok",
+    "lưu ý: vì xe admin không làm remote event nên khi xoá chỉ mọi người thấy được còn người khác thì không nha ai thích chụp ảnh thì dùng để tháo ra xem chi tiết rồi chụp cho đẹp nha",
+    "cách tìm part muốn xoá: khi mọi người click sẽ hiện selection box có màu và tên cụm và part nếu xe được gộp nhiều cụm lại thì rất dễ tháo nó chia nhỏ ra từng part cho mỗi cụm có tên riêng mọi người muốn xoá dàn áo thì cứ di cam lại gần dàn áo rồi bấm vô xong bấm xoá cả mục là xoá hết dàn áo ngoài luôn nếu còn hình mờ hoặc tem có nghĩa xe đó có một cụm to nữa mọi người phải bấm tìm cụm to đó rồi dò từng part để xoá , sẽ có cụm trước và cụm sau là không có gộp chung đâu nha cứ click lên cụm trước hay sau rồi tìm chỗ muốn xoá ví dụ ốp đầu hay ghi đông là ở cụm trước còn cụm giữa là cái khung và mấy part nhỏ nhỏ như ốc máy bla bla nói chung muốn xoá gì thì ngồi mò chút xíu nha là hiểu !",
+    "gợi ý: những mảnh dàn áo hay màu sơn và tem admin thường đặt tên part là (livery , paint) còn những xe khác có thể sẽ là những tên khác nhưng có selection box nên mọi người cứ đổi part đến khi nào thấy chỗ mình muốn xoá rồi xoá là được nha",
+    "Freecam: freecam này do mình làm và mọi người có thể dùng để quay phim chụp ảnh có thể tùy chỉnh tốc độ xoay camera , di chuyển , zoom , up down như pc luôn nha",
+    "cách dùng: mở menu chính lên và mở freecam sau đó mọi người tùy chỉnh tốc độ xoay camera và di chuyển freecam và trong menu có nút ẩn giao diện khi bật lên sẽ hiện nút nổi khi bấm vào sẽ ẩn toàn bộ cụm điều khiển nút nhảy nhưng vẫn bấm và di chuyển được bằng cụm điều khiển nha chỉ ẩn đi thôi chứ không mất và khi ẩn sẽ ẩn luôn nút nổi mọi người chỉ cần nhớ chỗ để nút nổi và ấn lại vị trí đó là được khi mọi người bấm ẩn mình đã cố định ở chỗ mọi người để nút nổi rồi nha",
+    "lưu ý: ẩn giao diện sẽ không ẩn được UI của game nha chỉ ẩn được của roblox thôi muốn ẩn UI của game một là mọi người bật freecam của game và bấm nút con mắt sẽ ẩn hết nhưng mà vẫn còn dấu x nha và cũng k có ích lợi gì :v",
+    "gợi ý: mọi người nên dùng quay video hoặc chụp ảnh của roblox không cần chụp bằng điện thoại mọi người bấm vô dấu 3 gạch tìm mục chụp ảnh có hình camera sau đó sẽ hiện một cái nút  nổi có thể di chuyển của roblox bấm ở trên là quay video và ở dưới là chụp ảnh và khi dùng cái đó thì không có thứ gì gây cản trở trên màn hình nữa nha nó chỉ quay trong game không vướng víu UI hay script gì đâu nha mọi người có thể thoải mái dùng freecam của mình để quay video không cần ẩn giao diện nha và khi quay hoặc chụp xong mọi người bấm vào roblox trên góc trái màn hình tìm chỗ thư viện ảnh và video của mọi người sẽ ở đó và chỉ việc lưu về nha!",
+    "Script By Khang Lê",
+    "Id Tiktok: @khangdayy215",
+    "Cảm ơn đã tin tưởng và sử dụng script của mình!.",
+}
+local guideFullText = table.concat(guideLines, "\n\n")
+
 -- ============================================================
--- KHOI 1: HUB UI (ZIndex dong bo)
+-- KHOI 1: HUB UI
 -- ============================================================
 do
     HubFrame = Instance.new("Frame")
@@ -541,7 +577,7 @@ do
     local optPage = pages["TỐI ƯU"]
     local guidePage = pages["GUIDE"]
 
-    -- TUNER (ZIndex 12+)
+    -- TUNER
     local function createInput(name, defaultVal, posY, pg)
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.9, 0, 0, 14)
@@ -707,7 +743,7 @@ do
         end)
     end)
 
-    -- CHUNG (ZIndex 12+)
+    -- CHUNG
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -816,7 +852,7 @@ do
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS (BO toggle LED; Anti-AFK + FPS = nut ON/OFF)
+    -- SETTINGS
     local function sectionTitle(y, text, color)
         local t = Instance.new("TextLabel")
         t.Size = UDim2.new(1, -20, 0, 20)
@@ -831,6 +867,16 @@ do
         t.Parent = settingsPage
         return t
     end
+    local function parseHex(str)
+        local input = (str or ""):gsub("^#", "")
+        if #input ~= 6 then return nil end
+        local r = tonumber(input:sub(1,2), 16)
+        local g = tonumber(input:sub(3,4), 16)
+        local b = tonumber(input:sub(5,6), 16)
+        if not (r and g and b) then return nil end
+        return Color3.fromRGB(r, g, b), input:upper()
+    end
+
     sectionTitle(6, "🎨 MÀU MENU CHÍNH", themeColor)
     local themePresets = {
         Color3.fromRGB(0, 229, 160),
@@ -853,8 +899,66 @@ do
             applyTheme(c)
         end)
     end
+    -- Mau menu theo ma HEX
+    local menuHexLbl = Instance.new("TextLabel")
+    menuHexLbl.Size = UDim2.new(0.34, 0, 0, 22)
+    menuHexLbl.Position = UDim2.new(0, 10, 0, 60)
+    menuHexLbl.BackgroundTransparency = 1
+    menuHexLbl.Text = "MÃ MENU (#RRGGBB):"
+    menuHexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    menuHexLbl.TextSize = 10
+    menuHexLbl.Font = Enum.Font.GothamBold
+    menuHexLbl.TextXAlignment = Enum.TextXAlignment.Left
+    menuHexLbl.ZIndex = 12
+    menuHexLbl.Parent = settingsPage
+    local menuHexBox = Instance.new("TextBox")
+    menuHexBox.Size = UDim2.new(0.3, 0, 0, 22)
+    menuHexBox.Position = UDim2.new(0.35, 0, 0, 60)
+    menuHexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    menuHexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    menuHexBox.PlaceholderText = "#00E5A0"
+    menuHexBox.Text = ""
+    menuHexBox.TextSize = 10
+    menuHexBox.Font = Enum.Font.GothamBold
+    menuHexBox.BorderSizePixel = 0
+    menuHexBox.ZIndex = 12
+    menuHexBox.Parent = settingsPage
+    Instance.new("UICorner", menuHexBox).CornerRadius = UDim.new(0, 6)
+    local menuHexApply = Instance.new("TextButton")
+    menuHexApply.Size = UDim2.new(0, 70, 0, 22)
+    menuHexApply.Position = UDim2.new(0.66, 0, 0, 60)
+    menuHexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
+    menuHexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
+    menuHexApply.Text = "ÁP DỤNG"
+    menuHexApply.TextSize = 10
+    menuHexApply.Font = Enum.Font.GothamBold
+    menuHexApply.ZIndex = 12
+    menuHexApply.Parent = settingsPage
+    Instance.new("UICorner", menuHexApply).CornerRadius = UDim.new(0, 6)
+    local menuHexStatus = Instance.new("TextLabel")
+    menuHexStatus.Size = UDim2.new(0.9, 0, 0, 14)
+    menuHexStatus.Position = UDim2.new(0.05, 0, 0, 84)
+    menuHexStatus.BackgroundTransparency = 1
+    menuHexStatus.Text = ""
+    menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    menuHexStatus.TextSize = 9
+    menuHexStatus.Font = Enum.Font.GothamBold
+    menuHexStatus.TextXAlignment = Enum.TextXAlignment.Left
+    menuHexStatus.ZIndex = 12
+    menuHexStatus.Parent = settingsPage
+    menuHexApply.MouseButton1Click:Connect(function()
+        local col, up = parseHex(menuHexBox.Text)
+        if not col then
+            menuHexStatus.Text = "❌ mã màu sai (VD: #00E5A0)"
+            menuHexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+            return
+        end
+        applyTheme(col)
+        menuHexStatus.Text = "✔ màu menu = #" .. up
+        menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    end)
 
-    sectionTitle(62, "🌈 ĐỔI MÀU LED RGB (NÚT NỔI + VIỀN STATUS)", ACCENT2)
+    sectionTitle(102, "🌈 ĐỔI MÀU LED RGB (NÚT NỔI + VIỀN STATUS)", ACCENT2)
     local ledPresets = {
         { name = "Cầu vồng", c = nil },
         { name = "Xanh dương", c = Color3.fromRGB(0, 150, 255) },
@@ -866,7 +970,7 @@ do
     for i, p in ipairs(ledPresets) do
         local sw = Instance.new("TextButton")
         sw.Size = UDim2.new(0, 52, 0, 24)
-        sw.Position = UDim2.new(0, 10 + (i - 1) * 56, 0, 84)
+        sw.Position = UDim2.new(0, 10 + (i - 1) * 56, 0, 124)
         sw.BackgroundColor3 = p.c or Color3.fromRGB(60, 60, 80)
         if p.c == nil then
             local g = Instance.new("UIGradient", sw)
@@ -900,9 +1004,9 @@ do
     end
     local hexLbl = Instance.new("TextLabel")
     hexLbl.Size = UDim2.new(0.35, 0, 0, 22)
-    hexLbl.Position = UDim2.new(0, 10, 0, 114)
+    hexLbl.Position = UDim2.new(0, 10, 0, 152)
     hexLbl.BackgroundTransparency = 1
-    hexLbl.Text = "HEX (#RRGGBB):"
+    hexLbl.Text = "HEX LED (#RRGGBB):"
     hexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
     hexLbl.TextSize = 10
     hexLbl.Font = Enum.Font.GothamBold
@@ -911,7 +1015,7 @@ do
     hexLbl.Parent = settingsPage
     local hexBox = Instance.new("TextBox")
     hexBox.Size = UDim2.new(0.3, 0, 0, 22)
-    hexBox.Position = UDim2.new(0.35, 0, 0, 114)
+    hexBox.Position = UDim2.new(0.35, 0, 0, 152)
     hexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
     hexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     hexBox.PlaceholderText = "#FF00AA"
@@ -922,12 +1026,9 @@ do
     hexBox.ZIndex = 12
     hexBox.Parent = settingsPage
     Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
-    local hexStroke = Instance.new("UIStroke", hexBox)
-    hexStroke.Color = Color3.fromRGB(60, 60, 75)
-    hexStroke.Thickness = 1
     local hexApply = Instance.new("TextButton")
     hexApply.Size = UDim2.new(0, 70, 0, 22)
-    hexApply.Position = UDim2.new(0.66, 0, 0, 114)
+    hexApply.Position = UDim2.new(0.66, 0, 0, 152)
     hexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
     hexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
     hexApply.Text = "ÁP DỤNG"
@@ -938,7 +1039,7 @@ do
     Instance.new("UICorner", hexApply).CornerRadius = UDim.new(0, 6)
     local hexStatus = Instance.new("TextLabel")
     hexStatus.Size = UDim2.new(0.9, 0, 0, 14)
-    hexStatus.Position = UDim2.new(0.05, 0, 0, 140)
+    hexStatus.Position = UDim2.new(0.05, 0, 0, 176)
     hexStatus.BackgroundTransparency = 1
     hexStatus.Text = ""
     hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -948,28 +1049,19 @@ do
     hexStatus.ZIndex = 12
     hexStatus.Parent = settingsPage
     hexApply.MouseButton1Click:Connect(function()
-        local input = hexBox.Text:gsub("^#", "")
-        if #input ~= 6 then
+        local col, up = parseHex(hexBox.Text)
+        if not col then
             hexStatus.Text = "❌ hex phải đủ 6 ký tự (VD: FF00AA)"
             hexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
             return
         end
-        local r = tonumber(input:sub(1,2), 16)
-        local g = tonumber(input:sub(3,4), 16)
-        local b = tonumber(input:sub(5,6), 16)
-        if not (r and g and b) then
-            hexStatus.Text = "❌ ký tự không hợp lệ (chỉ 0-9 A-F)"
-            hexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
         ledMode = "fixed"
-        ledFixedColor = Color3.fromRGB(r, g, b)
-        hexStatus.Text = "✔ đã đổi LED sang #" .. input:upper()
+        ledFixedColor = col
+        hexStatus.Text = "✔ đã đổi LED sang #" .. up
         hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
-        print("[hub] LED fixed = #" .. input:upper())
     end)
 
-    -- Nut ON/OFF ro rang (thay cong tac)
+    -- Nut ON/OFF
     local function toggleBtn(y, defaultOn, labelOn, labelOff, colorOn, colorOff, cb)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0.9, 0, 0, 30)
@@ -994,30 +1086,19 @@ do
         end)
         return b
     end
-    toggleBtn(168, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
+    toggleBtn(196, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
         antiAfk = v
     end)
-    toggleBtn(204, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
+    toggleBtn(230, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
         perfOn = v
         perfFrame.Visible = v
     end)
-    local perfPosBtn = Instance.new("TextButton")
-    perfPosBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 240)
-    perfPosBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    perfPosBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    perfPosBtn.Text = "📌 ĐỔI GÓC HIỆN FPS/PING"
-    perfPosBtn.TextSize = 10
-    perfPosBtn.Font = Enum.Font.GothamBold
-    perfPosBtn.ZIndex = 12
-    perfPosBtn.Parent = settingsPage
-    Instance.new("UICorner", perfPosBtn).CornerRadius = UDim.new(0, 6)
-    perfPosBtn.MouseButton1Click:Connect(function()
-        perfCornerIdx = perfCornerIdx % 4 + 1
-        perfFrame.Position = perfCorners[perfCornerIdx]
+    toggleBtn(264, false, "🔒 KHÓA VỊ TRÍ FPS/PING: ĐANG KHÓA", "🔒 KHÓA VỊ TRÍ FPS/PING: ĐANG MỞ", Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70), function(v)
+        perfLocked = v
+        perfFrame.Draggable = not v
     end)
 
-    -- TOI UU
+    -- TOI UU (chi con FPS + CHAT LUONG) + PRESET DO HOA
     local QUAL = {
         Enum.SavedQualitySetting.QualityLevel1,
         Enum.SavedQualitySetting.QualityLevel2,
@@ -1030,11 +1111,11 @@ do
         Enum.SavedQualitySetting.QualityLevel9,
         Enum.SavedQualitySetting.QualityLevel10,
     }
-    local optState = { nhe = false, nhieu = false, sieu = false, fps = false, gem = false }
+    local optState = { fps = false, gem = false }
     local optBtns = {}
     local optInfo = Instance.new("TextLabel")
     optInfo.Size = UDim2.new(0.9, 0, 0, 20)
-    optInfo.Position = UDim2.new(0.05, 0, 0, 186)
+    optInfo.Position = UDim2.new(0.05, 0, 0, 100)
     optInfo.BackgroundTransparency = 1
     optInfo.Text = "đang dùng: mặc định game"
     optInfo.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -1059,17 +1140,6 @@ do
             end
         end)
     end
-    local function killEffects(level)
-        pcall(function()
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Sparkles") or d:IsA("Fire") or d:IsA("Smoke") then
-                    d:Destroy()
-                elseif level >= 3 and (d:IsA("Beam") or d:IsA("PointLight") or d:IsA("SpotLight") or d:IsA("SurfaceLight")) then
-                    d:Destroy()
-                end
-            end
-        end)
-    end
     local function bloomOn(v)
         pcall(function()
             local b = Lighting:FindFirstChild("KhangLeBloom")
@@ -1082,45 +1152,37 @@ do
             b.Enabled = v
         end)
     end
+    local function sunOn(v)
+        pcall(function()
+            local s = Lighting:FindFirstChild("KhangLeSun")
+            if not s then
+                s = Instance.new("SunRaysEffect", Lighting)
+                s.Name = "KhangLeSun"
+                s.Intensity = 0.3
+            end
+            s.Enabled = v
+        end)
+    end
     local function applyOpt()
         if optState.gem then
             pcall(function() Lighting.GlobalShadows = true end)
-            pcall(function() Lighting.Brightness = 2 end)
-            pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120) end)
+            pcall(function() Lighting.Brightness = 2.2 end)
             bloomOn(true)
+            sunOn(true)
             setQualityLevel(10)
             optInfo.Text = "đang dùng: 💎 TĂNG CHẤT LƯỢNG (máy mạnh)"
-        elseif optState.sieu then
-            pcall(function() Lighting.GlobalShadows = false end)
-            pcall(function() Lighting.Brightness = 1 end)
-            pcall(function() Lighting.Ambient = Color3.fromRGB(120, 120, 120) end)
-            bloomOn(false)
-            killEffects(3)
-            setQualityLevel(1)
-            optInfo.Text = "đang dùng: 👻 FIX LAG SIÊU MẠNH"
-        elseif optState.nhieu then
-            pcall(function() Lighting.GlobalShadows = false end)
-            pcall(function() Lighting.Brightness = 1 end)
-            bloomOn(false)
-            killEffects(1)
-            setQualityLevel(3)
-            optInfo.Text = "đang dùng: 🌪️ FIX LAG NHIỀU"
-        elseif optState.nhe then
-            pcall(function() Lighting.GlobalShadows = false end)
-            bloomOn(false)
-            setQualityLevel(6)
-            optInfo.Text = "đang dùng: 🍃 FIX LAG NHẸ"
         elseif optState.fps then
             pcall(function() Lighting.GlobalShadows = false end)
             bloomOn(false)
+            sunOn(false)
             pcall(function() workspace.StreamingEnabled = true end)
             setQualityLevel(4)
             optInfo.Text = "đang dùng: ⚡ TỐI ƯU FPS"
         else
             pcall(function() Lighting.GlobalShadows = true end)
             pcall(function() Lighting.Brightness = 2 end)
-            pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120) end)
             bloomOn(true)
+            sunOn(false)
             setQualityLevel(nil)
             optInfo.Text = "đang dùng: mặc định game"
         end
@@ -1148,46 +1210,155 @@ do
         optBtns[key] = b
         b.MouseButton1Click:Connect(function()
             optState[key] = not optState[key]
-            if key == "gem" and optState.gem then
-                optState.nhe, optState.nhieu, optState.sieu, optState.fps = false, false, false, false
-            elseif key ~= "gem" and optState[key] then
-                optState.gem = false
+            if optState[key] then
+                for k2 in pairs(optState) do
+                    if k2 ~= key then optState[k2] = false end
+                end
             end
             applyOpt()
             print("[hub] opt " .. key .. " = " .. tostring(optState[key]))
         end)
         return b
     end
-    optBtn(6,  "nhe",  "🍃 FIX LAG NHẸ", Color3.fromRGB(60, 140, 90))
-    optBtn(42, "nhieu","🌪️ FIX LAG NHIỀU", Color3.fromRGB(180, 120, 40))
-    optBtn(78, "sieu","👻 FIX LAG SIÊU MẠNH (bay màu hiệu ứng)", Color3.fromRGB(120, 60, 160))
-    optBtn(114,"fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
-    optBtn(150,"gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
+    sectionTitle(6, "⚡ HIỆU NĂNG", themeColor)
+    optBtn(28, "fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
+    optBtn(64, "gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
 
-    -- GUIDE (ZIndex 12+)
-    guideOpenBtn = Instance.new("TextButton")
-    guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
-    guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
-    guideOpenBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-    guideOpenBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
-    guideOpenBtn.Text = "📜 MỞ HƯỚNG DẪN SỬ DỤNG"
-    guideOpenBtn.TextSize = 11
-    guideOpenBtn.Font = Enum.Font.GothamBold
-    guideOpenBtn.ZIndex = 12
-    guideOpenBtn.Parent = guidePage
-    Instance.new("UICorner", guideOpenBtn).CornerRadius = UDim.new(0, 7)
+    -- PRESET DO HOA / MAU TROI
+    local gfxInfo = Instance.new("TextLabel")
+    gfxInfo.Size = UDim2.new(0.9, 0, 0, 20)
+    gfxInfo.Position = UDim2.new(0.05, 0, 0, 180)
+    gfxInfo.BackgroundTransparency = 1
+    gfxInfo.Text = "đồ họa: mặc định"
+    gfxInfo.TextColor3 = Color3.fromRGB(140, 220, 255)
+    gfxInfo.TextSize = 10
+    gfxInfo.Font = Enum.Font.GothamBold
+    gfxInfo.TextXAlignment = Enum.TextXAlignment.Left
+    gfxInfo.ZIndex = 12
+    gfxInfo.Parent = optPage
+    local function getFX()
+        local cc = Lighting:FindFirstChild("KL_CC")
+        if not cc then
+            cc = Instance.new("ColorCorrectionEffect", Lighting)
+            cc.Name = "KL_CC"
+        end
+        local atm = Lighting:FindFirstChild("KL_ATM")
+        if not atm then
+            atm = Instance.new("Atmosphere", Lighting)
+            atm.Name = "KL_ATM"
+        end
+        return cc, atm
+    end
+    local function applyPreset(name)
+        local cc, atm = getFX()
+        local label = name
+        if name == "default" then
+            label = "Mặc định"
+            cc.TintColor = Color3.new(1,1,1); cc.Contrast = 0; cc.Saturation = 0; cc.Brightness = 0
+            atm.Density = 0.3; atm.Haze = 0; atm.Glare = 0
+            atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
+            pcall(function() Lighting.ClockTime = 14 end)
+            pcall(function() Lighting.Brightness = 2 end)
+            pcall(function() Lighting.Ambient = Color3.fromRGB(90,90,90) end)
+            pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120,120,120) end)
+        elseif name == "tram" then
+            label = "Trầm (muted)"
+            cc.TintColor = Color3.fromRGB(205,205,215); cc.Contrast = 0.12; cc.Saturation = -0.25; cc.Brightness = -0.04
+            atm.Density = 0.45; atm.Haze = 0.35; atm.Glare = 0.08
+            atm.Color = Color3.fromRGB(190,190,205); atm.Decay = Color3.fromRGB(200,200,210)
+            pcall(function() Lighting.ClockTime = 16.5 end)
+            pcall(function() Lighting.Brightness = 1.6 end)
+        elseif name == "hoanghon" then
+            label = "Hoàng hôn"
+            cc.TintColor = Color3.fromRGB(255,190,140); cc.Contrast = 0.1; cc.Saturation = 0.18; cc.Brightness = 0
+            atm.Density = 0.55; atm.Haze = 0.5; atm.Glare = 0.25
+            atm.Color = Color3.fromRGB(255,160,110); atm.Decay = Color3.fromRGB(255,140,90)
+            pcall(function() Lighting.ClockTime = 17.8 end)
+            pcall(function() Lighting.Brightness = 1.8 end)
+        elseif name == "dem" then
+            label = "Ban đêm"
+            cc.TintColor = Color3.fromRGB(165,180,255); cc.Contrast = 0.15; cc.Saturation = -0.1; cc.Brightness = -0.12
+            atm.Density = 0.6; atm.Haze = 0.4; atm.Glare = 0.05
+            atm.Color = Color3.fromRGB(120,140,220); atm.Decay = Color3.fromRGB(90,110,200)
+            pcall(function() Lighting.ClockTime = 0.5 end)
+            pcall(function() Lighting.Brightness = 1.2 end)
+        elseif name == "pc" then
+            label = "Rực rỡ kiểu PC"
+            cc.TintColor = Color3.new(1,1,1); cc.Contrast = 0.18; cc.Saturation = 0.25; cc.Brightness = 0.03
+            atm.Density = 0.25; atm.Haze = 0.15; atm.Glare = 0.35
+            atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
+            pcall(function() Lighting.ClockTime = 14 end)
+            pcall(function() Lighting.Brightness = 2.2 end)
+            bloomOn(true)
+            sunOn(true)
+            pcall(function() Lighting.GlobalShadows = true end)
+            setQualityLevel(10)
+        end
+        gfxInfo.Text = "đồ họa: " .. label
+        print("[hub] preset do hoa = " .. label)
+    end
+    sectionTitle(126, "🌗 PRESET ĐỒ HỌA / MÀU TRỜI (xe đẹp nét)", ACCENT2)
+    local gfxPresets = {
+        { key = "default", txt = "Mặc định" },
+        { key = "tram", txt = "Trầm" },
+        { key = "hoanghon", txt = "Hoàng hôn" },
+        { key = "dem", txt = "Đêm" },
+        { key = "pc", txt = "PC" },
+    }
+    for i, p in ipairs(gfxPresets) do
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0, 68, 0, 26)
+        b.Position = UDim2.new(0, 6 + (i - 1) * 72, 0, 148)
+        b.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        b.Text = p.txt
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 10
+        b.Font = Enum.Font.GothamBold
+        b.ZIndex = 13
+        b.Parent = optPage
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        local st = Instance.new("UIStroke", b)
+        st.Color = ACCENT2
+        st.Transparency = 0.5
+        st.Thickness = 1
+        b.MouseButton1Click:Connect(function()
+            applyPreset(p.key)
+        end)
+    end
+
+    -- GUIDE (nhung thang vao menu)
     local guideHint = Instance.new("TextLabel")
-    guideHint.Size = UDim2.new(0.9, 0, 0, 40)
-    guideHint.Position = UDim2.new(0.05, 0, 0, 52)
+    guideHint.Size = UDim2.new(0.9, 0, 0, 20)
+    guideHint.Position = UDim2.new(0.05, 0, 0, 6)
     guideHint.BackgroundTransparency = 1
-    guideHint.Text = "Đọc kĩ hướng dẫn gốc của Khang Lê\ntrước khi chỉnh thông số xe."
-    guideHint.TextColor3 = TXT_DIM
+    guideHint.Text = "Vui lòng đọc kĩ bảng hướng dẫn để tùy chỉnh thông số tránh lỗi !"
+    guideHint.TextColor3 = Color3.fromRGB(255, 215, 0)
     guideHint.TextSize = 10
-    guideHint.Font = Enum.Font.GothamMedium
+    guideHint.Font = Enum.Font.GothamBold
     guideHint.TextXAlignment = Enum.TextXAlignment.Left
-    guideHint.TextWrapped = true
     guideHint.ZIndex = 12
     guideHint.Parent = guidePage
+    local guideScroll = Instance.new("ScrollingFrame")
+    guideScroll.Size = UDim2.new(1, -8, 1, -34)
+    guideScroll.Position = UDim2.new(0, 4, 0, 30)
+    guideScroll.BackgroundTransparency = 1
+    guideScroll.BorderSizePixel = 0
+    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1700)
+    guideScroll.ScrollBarThickness = 4
+    guideScroll.ZIndex = 12
+    guideScroll.Parent = guidePage
+    local guideText = Instance.new("TextLabel")
+    guideText.Size = UDim2.new(1, -10, 0, 1700)
+    guideText.BackgroundTransparency = 1
+    guideText.Text = guideFullText
+    guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
+    guideText.TextSize = 11
+    guideText.Font = Enum.Font.GothamMedium
+    guideText.TextXAlignment = Enum.TextXAlignment.Left
+    guideText.TextYAlignment = Enum.TextYAlignment.Top
+    guideText.TextWrapped = true
+    guideText.ZIndex = 13
+    guideText.Parent = guideScroll
 
     selectPage("TUNER")
 
@@ -1204,34 +1375,7 @@ do
         end
     end
 
-    -- GUIDE FRAME
-    local guideLines = {
-        "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
-        "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
-        "mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )",
-        "rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy",
-        "tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha",
-        "ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )",
-        "final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha )",
-        "Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha",
-        "Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.",
-        "Lưu Ý Về Xe: sẽ có vài xe không áp dụng được top speed chỉ có thể tăng mã lực giúp xe đề pa sẽ mạnh hơn tăng tầm 7 - 12 km/h tùy vào xe còn top speed sẽ không hoạt động nha vì admin lock thông số xe đó nên script sẽ không can thiệp để thay đổi top speed được nhưng bù lại mọi người có thể chỉnh mã lực đề pa xoáy bánh và chỉnh rpm vẫn được nha nhưng đừng chỉnh ratio gear và final drive dễ gây xung đột và lỗi, rpm mình set mặc định là 3500 mọi người thấy chạy max speed mà nó vẫn còn dư cả khúc rpm ở thanh dưới thì mọi người giảm rpm xuống đến khi nào xe nó đờn tằng tằng nha nhưng nếu mọi người thấy xe nó tự chạy bấm dừng không được thì tăng rpm lên một chút tầm 50 - 100 gì đó để nó dư một khoản nhỏ xong lại giảm nhẹ lại 10 - 20 căn đến khi nào nó đờn tua nha để tránh lỗi tiếng pô và chạy cũng sướng hơn nữa",
-        "Auto T: tự động bốc đầu cho ai muốn múa lửa",
-        "cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê",
-        "lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại",
-        "Tháo Dàn Áo: tháo mọi thứ của xe bánh xe áo xe cục máy bla bla..vv",
-        "cách dùng: bật menu lên và bật quản lý dàn áo sau đó spawn xe muốn tháo và ngồi lên xe bấm quét xe để quét xe sau đó xuống xe bật free cam và click vào chỗ muốn tháo lưu ý bộ phận của xe được gọi là part và part có nhiều cụm tùy xe admin sẽ chia nhỏ từng cụm ra rất dễ tháo còn xe gộp một đống part vào một cụm nếu mọi người bấm vào một chỗ muốn xoá mà thấy cụm đó có tới 100 hoặc hơn 200 part có nghĩa là nó k chia nhỏ cụm ra và gộp thành 1 cụm to mọi người chịu khó bấm tới chỗ mình muốn xoá ví dụ phuộc bla bla có thể tháo luôn cục máy để chụp ảnh sau khi tháo mọi người vẫn chạy bình thường nha nhưng chịu khó xíu sau khi tháo xong hết thì mọi người tắt soi và tháo đi nha là ok",
-        "lưu ý: vì xe admin không làm remote event nên khi xoá chỉ mọi người thấy được còn người khác thì không nha ai thích chụp ảnh thì dùng để tháo ra xem chi tiết rồi chụp cho đẹp nha",
-        "cách tìm part muốn xoá: khi mọi người click sẽ hiện selection box có màu và tên cụm và part nếu xe được gộp nhiều cụm lại thì rất dễ tháo nó chia nhỏ ra từng part cho mỗi cụm có tên riêng mọi người muốn xoá dàn áo thì cứ di cam lại gần dàn áo rồi bấm vô xong bấm xoá cả mục là xoá hết dàn áo ngoài luôn nếu còn hình mờ hoặc tem có nghĩa xe đó có một cụm to nữa mọi người phải bấm tìm cụm to đó rồi dò từng part để xoá , sẽ có cụm trước và cụm sau là không có gộp chung đâu nha cứ click lên cụm trước hay sau rồi tìm chỗ muốn xoá ví dụ ốp đầu hay ghi đông là ở cụm trước còn cụm giữa là cái khung và mấy part nhỏ nhỏ như ốc máy bla bla nói chung muốn xoá gì thì ngồi mò chút xíu nha là hiểu !",
-        "gợi ý: những mảnh dàn áo hay màu sơn và tem admin thường đặt tên part là (livery , paint) còn những xe khác có thể sẽ là những tên khác nhưng có selection box nên mọi người cứ đổi part đến khi nào thấy chỗ mình muốn xoá rồi xoá là được nha",
-        "Freecam: freecam này do mình làm và mọi người có thể dùng để quay phim chụp ảnh có thể tùy chỉnh tốc độ xoay camera , di chuyển , zoom , up down như pc luôn nha",
-        "cách dùng: mở menu chính lên và mở freecam sau đó mọi người tùy chỉnh tốc độ xoay camera và di chuyển freecam và trong menu có nút ẩn giao diện khi bật lên sẽ hiện nút nổi khi bấm vào sẽ ẩn toàn bộ cụm điều khiển nút nhảy nhưng vẫn bấm và di chuyển được bằng cụm điều khiển nha chỉ ẩn đi thôi chứ không mất và khi ẩn sẽ ẩn luôn nút nổi mọi người chỉ cần nhớ chỗ để nút nổi và ấn lại vị trí đó là được khi mọi người bấm ẩn mình đã cố định ở chỗ mọi người để nút nổi rồi nha",
-        "lưu ý: ẩn giao diện sẽ không ẩn được UI của game nha chỉ ẩn được của roblox thôi muốn ẩn UI của game một là mọi người bật freecam của game và bấm nút con mắt sẽ ẩn hết nhưng mà vẫn còn dấu x nha và cũng k có ích lợi gì :v",
-        "gợi ý: mọi người nên dùng quay video hoặc chụp ảnh của roblox không cần chụp bằng điện thoại mọi người bấm vô dấu 3 gạch tìm mục chụp ảnh có hình camera sau đó sẽ hiện một cái nút  nổi có thể di chuyển của roblox bấm ở trên là quay video và ở dưới là chụp ảnh và khi dùng cái đó thì không có thứ gì gây cản trở trên màn hình nữa nha nó chỉ quay trong game không vướng víu UI hay script gì đâu nha mọi người có thể thoải mái dùng freecam của mình để quay video không cần ẩn giao diện nha và khi quay hoặc chụp xong mọi người bấm vào roblox trên góc trái màn hình tìm chỗ thư viện ảnh và video của mọi người sẽ ở đó và chỉ việc lưu về nha!",
-        "Script By Khang Lê",
-        "Id Tiktok: @khangdayy215",
-        "Cảm ơn đã tin tưởng và sử dụng script của mình!.",
-    }
+    -- GUIDE FRAME popup (onboarding)
     GuideFrame = Instance.new("Frame")
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
@@ -1263,7 +1407,7 @@ do
     ScrollGuide.Parent = GuideFrame
     local GuideContent = Instance.new("TextLabel")
     GuideContent.BackgroundTransparency = 1
-    GuideContent.Text = table.concat(guideLines, "\n\n")
+    GuideContent.Text = guideFullText
     GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
     GuideContent.TextSize = 12
     GuideContent.Font = Enum.Font.GothamMedium
@@ -2720,9 +2864,6 @@ end)
 hubClose.MouseButton1Click:Connect(function()
     HubFrame.Visible = false
 end)
-guideOpenBtn.MouseButton1Click:Connect(function()
-    GuideFrame.Visible = true
-end)
 
 local bodyOn = false
 bodyOpenBtn.MouseButton1Click:Connect(function()
@@ -2755,4 +2896,4 @@ addRGBStroke(FreecamFloatingBtn, 3)
 addRGBStroke(hideFloatBtn, 4)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v8] san sang — trang hien day du, settings gon, FPS/PING bat duoc")
+print("[hub remix v9] san sang — preset do hoa, guide nhung, ping that, khoa FPS, hex menu")
