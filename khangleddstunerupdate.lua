@@ -1,10 +1,8 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v5
--- v5: LED chase nguyen khoi (toa do nguyen, het dut khuc)
---     RingFrame rieng cho moi nut noi + freecam + statPanel
---     statPanel doi sang trai (het che nut Settings)
---     Dan Ao / Freecam = BAT/TAT (bat moi hien nut noi)
---     Toi Uu = 5 cong tac doc lap, tac that, co nhan phan hoi
+-- KHANGLE DDS HUB — 4080 REMIX v6
+-- v6: nut noi = LED RGB doi mau don gian (UIStroke bo tron theo nut)
+--     statPanel GIU NGUYEN vi tri, khong doi
+--     GuideFrame: tao noi dung truoc, hien sau, clip chong phinh
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -104,11 +102,35 @@ local function rainbowAt(pos)
     return a:Lerp(b, f)
 end
 
+-- LED RGB don gian cho nut noi (UIStroke bo tron theo nut)
+local floatRGB = {}
+local function addRGBStroke(btn, phase)
+    local s = Instance.new("UIStroke", btn)
+    s.Name = "RGB"
+    s.Thickness = 2.4
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Transparency = 0
+    table.insert(floatRGB, { s = s, phase = phase })
+    return s
+end
+task.spawn(function()
+    local t = 0
+    while true do
+        t = t + 0.06
+        for _, e in ipairs(floatRGB) do
+            e.s.Color = rainbowAt((t + e.phase) % 7)
+        end
+        task.wait(0.03)
+    end
+end)
+
+-- Chase ring rieng cho statPanel (hinh chu nhat, giu nguyen)
 local ledOn = true
-local rings = {}
-local function makeChaseRing(target, W, H, inset, T, n1, n2)
+local statRingSegs = {}
+local statRingFrame = nil
+local function makeStatRing(target, W, H, inset, T, n1, n2)
     local rf = Instance.new("Frame")
-    rf.Name = "ChaseRing"
+    rf.Name = "StatRing"
     rf.BackgroundTransparency = 1
     rf.BorderSizePixel = 0
     rf.Size = UDim2.new(0, W, 0, H)
@@ -117,9 +139,10 @@ local function makeChaseRing(target, W, H, inset, T, n1, n2)
     rf.ZIndex = 20
     rf.Active = false
     rf.Parent = ScreenGui
-    local segs = {}
-    local innerW = W - 2 * inset
-    local innerH = H - 2 * inset
+    local xs = {}
+    for i = 0, n1 do xs[i] = math.floor(inset + i * (W - 2 * inset) / n1) end
+    local ys = {}
+    for i = 0, n2 do ys[i] = math.floor(inset + i * (H - 2 * inset) / n2) end
     local function addPx(x, y, w, h)
         local f = Instance.new("Frame")
         f.Position = UDim2.new(0, x, 0, y)
@@ -127,29 +150,26 @@ local function makeChaseRing(target, W, H, inset, T, n1, n2)
         f.BorderSizePixel = 0
         f.ZIndex = 21
         f.Parent = rf
-        table.insert(segs, f)
+        table.insert(statRingSegs, f)
     end
-    local xs = {}
-    for i = 0, n1 do xs[i] = math.floor(inset + i * innerW / n1) end
-    local ys = {}
-    for i = 0, n2 do ys[i] = math.floor(inset + i * innerH / n2) end
     for i = 0, n1 - 1 do addPx(xs[i], inset, xs[i + 1] - xs[i], T) end
     for i = 0, n2 - 1 do addPx(W - inset - T, ys[i], T, ys[i + 1] - ys[i]) end
     for i = n1 - 1, 0, -1 do addPx(xs[i], H - inset - T, xs[i + 1] - xs[i], T) end
     for i = n2 - 1, 0, -1 do addPx(inset, ys[i], T, ys[i + 1] - ys[i]) end
-    table.insert(rings, { frame = rf, target = target, segs = segs, n = #segs })
     return rf
 end
 task.spawn(function()
     local t = 0
+    local n = 0
     while true do
         t = t + 0.06
-        for r, ring in ipairs(rings) do
-            ring.frame.Position = ring.target.Position
-            ring.frame.Visible = ledOn and ring.target.Visible or false
-            if ring.frame.Visible then
-                for i, seg in ipairs(ring.segs) do
-                    seg.BackgroundColor3 = rainbowAt((t + (i - 1) * 7 / ring.n + r * 1.7) % 7)
+        n = #statRingSegs
+        if statRingFrame and ledOn then
+            statRingFrame.Position = statPanel and statPanel.Position or statRingFrame.Position
+            statRingFrame.Visible = statPanel and statPanel.Visible or false
+            if statRingFrame.Visible and n > 0 then
+                for i, seg in ipairs(statRingSegs) do
+                    seg.BackgroundColor3 = rainbowAt((t + (i - 1) * 7 / n) % 7)
                 end
             end
         end
@@ -195,7 +215,7 @@ task.spawn(function()
     end
 end)
 
--- ============ NUT NOI (VUONG) ============
+-- ============ NUT NOI (VUONG + LED RGB) ============
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 48, 0, 48)
 ToggleBtn.Position = UDim2.new(0, 25, 0.4, 0)
@@ -207,9 +227,6 @@ ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.Draggable = true
 ToggleBtn.Parent = ScreenGui
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 7)
-local stroke1 = Instance.new("UIStroke", ToggleBtn)
-stroke1.Color = themeColor
-stroke1.Thickness = 2
 
 local AutoTFloatingBtn = Instance.new("TextButton")
 AutoTFloatingBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -260,11 +277,11 @@ local strokeFreecamFloat = Instance.new("UIStroke", FreecamFloatingBtn)
 strokeFreecamFloat.Color = Color3.fromRGB(100, 150, 255)
 strokeFreecamFloat.Thickness = 2
 
--- ============ BANG STATUS TRONG SUOT (doi sang trai, chi hien khi farm) ============
+-- ============ BANG STATUS (GIU NGUYEN VI TRI) ============
 do
     statPanel = Instance.new("Frame")
     statPanel.Size = UDim2.new(0, 250, 0, 134)
-    statPanel.Position = UDim2.new(0, 16, 0.5, 40)
+    statPanel.Position = UDim2.new(0, 76, 0.5, 62)
     statPanel.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
     statPanel.BackgroundTransparency = 0.45
     statPanel.BorderSizePixel = 0
@@ -663,7 +680,7 @@ do
         end)
     end)
 
-    -- CHUNG (scroll, 3 card, nut DAN AO / FREECAM = BAT-TAT)
+    -- CHUNG
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -817,8 +834,14 @@ do
         end)
         return sw2
     end
-    makeSetSwitch(64, "🌈 LED ĐUỔI RGB NÚT NỔI", true, function(v)
+    makeSetSwitch(64, "🌈 LED RGB NÚT NỔI", true, function(v)
         ledOn = v
+        for _, e in ipairs(floatRGB) do
+            e.s.Enabled = v
+        end
+        for _, seg in ipairs(statRingSegs) do
+            seg.Visible = v
+        end
     end)
     makeSetSwitch(96, "🛡️ ANTI-AFK", true, function(v)
         antiAfk = v
@@ -843,7 +866,7 @@ do
         perfFrame.Position = perfCorners[perfCornerIdx]
     end)
 
-    -- TOI UU: 5 cong tac doc lap
+    -- TOI UU
     local QUAL = {
         Enum.SavedQualitySetting.QualityLevel1,
         Enum.SavedQualitySetting.QualityLevel2,
@@ -989,7 +1012,7 @@ do
     optBtn(114,"fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
     optBtn(150,"gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
 
-    -- GUIDE
+    -- GUIDE (noi dung truoc, hien sau, clip chong phinh)
     guideOpenBtn = Instance.new("TextButton")
     guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
     guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
@@ -1018,7 +1041,6 @@ do
         themeColor = c
         hubStroke.Color = c
         hubHeader.TextColor3 = c
-        stroke1.Color = c
         ToggleBtn.TextColor3 = c
         if currentPageName then
             selectPage(currentPageName)
@@ -1057,13 +1079,12 @@ do
         "Cảm ơn đã tin tưởng và sử dụng script của mình!.",
     }
     GuideFrame = Instance.new("Frame")
-    GuideFrame.Size = UDim2.new(0, 540, 0, 350)
-    GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
     GuideFrame.Active = true
     GuideFrame.Draggable = false
-    GuideFrame.Visible = true
+    GuideFrame.Visible = false
+    GuideFrame.ClipsDescendants = true
     GuideFrame.ZIndex = 9
     GuideFrame.Parent = ScreenGui
     Instance.new("UICorner", GuideFrame).CornerRadius = UDim.new(0, 14)
@@ -1077,18 +1098,16 @@ do
     GuideTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
     GuideTitle.TextSize = 12
     GuideTitle.Font = Enum.Font.GothamBold
+    GuideTitle.ZIndex = 10
     GuideTitle.Parent = GuideFrame
     makeHeaderDraggable(GuideTitle, GuideFrame)
     local ScrollGuide = Instance.new("ScrollingFrame")
-    ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
-    ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
     ScrollGuide.BackgroundTransparency = 1
     ScrollGuide.BorderSizePixel = 0
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1700)
     ScrollGuide.ScrollBarThickness = 4
+    ScrollGuide.ZIndex = 10
     ScrollGuide.Parent = GuideFrame
     local GuideContent = Instance.new("TextLabel")
-    GuideContent.Size = UDim2.new(1, -10, 0, 1700)
     GuideContent.BackgroundTransparency = 1
     GuideContent.Text = table.concat(guideLines, "\n\n")
     GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -1097,17 +1116,27 @@ do
     GuideContent.TextXAlignment = Enum.TextXAlignment.Left
     GuideContent.TextYAlignment = Enum.TextYAlignment.Top
     GuideContent.TextWrapped = true
+    GuideContent.ZIndex = 10
     GuideContent.Parent = ScrollGuide
     local CloseGuideBtn = Instance.new("TextButton")
-    CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
-    CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     CloseGuideBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
     CloseGuideBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
     CloseGuideBtn.Text = "✖ ĐÃ HIỂU - VÀO GIAO DIỆN CHÍNH"
     CloseGuideBtn.TextSize = 12
     CloseGuideBtn.Font = Enum.Font.GothamBold
+    CloseGuideBtn.ZIndex = 10
     CloseGuideBtn.Parent = GuideFrame
     Instance.new("UICorner", CloseGuideBtn).CornerRadius = UDim.new(0, 8)
+    -- kich thuoc + vi tri sau cung, roi moi hien
+    GuideFrame.Size = UDim2.new(0, 540, 0, 350)
+    GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
+    ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
+    ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1700)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1700)
+    CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
+    CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
+    GuideFrame.Visible = true
     CloseGuideBtn.MouseButton1Click:Connect(function()
         GuideFrame.Visible = false
         HubFrame.Visible = true
@@ -2530,7 +2559,7 @@ do
     end)
 end
 
--- ============ NOI DAY CUOI: NUT CHUNG BAT/TAT + LED RING ============
+-- ============ NOI DAY CUOI + LED RGB NUT NOI ============
 ToggleBtn.MouseButton1Click:Connect(function()
     HubFrame.Visible = not HubFrame.Visible
 end)
@@ -2565,11 +2594,13 @@ fcOpenBtn.MouseButton1Click:Connect(function()
     fcOpenBtn.BackgroundColor3 = fcOn and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(30, 30, 40)
 end)
 
-makeChaseRing(ToggleBtn, 48, 48, 3, 3, 4, 2)
-makeChaseRing(AutoTFloatingBtn, 48, 48, 3, 3, 4, 2)
-makeChaseRing(BodyManagerFloatingBtn, 48, 48, 3, 3, 4, 2)
-makeChaseRing(FreecamFloatingBtn, 48, 48, 3, 3, 4, 2)
-makeChaseRing(hideFloatBtn, 52, 52, 3, 3, 4, 2)
-makeChaseRing(statPanel, 250, 134, 4, 3, 14, 7)
+-- LED RGB don gian, bo tron theo tung nut noi
+addRGBStroke(ToggleBtn, 0)
+addRGBStroke(AutoTFloatingBtn, 1)
+addRGBStroke(BodyManagerFloatingBtn, 2)
+addRGBStroke(FreecamFloatingBtn, 3)
+addRGBStroke(hideFloatBtn, 4)
+-- chase ring rieng cho statPanel (giu nguyen vi tri statPanel)
+statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v5] san sang — LED lien mach, ring moi nut, toggle toi uu that")
+print("[hub remix v6] san sang — LED RGB bo tron nut noi, status giu cho, guide het phinh")
