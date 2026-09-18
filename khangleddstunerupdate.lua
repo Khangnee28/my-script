@@ -1,10 +1,9 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v11
--- v11: BO trang TOI UU + preset + tang chat luong; giu TOI UU FPS -> Settings
---      Settings = ScrollingFrame gian dong het dinh chu
---      Guide canvas/content = 1600
---      Card Office bo luot giai/in (chi con trong status khi bat farm)
---      LED nut noi moi chuc nang = CUNG MAU nut 👑, nhanh hon, 12 mau
+-- KHANGLE DDS HUB — 4080 REMIX v12
+-- v12: card Dan Ao/Freecam cao 110 (nut y=70 het de chu)
+--      guide canvas/content = 1400
+--      XOA MOI print/warn (console sach)
+--      notify bar "Script By KhangLe" vien LED
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -125,7 +124,6 @@ local function addRGBStroke(btn)
     table.insert(floatRGB, s)
     return s
 end
--- LED nut noi: TAT CA CUNG MAU dong thoi, chay nhanh hon
 task.spawn(function()
     local t = 0
     while true do
@@ -213,29 +211,6 @@ local activeMode = nil
 local farmStart = 0
 local antiAfk = true
 local optFPS = false
-
-pcall(function()
-    player.Kicked:Connect(function(reason)
-        warn("[farm] KICK MSG: " .. tostring(reason))
-    end)
-end)
-
-task.spawn(function()
-    while true do
-        pcall(function()
-            VirtualInputManager:SendMouseMoveEvent(math.random(-3, 3), math.random(-3, 3))
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local seated = (hum and hum.Sit) or false
-            if not seated then
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
-                task.wait(0.05)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
-            end
-        end)
-        task.wait(45 + math.random(5, 15))
-    end
-end)
 
 -- ============ NUT NOI (VUONG + LED RGB) ============
 local ToggleBtn = Instance.new("TextButton")
@@ -426,7 +401,7 @@ task.spawn(function()
     end
 end)
 
--- ============ NOI DUNG GUIDE (1600) ============
+-- ============ NOI DUNG GUIDE (1400) ============
 local guideLines = {
     "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
     "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
@@ -745,7 +720,7 @@ do
         end)
     end)
 
-    -- CHUNG (card Office KHONG con luot giai/in)
+    -- CHUNG (card cao 110, nut y=70 het de chu)
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -756,7 +731,7 @@ do
     scroll.Parent = chungPage
     local function makeCard(y, title, desc, strokeColor)
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -8, 0, 90)
+        card.Size = UDim2.new(1, -8, 0, 110)
         card.Position = UDim2.new(0, 4, 0, y)
         card.BackgroundColor3 = CARD_BG
         card.BorderSizePixel = 0
@@ -779,7 +754,7 @@ do
         t.ZIndex = 13
         t.Parent = card
         local d = Instance.new("TextLabel")
-        d.Size = UDim2.new(1, -24, 0, 30)
+        d.Size = UDim2.new(1, -24, 0, 34)
         d.Position = UDim2.new(0, 12, 0, 30)
         d.BackgroundTransparency = 1
         d.Text = desc
@@ -818,10 +793,10 @@ do
         return { track = track, set = set, isOn = function() return on end }
     end
     farmSwitch = makeSwitch(cardFarm, 10)
-    local cardBody = makeCard(100, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
+    local cardBody = makeCard(120, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton")
     bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 52)
+    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
     bodyOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     bodyOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     bodyOpenBtn.Text = "🚗 DÀN ÁO: ĐANG TẮT"
@@ -830,10 +805,10 @@ do
     bodyOpenBtn.ZIndex = 13
     bodyOpenBtn.Parent = cardBody
     Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
-    local cardFc = makeCard(200, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
+    local cardFc = makeCard(240, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
     fcOpenBtn = Instance.new("TextButton")
     fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 52)
+    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
     fcOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     fcOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     fcOpenBtn.Text = "📷 FREECAM: ĐANG TẮT"
@@ -843,7 +818,7 @@ do
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS (ScrollingFrame, gian dong, them TOI UU FPS)
+    -- SETTINGS (ScrollingFrame)
     local settingsScroll = Instance.new("ScrollingFrame")
     settingsScroll.Size = UDim2.new(1, 0, 1, 0)
     settingsScroll.BackgroundTransparency = 1
@@ -990,7 +965,6 @@ do
                 ledMode = "fixed"
                 ledFixedColor = p.c
             end
-            print("[hub] LED = " .. p.name)
         end)
     end
     local hexLbl = Instance.new("TextLabel")
@@ -1072,7 +1046,6 @@ do
             on = not on
             paint()
             cb(on)
-            print("[hub] " .. (on and "ON: " or "OFF: ") .. labelOn)
         end)
         return b
     end
@@ -1088,7 +1061,7 @@ do
         perfFrame.Draggable = not v
     end)
 
-    -- TOI UU FPS (tu trang TOI UU cu)
+    -- TOI UU FPS
     local QUAL = {
         Enum.SavedQualitySetting.QualityLevel1,
         Enum.SavedQualitySetting.QualityLevel2,
@@ -1148,18 +1121,16 @@ do
             sunSet(false)
             pcall(function() workspace.StreamingEnabled = true end)
             setQualityLevel(4)
-            print("[hub] TOI UU FPS = ON")
         else
             pcall(function() Lighting.GlobalShadows = true end)
             pcall(function() Lighting.Brightness = 2 end)
             bloomSet(true, 0.4, 0.8)
             sunSet(false)
             setQualityLevel(nil)
-            print("[hub] TOI UU FPS = OFF")
         end
     end)
 
-    -- GUIDE (nhung thang, 1600)
+    -- GUIDE (nhung thang, 1400)
     local guideHint = Instance.new("TextLabel")
     guideHint.Size = UDim2.new(0.9, 0, 0, 20)
     guideHint.Position = UDim2.new(0.05, 0, 0, 6)
@@ -1176,12 +1147,12 @@ do
     guideScroll.Position = UDim2.new(0, 4, 0, 30)
     guideScroll.BackgroundTransparency = 1
     guideScroll.BorderSizePixel = 0
-    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1600)
+    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1400)
     guideScroll.ScrollBarThickness = 4
     guideScroll.ZIndex = 12
     guideScroll.Parent = guidePage
     local guideText = Instance.new("TextLabel")
-    guideText.Size = UDim2.new(1, -10, 0, 1600)
+    guideText.Size = UDim2.new(1, -10, 0, 1400)
     guideText.BackgroundTransparency = 1
     guideText.Text = guideFullText
     guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -1208,7 +1179,7 @@ do
         end
     end
 
-    -- GUIDE FRAME popup (1600)
+    -- GUIDE FRAME popup (1400)
     GuideFrame = Instance.new("Frame")
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
@@ -1262,8 +1233,8 @@ do
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1600)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1600)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1400)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1400)
     CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
     CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     GuideFrame.Visible = true
@@ -2352,9 +2323,6 @@ do
                 task.wait(0.1)
             end
         end)
-        if not ok then
-            warn("[farm] fly loi, ha canh di bo")
-        end
         of_killBV()
         task.wait(0.3)
     end
@@ -2412,7 +2380,6 @@ do
                 if flat.Magnitude <= stopDist then break end
                 h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
                 if hrp.Position.Y < target.Y - 120 then
-                    warn("[farm] rot void — tu respawn de tiep tuc")
                     pcall(function() h.Health = 0 end)
                     break
                 end
@@ -2429,7 +2396,6 @@ do
                         slip = 0.5
                         pulses += 1
                         stuckTime = 0
-                        print("[farm] tuong chan — mo tuong 0.5s")
                     end
                 end
                 if slip > 0 then
@@ -2463,9 +2429,6 @@ do
         if h and hrp then
             h:MoveTo(hrp.Position)
             of_endSprint(h)
-        end
-        if not ok then
-            warn("[farm] walk loi")
         end
     end
     local function of_forceSit(h)
@@ -2554,15 +2517,11 @@ do
     local function of_fireAnswer(q)
         local choice = of_solve(q)
         if not choice then
-            warn("[farm] khong parse duoc: " .. tostring(q and q.text))
             return false
         end
         local btn = of_findButton(choice.Text)
         local how = btn and of_clickButton(btn) or nil
-        if how then
-            print("[farm] bam nut Text=" .. tostring(choice.Text) .. " cach=" .. tostring(how))
-        else
-            print("[farm] duong cung remote Text=" .. tostring(choice.Text))
+        if not how then
             pcall(function()
                 CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice)))
             end)
@@ -2574,7 +2533,6 @@ do
     local function of_doPrint(name)
         local model = Computers:FindFirstChild(name)
         if not model then
-            warn("[farm] khong thay may in: " .. tostring(name))
             return
         end
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
@@ -2610,7 +2568,6 @@ do
         if not farmOffice then return end
         if not of_sitAtChair() then
             if farmOffice then
-                warn("[farm] khong ngoi duoc ghe, thu lai")
                 task.wait(2)
             end
             return
@@ -2629,7 +2586,6 @@ do
             end
             if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
                 of_refired = true
-                print("[farm] khong thay xac nhan — thu lai 1 lan")
                 if of_lastKnownQuestion then
                     of_fireAnswer(of_lastKnownQuestion)
                     setStatus("đã giải")
@@ -2646,10 +2602,9 @@ do
     task.spawn(function()
         while true do
             if farmOffice then
-                local ok, err = pcall(of_runCycle)
+                local ok = pcall(of_runCycle)
                 if not ok then
                     of_killBV()
-                    warn("[farm] LOOP ERR: " .. tostring(err))
                     task.wait(1)
                 end
             else
@@ -2729,4 +2684,47 @@ addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v11] san sang — bo toi uu/preset, FPS vao Settings, guide 1600, LED dong mau")
+-- ============ THANH THONG BAO "Script By KhangLe" ============
+do
+    local notifyBar = Instance.new("Frame")
+    notifyBar.Size = UDim2.new(0, 340, 0, 46)
+    notifyBar.Position = UDim2.new(0.5, -170, 0, 64)
+    notifyBar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    notifyBar.BackgroundTransparency = 0.15
+    notifyBar.BorderSizePixel = 0
+    notifyBar.ZIndex = 60
+    notifyBar.Parent = ScreenGui
+    Instance.new("UICorner", notifyBar).CornerRadius = UDim.new(0, 10)
+    local notifyStroke = Instance.new("UIStroke", notifyBar)
+    notifyStroke.Thickness = 2
+    notifyStroke.Parent = notifyBar
+    local notifyLabel = Instance.new("TextLabel")
+    notifyLabel.Size = UDim2.new(1, -20, 1, 0)
+    notifyLabel.Position = UDim2.new(0, 10, 0, 0)
+    notifyLabel.BackgroundTransparency = 1
+    notifyLabel.Text = "👑 Script By KhangLe"
+    notifyLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+    notifyLabel.TextSize = 16
+    notifyLabel.Font = Enum.Font.GothamBold
+    notifyLabel.TextXAlignment = Enum.TextXAlignment.Center
+    notifyLabel.ZIndex = 61
+    notifyLabel.Parent = notifyBar
+    task.spawn(function()
+        local t = 0
+        while notifyBar.Visible do
+            t = t + 0.15
+            notifyStroke.Color = rainbowAt(t)
+            task.wait(0.03)
+        end
+    end)
+    task.spawn(function()
+        task.wait(8)
+        for i = 0, 20 do
+            notifyBar.BackgroundTransparency = 0.15 + (i / 20) * 0.85
+            notifyLabel.TextTransparency = i / 20
+            notifyStroke.Transparency = i / 20
+            task.wait(0.05)
+        end
+        notifyBar.Visible = false
+    end)
+end
