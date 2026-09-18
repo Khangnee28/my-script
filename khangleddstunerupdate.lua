@@ -1,10 +1,9 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v9
--- v9: BO 3 nut fix lag (giu TOI UU FPS + TANG CHAT LUONG)
---     Them PRESET DO HOA / MAU TROI (Tram / Hoang hon / Dem / PC)
---     Guide nhung thang vao trang GUIDE trong menu
---     FPS/PING hien du ping; khung FPS keo tha + nut KHOA VI TRI
---     Doi mau menu bang ma HEX
+-- KHANGLE DDS HUB — 4080 REMIX v10
+-- v10: Settings gian dong het dinh chu; LED = 6 o vuong nho
+--      Bo Hoang hon/Dem; them Studio/Cinematic/Golden Hour (chup xe dep)
+--      TANG CHAT LUONG = Future lighting + shadow mem + bloom manh
+--      Guide CanvasSize/ContentSize = 1300
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -422,7 +421,7 @@ task.spawn(function()
     end
 end)
 
--- ============ NOI DUNG GUIDE (dung chung cho popup + trang GUIDE) ============
+-- ============ NOI DUNG GUIDE (1300) ============
 local guideLines = {
     "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
     "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
@@ -852,10 +851,10 @@ do
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS
+    -- SETTINGS (gian dong, LED o vuong nho)
     local function sectionTitle(y, text, color)
         local t = Instance.new("TextLabel")
-        t.Size = UDim2.new(1, -20, 0, 20)
+        t.Size = UDim2.new(1, -20, 0, 18)
         t.Position = UDim2.new(0, 10, 0, y)
         t.BackgroundTransparency = 1
         t.Text = text
@@ -876,8 +875,28 @@ do
         if not (r and g and b) then return nil end
         return Color3.fromRGB(r, g, b), input:upper()
     end
+    local function makeSwatch(x, y, color, gradient, onClick)
+        local sw = Instance.new("TextButton")
+        sw.Size = UDim2.new(0, 34, 0, 26)
+        sw.Position = UDim2.new(0, x, 0, y)
+        sw.BackgroundColor3 = color or Color3.fromRGB(60, 60, 80)
+        sw.Text = ""
+        sw.ZIndex = 13
+        sw.Parent = settingsPage
+        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
+        if gradient then
+            local g = Instance.new("UIGradient", sw)
+            g.Color = gradient
+        end
+        local st = Instance.new("UIStroke", sw)
+        st.Color = Color3.fromRGB(255, 255, 255)
+        st.Transparency = 0.75
+        st.Thickness = 1
+        sw.MouseButton1Click:Connect(onClick)
+        return sw
+    end
 
-    sectionTitle(6, "🎨 MÀU MENU CHÍNH", themeColor)
+    sectionTitle(4, "🎨 MÀU MENU CHÍNH", themeColor)
     local themePresets = {
         Color3.fromRGB(0, 229, 160),
         Color3.fromRGB(56, 189, 248),
@@ -887,24 +906,13 @@ do
         Color3.fromRGB(255, 110, 190),
     }
     for i, c in ipairs(themePresets) do
-        local sw = Instance.new("TextButton")
-        sw.Size = UDim2.new(0, 34, 0, 26)
-        sw.Position = UDim2.new(0, 10 + (i - 1) * 40, 0, 28)
-        sw.BackgroundColor3 = c
-        sw.Text = ""
-        sw.ZIndex = 12
-        sw.Parent = settingsPage
-        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        sw.MouseButton1Click:Connect(function()
-            applyTheme(c)
-        end)
+        makeSwatch(10 + (i - 1) * 40, 26, c, nil, function() applyTheme(c) end)
     end
-    -- Mau menu theo ma HEX
     local menuHexLbl = Instance.new("TextLabel")
-    menuHexLbl.Size = UDim2.new(0.34, 0, 0, 22)
-    menuHexLbl.Position = UDim2.new(0, 10, 0, 60)
+    menuHexLbl.Size = UDim2.new(0, 88, 0, 24)
+    menuHexLbl.Position = UDim2.new(0, 10, 0, 58)
     menuHexLbl.BackgroundTransparency = 1
-    menuHexLbl.Text = "MÃ MENU (#RRGGBB):"
+    menuHexLbl.Text = "MÃ MENU:"
     menuHexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
     menuHexLbl.TextSize = 10
     menuHexLbl.Font = Enum.Font.GothamBold
@@ -912,8 +920,8 @@ do
     menuHexLbl.ZIndex = 12
     menuHexLbl.Parent = settingsPage
     local menuHexBox = Instance.new("TextBox")
-    menuHexBox.Size = UDim2.new(0.3, 0, 0, 22)
-    menuHexBox.Position = UDim2.new(0.35, 0, 0, 60)
+    menuHexBox.Size = UDim2.new(0, 110, 0, 24)
+    menuHexBox.Position = UDim2.new(0, 102, 0, 58)
     menuHexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
     menuHexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     menuHexBox.PlaceholderText = "#00E5A0"
@@ -925,8 +933,8 @@ do
     menuHexBox.Parent = settingsPage
     Instance.new("UICorner", menuHexBox).CornerRadius = UDim.new(0, 6)
     local menuHexApply = Instance.new("TextButton")
-    menuHexApply.Size = UDim2.new(0, 70, 0, 22)
-    menuHexApply.Position = UDim2.new(0.66, 0, 0, 60)
+    menuHexApply.Size = UDim2.new(0, 70, 0, 24)
+    menuHexApply.Position = UDim2.new(0, 220, 0, 58)
     menuHexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
     menuHexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
     menuHexApply.Text = "ÁP DỤNG"
@@ -937,7 +945,7 @@ do
     Instance.new("UICorner", menuHexApply).CornerRadius = UDim.new(0, 6)
     local menuHexStatus = Instance.new("TextLabel")
     menuHexStatus.Size = UDim2.new(0.9, 0, 0, 14)
-    menuHexStatus.Position = UDim2.new(0.05, 0, 0, 84)
+    menuHexStatus.Position = UDim2.new(0, 10, 0, 84)
     menuHexStatus.BackgroundTransparency = 1
     menuHexStatus.Text = ""
     menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -958,41 +966,23 @@ do
         menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
     end)
 
-    sectionTitle(102, "🌈 ĐỔI MÀU LED RGB (NÚT NỔI + VIỀN STATUS)", ACCENT2)
+    sectionTitle(102, "🌈 MÀU LED RGB", ACCENT2)
     local ledPresets = {
-        { name = "Cầu vồng", c = nil },
-        { name = "Xanh dương", c = Color3.fromRGB(0, 150, 255) },
-        { name = "Đỏ", c = Color3.fromRGB(255, 40, 60) },
-        { name = "Vàng", c = Color3.fromRGB(255, 210, 40) },
-        { name = "Tím", c = Color3.fromRGB(180, 80, 255) },
-        { name = "Trắng", c = Color3.fromRGB(240, 240, 255) },
+        { name = "rainbow", c = nil },
+        { name = "blue", c = Color3.fromRGB(0, 150, 255) },
+        { name = "red", c = Color3.fromRGB(255, 40, 60) },
+        { name = "yellow", c = Color3.fromRGB(255, 210, 40) },
+        { name = "purple", c = Color3.fromRGB(180, 80, 255) },
+        { name = "white", c = Color3.fromRGB(240, 240, 255) },
+    }
+    local rainbowGrad = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(90, 230, 90)),
+        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(70, 160, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(225, 80, 220)),
     }
     for i, p in ipairs(ledPresets) do
-        local sw = Instance.new("TextButton")
-        sw.Size = UDim2.new(0, 52, 0, 24)
-        sw.Position = UDim2.new(0, 10 + (i - 1) * 56, 0, 124)
-        sw.BackgroundColor3 = p.c or Color3.fromRGB(60, 60, 80)
-        if p.c == nil then
-            local g = Instance.new("UIGradient", sw)
-            g.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(90, 230, 90)),
-                ColorSequenceKeypoint.new(0.66, Color3.fromRGB(70, 160, 255)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(225, 80, 220)),
-            }
-        end
-        sw.Text = p.name
-        sw.TextColor3 = Color3.fromRGB(255, 255, 255)
-        sw.TextSize = 9
-        sw.Font = Enum.Font.GothamBold
-        sw.ZIndex = 13
-        sw.Parent = settingsPage
-        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        local st = Instance.new("UIStroke", sw)
-        st.Color = Color3.fromRGB(255, 255, 255)
-        st.Transparency = 0.7
-        st.Thickness = 1
-        sw.MouseButton1Click:Connect(function()
+        makeSwatch(10 + (i - 1) * 40, 124, p.c, (p.c == nil and rainbowGrad or nil), function()
             if p.c == nil then
                 ledMode = "rainbow"
             else
@@ -1003,10 +993,10 @@ do
         end)
     end
     local hexLbl = Instance.new("TextLabel")
-    hexLbl.Size = UDim2.new(0.35, 0, 0, 22)
-    hexLbl.Position = UDim2.new(0, 10, 0, 152)
+    hexLbl.Size = UDim2.new(0, 88, 0, 24)
+    hexLbl.Position = UDim2.new(0, 10, 0, 156)
     hexLbl.BackgroundTransparency = 1
-    hexLbl.Text = "HEX LED (#RRGGBB):"
+    hexLbl.Text = "HEX LED:"
     hexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
     hexLbl.TextSize = 10
     hexLbl.Font = Enum.Font.GothamBold
@@ -1014,8 +1004,8 @@ do
     hexLbl.ZIndex = 12
     hexLbl.Parent = settingsPage
     local hexBox = Instance.new("TextBox")
-    hexBox.Size = UDim2.new(0.3, 0, 0, 22)
-    hexBox.Position = UDim2.new(0.35, 0, 0, 152)
+    hexBox.Size = UDim2.new(0, 110, 0, 24)
+    hexBox.Position = UDim2.new(0, 102, 0, 156)
     hexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
     hexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
     hexBox.PlaceholderText = "#FF00AA"
@@ -1027,8 +1017,8 @@ do
     hexBox.Parent = settingsPage
     Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
     local hexApply = Instance.new("TextButton")
-    hexApply.Size = UDim2.new(0, 70, 0, 22)
-    hexApply.Position = UDim2.new(0.66, 0, 0, 152)
+    hexApply.Size = UDim2.new(0, 70, 0, 24)
+    hexApply.Position = UDim2.new(0, 220, 0, 156)
     hexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
     hexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
     hexApply.Text = "ÁP DỤNG"
@@ -1039,7 +1029,7 @@ do
     Instance.new("UICorner", hexApply).CornerRadius = UDim.new(0, 6)
     local hexStatus = Instance.new("TextLabel")
     hexStatus.Size = UDim2.new(0.9, 0, 0, 14)
-    hexStatus.Position = UDim2.new(0.05, 0, 0, 176)
+    hexStatus.Position = UDim2.new(0, 10, 0, 182)
     hexStatus.BackgroundTransparency = 1
     hexStatus.Text = ""
     hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -1061,10 +1051,9 @@ do
         hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
     end)
 
-    -- Nut ON/OFF
     local function toggleBtn(y, defaultOn, labelOn, labelOff, colorOn, colorOff, cb)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.9, 0, 0, 30)
+        b.Size = UDim2.new(0.9, 0, 0, 28)
         b.Position = UDim2.new(0.05, 0, 0, y)
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.TextSize = 10
@@ -1086,10 +1075,10 @@ do
         end)
         return b
     end
-    toggleBtn(196, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
+    toggleBtn(200, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
         antiAfk = v
     end)
-    toggleBtn(230, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
+    toggleBtn(232, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
         perfOn = v
         perfFrame.Visible = v
     end)
@@ -1098,7 +1087,7 @@ do
         perfFrame.Draggable = not v
     end)
 
-    -- TOI UU (chi con FPS + CHAT LUONG) + PRESET DO HOA
+    -- TOI UU (FPS + CHAT LUONG) + PRESET CHUP ANH
     local QUAL = {
         Enum.SavedQualitySetting.QualityLevel1,
         Enum.SavedQualitySetting.QualityLevel2,
@@ -1114,8 +1103,8 @@ do
     local optState = { fps = false, gem = false }
     local optBtns = {}
     local optInfo = Instance.new("TextLabel")
-    optInfo.Size = UDim2.new(0.9, 0, 0, 20)
-    optInfo.Position = UDim2.new(0.05, 0, 0, 100)
+    optInfo.Size = UDim2.new(0.9, 0, 0, 18)
+    optInfo.Position = UDim2.new(0.05, 0, 0, 98)
     optInfo.BackgroundTransparency = 1
     optInfo.Text = "đang dùng: mặc định game"
     optInfo.TextColor3 = Color3.fromRGB(140, 255, 140)
@@ -1140,49 +1129,79 @@ do
             end
         end)
     end
-    local function bloomOn(v)
+    local function getBloom()
+        local b = Lighting:FindFirstChild("KhangLeBloom")
+        if not b then
+            b = Instance.new("BloomEffect", Lighting)
+            b.Name = "KhangLeBloom"
+        end
+        return b
+    end
+    local function bloomSet(on, intensity, threshold)
         pcall(function()
-            local b = Lighting:FindFirstChild("KhangLeBloom")
-            if not b then
-                b = Instance.new("BloomEffect", Lighting)
-                b.Name = "KhangLeBloom"
-                b.Intensity = 0.4
-                b.Threshold = 0.8
-            end
-            b.Enabled = v
+            local b = getBloom()
+            b.Enabled = on
+            if intensity then b.Intensity = intensity end
+            if threshold then b.Threshold = threshold end
         end)
     end
-    local function sunOn(v)
+    local function sunSet(on, intensity)
         pcall(function()
             local s = Lighting:FindFirstChild("KhangLeSun")
             if not s then
                 s = Instance.new("SunRaysEffect", Lighting)
                 s.Name = "KhangLeSun"
-                s.Intensity = 0.3
             end
-            s.Enabled = v
+            s.Enabled = on
+            if intensity then s.Intensity = intensity end
         end)
+    end
+    local function getCC()
+        local cc = Lighting:FindFirstChild("KL_CC")
+        if not cc then
+            cc = Instance.new("ColorCorrectionEffect", Lighting)
+            cc.Name = "KL_CC"
+        end
+        return cc
+    end
+    local function getATM()
+        local atm = Lighting:FindFirstChild("KL_ATM")
+        if not atm then
+            atm = Instance.new("Atmosphere", Lighting)
+            atm.Name = "KL_ATM"
+        end
+        return atm
     end
     local function applyOpt()
         if optState.gem then
+            -- DEP BAT NGO: Future lighting + shadow mem + specular + bloom manh
+            pcall(function() Lighting.Technology = Enum.Technology.Future end)
             pcall(function() Lighting.GlobalShadows = true end)
-            pcall(function() Lighting.Brightness = 2.2 end)
-            bloomOn(true)
-            sunOn(true)
+            pcall(function() Lighting.ShadowSoftness = 0.4 end)
+            pcall(function() Lighting.Brightness = 2.4 end)
+            pcall(function() Lighting.EnvironmentDiffuseScale = 0.6 end)
+            pcall(function() Lighting.EnvironmentSpecularScale = 0.6 end)
+            bloomSet(true, 0.6, 0.7)
+            sunSet(true, 0.4)
+            local cc = getCC()
+            cc.TintColor = Color3.new(1,1,1); cc.Saturation = 0.22; cc.Contrast = 0.16; cc.Brightness = 0.02
+            local atm = getATM()
+            atm.Density = 0.2; atm.Haze = 0.12; atm.Glare = 0.3
+            atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
             setQualityLevel(10)
-            optInfo.Text = "đang dùng: 💎 TĂNG CHẤT LƯỢNG (máy mạnh)"
+            optInfo.Text = "đang dùng: 💎 TĂNG CHẤT LƯỢNG (Future lighting)"
         elseif optState.fps then
             pcall(function() Lighting.GlobalShadows = false end)
-            bloomOn(false)
-            sunOn(false)
+            bloomSet(false)
+            sunSet(false)
             pcall(function() workspace.StreamingEnabled = true end)
             setQualityLevel(4)
             optInfo.Text = "đang dùng: ⚡ TỐI ƯU FPS"
         else
             pcall(function() Lighting.GlobalShadows = true end)
             pcall(function() Lighting.Brightness = 2 end)
-            bloomOn(true)
-            sunOn(false)
+            bloomSet(true, 0.4, 0.8)
+            sunSet(false)
             setQualityLevel(nil)
             optInfo.Text = "đang dùng: mặc định game"
         end
@@ -1220,14 +1239,14 @@ do
         end)
         return b
     end
-    sectionTitle(6, "⚡ HIỆU NĂNG", themeColor)
-    optBtn(28, "fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
-    optBtn(64, "gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
+    sectionTitle(4, "⚡ HIỆU NĂNG", themeColor)
+    optBtn(26, "fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
+    optBtn(62, "gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (máy mạnh)", Color3.fromRGB(200, 70, 120))
 
-    -- PRESET DO HOA / MAU TROI
+    -- PRESET DO HOA / CHUP ANH XE (bo hoang hon/dem; them studio/cinematic/golden)
     local gfxInfo = Instance.new("TextLabel")
-    gfxInfo.Size = UDim2.new(0.9, 0, 0, 20)
-    gfxInfo.Position = UDim2.new(0.05, 0, 0, 180)
+    gfxInfo.Size = UDim2.new(0.9, 0, 0, 18)
+    gfxInfo.Position = UDim2.new(0.05, 0, 0, 176)
     gfxInfo.BackgroundTransparency = 1
     gfxInfo.Text = "đồ họa: mặc định"
     gfxInfo.TextColor3 = Color3.fromRGB(140, 220, 255)
@@ -1236,31 +1255,21 @@ do
     gfxInfo.TextXAlignment = Enum.TextXAlignment.Left
     gfxInfo.ZIndex = 12
     gfxInfo.Parent = optPage
-    local function getFX()
-        local cc = Lighting:FindFirstChild("KL_CC")
-        if not cc then
-            cc = Instance.new("ColorCorrectionEffect", Lighting)
-            cc.Name = "KL_CC"
-        end
-        local atm = Lighting:FindFirstChild("KL_ATM")
-        if not atm then
-            atm = Instance.new("Atmosphere", Lighting)
-            atm.Name = "KL_ATM"
-        end
-        return cc, atm
-    end
     local function applyPreset(name)
-        local cc, atm = getFX()
+        local cc = getCC()
+        local atm = getATM()
         local label = name
         if name == "default" then
             label = "Mặc định"
+            pcall(function() Lighting.Technology = Enum.Technology.ShadowMap end)
             cc.TintColor = Color3.new(1,1,1); cc.Contrast = 0; cc.Saturation = 0; cc.Brightness = 0
             atm.Density = 0.3; atm.Haze = 0; atm.Glare = 0
             atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
             pcall(function() Lighting.ClockTime = 14 end)
             pcall(function() Lighting.Brightness = 2 end)
-            pcall(function() Lighting.Ambient = Color3.fromRGB(90,90,90) end)
-            pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120,120,120) end)
+            pcall(function() Lighting.GlobalShadows = true end)
+            bloomSet(true, 0.4, 0.8)
+            sunSet(false)
         elseif name == "tram" then
             label = "Trầm (muted)"
             cc.TintColor = Color3.fromRGB(205,205,215); cc.Contrast = 0.12; cc.Saturation = -0.25; cc.Brightness = -0.04
@@ -1268,51 +1277,78 @@ do
             atm.Color = Color3.fromRGB(190,190,205); atm.Decay = Color3.fromRGB(200,200,210)
             pcall(function() Lighting.ClockTime = 16.5 end)
             pcall(function() Lighting.Brightness = 1.6 end)
-        elseif name == "hoanghon" then
-            label = "Hoàng hôn"
-            cc.TintColor = Color3.fromRGB(255,190,140); cc.Contrast = 0.1; cc.Saturation = 0.18; cc.Brightness = 0
-            atm.Density = 0.55; atm.Haze = 0.5; atm.Glare = 0.25
-            atm.Color = Color3.fromRGB(255,160,110); atm.Decay = Color3.fromRGB(255,140,90)
-            pcall(function() Lighting.ClockTime = 17.8 end)
-            pcall(function() Lighting.Brightness = 1.8 end)
-        elseif name == "dem" then
-            label = "Ban đêm"
-            cc.TintColor = Color3.fromRGB(165,180,255); cc.Contrast = 0.15; cc.Saturation = -0.1; cc.Brightness = -0.12
-            atm.Density = 0.6; atm.Haze = 0.4; atm.Glare = 0.05
-            atm.Color = Color3.fromRGB(120,140,220); atm.Decay = Color3.fromRGB(90,110,200)
-            pcall(function() Lighting.ClockTime = 0.5 end)
-            pcall(function() Lighting.Brightness = 1.2 end)
         elseif name == "pc" then
-            label = "Rực rỡ kiểu PC"
+            label = "PC Max"
+            pcall(function() Lighting.Technology = Enum.Technology.Future end)
             cc.TintColor = Color3.new(1,1,1); cc.Contrast = 0.18; cc.Saturation = 0.25; cc.Brightness = 0.03
             atm.Density = 0.25; atm.Haze = 0.15; atm.Glare = 0.35
             atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
             pcall(function() Lighting.ClockTime = 14 end)
             pcall(function() Lighting.Brightness = 2.2 end)
-            bloomOn(true)
-            sunOn(true)
             pcall(function() Lighting.GlobalShadows = true end)
+            bloomSet(true, 0.5, 0.75)
+            sunSet(true, 0.3)
+            setQualityLevel(10)
+        elseif name == "studio" then
+            label = "📸 Studio (chụp xe sạch)"
+            pcall(function() Lighting.Technology = Enum.Technology.Future end)
+            pcall(function() Lighting.ClockTime = 12 end)
+            pcall(function() Lighting.Brightness = 2.6 end)
+            pcall(function() Lighting.GlobalShadows = true end)
+            pcall(function() Lighting.ShadowSoftness = 0.6 end)
+            cc.TintColor = Color3.new(1,1,1); cc.Contrast = 0.22; cc.Saturation = 0.1; cc.Brightness = 0.05
+            atm.Density = 0.12; atm.Haze = 0.05; atm.Glare = 0.15
+            atm.Color = Color3.new(1,1,1); atm.Decay = Color3.new(1,1,1)
+            bloomSet(true, 0.35, 0.85)
+            sunSet(false)
+            setQualityLevel(10)
+        elseif name == "cinematic" then
+            label = "🎬 Cinematic (teal-orange)"
+            pcall(function() Lighting.Technology = Enum.Technology.Future end)
+            pcall(function() Lighting.ClockTime = 17.2 end)
+            pcall(function() Lighting.Brightness = 2.0 end)
+            pcall(function() Lighting.GlobalShadows = true end)
+            pcall(function() Lighting.ShadowSoftness = 0.45 end)
+            cc.TintColor = Color3.fromRGB(255,214,170); cc.Contrast = 0.28; cc.Saturation = 0.18; cc.Brightness = -0.02
+            atm.Density = 0.35; atm.Haze = 0.3; atm.Glare = 0.3
+            atm.Color = Color3.fromRGB(255,170,120); atm.Decay = Color3.fromRGB(255,140,90)
+            bloomSet(true, 0.5, 0.75)
+            sunSet(true, 0.35)
+            setQualityLevel(10)
+        elseif name == "golden" then
+            label = "🌅 Golden Hour (ánh vàng)"
+            pcall(function() Lighting.Technology = Enum.Technology.Future end)
+            pcall(function() Lighting.ClockTime = 17.6 end)
+            pcall(function() Lighting.Brightness = 2.1 end)
+            pcall(function() Lighting.GlobalShadows = true end)
+            pcall(function() Lighting.ShadowSoftness = 0.5 end)
+            cc.TintColor = Color3.fromRGB(255,196,130); cc.Contrast = 0.18; cc.Saturation = 0.2; cc.Brightness = 0
+            atm.Density = 0.45; atm.Haze = 0.4; atm.Glare = 0.35
+            atm.Color = Color3.fromRGB(255,170,100); atm.Decay = Color3.fromRGB(255,150,90)
+            bloomSet(true, 0.45, 0.8)
+            sunSet(true, 0.4)
             setQualityLevel(10)
         end
         gfxInfo.Text = "đồ họa: " .. label
         print("[hub] preset do hoa = " .. label)
     end
-    sectionTitle(126, "🌗 PRESET ĐỒ HỌA / MÀU TRỜI (xe đẹp nét)", ACCENT2)
+    sectionTitle(120, "🌗 PRESET ĐỒ HỌA / CHỤP ẢNH XE", ACCENT2)
     local gfxPresets = {
         { key = "default", txt = "Mặc định" },
         { key = "tram", txt = "Trầm" },
-        { key = "hoanghon", txt = "Hoàng hôn" },
-        { key = "dem", txt = "Đêm" },
         { key = "pc", txt = "PC" },
+        { key = "studio", txt = "Studio" },
+        { key = "cinematic", txt = "Cinema" },
+        { key = "golden", txt = "Golden" },
     }
     for i, p in ipairs(gfxPresets) do
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0, 68, 0, 26)
-        b.Position = UDim2.new(0, 6 + (i - 1) * 72, 0, 148)
+        b.Size = UDim2.new(0, 58, 0, 26)
+        b.Position = UDim2.new(0, 6 + (i - 1) * 61, 0, 142)
         b.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
         b.Text = p.txt
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
-        b.TextSize = 10
+        b.TextSize = 9
         b.Font = Enum.Font.GothamBold
         b.ZIndex = 13
         b.Parent = optPage
@@ -1326,7 +1362,7 @@ do
         end)
     end
 
-    -- GUIDE (nhung thang vao menu)
+    -- GUIDE (nhung thang, 1300)
     local guideHint = Instance.new("TextLabel")
     guideHint.Size = UDim2.new(0.9, 0, 0, 20)
     guideHint.Position = UDim2.new(0.05, 0, 0, 6)
@@ -1343,12 +1379,12 @@ do
     guideScroll.Position = UDim2.new(0, 4, 0, 30)
     guideScroll.BackgroundTransparency = 1
     guideScroll.BorderSizePixel = 0
-    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1700)
+    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1300)
     guideScroll.ScrollBarThickness = 4
     guideScroll.ZIndex = 12
     guideScroll.Parent = guidePage
     local guideText = Instance.new("TextLabel")
-    guideText.Size = UDim2.new(1, -10, 0, 1700)
+    guideText.Size = UDim2.new(1, -10, 0, 1300)
     guideText.BackgroundTransparency = 1
     guideText.Text = guideFullText
     guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -1375,7 +1411,7 @@ do
         end
     end
 
-    -- GUIDE FRAME popup (onboarding)
+    -- GUIDE FRAME popup (1300)
     GuideFrame = Instance.new("Frame")
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
@@ -1429,8 +1465,8 @@ do
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1700)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1700)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1300)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1300)
     CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
     CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     GuideFrame.Visible = true
@@ -2896,4 +2932,4 @@ addRGBStroke(FreecamFloatingBtn, 3)
 addRGBStroke(hideFloatBtn, 4)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v9] san sang — preset do hoa, guide nhung, ping that, khoa FPS, hex menu")
+print("[hub remix v10] san sang — settings gon, LED o vuong, preset chup xe, gem Future")
