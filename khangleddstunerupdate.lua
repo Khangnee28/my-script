@@ -1,8 +1,8 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v6
--- v6: nut noi = LED RGB doi mau don gian (UIStroke bo tron theo nut)
---     statPanel GIU NGUYEN vi tri, khong doi
---     GuideFrame: tao noi dung truoc, hien sau, clip chong phinh
+-- KHANGLE DDS HUB — 4080 REMIX v7
+-- v7: FIX menu (sidebar/content cung Y, sidebar ZIndex cao)
+--     XOA "4080" ra khoi title
+--     Settings them muc DOI MAU LED RGB (6 preset + nhap hex)
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -102,15 +102,18 @@ local function rainbowAt(pos)
     return a:Lerp(b, f)
 end
 
--- LED RGB don gian cho nut noi (UIStroke bo tron theo nut)
+-- LED RGB cho nut noi (doi mau lien tuc, bo tron theo nut)
 local floatRGB = {}
+local ledOn = true
+local ledMode = "rainbow"  -- "rainbow" hoac "fixed"
+local ledFixedColor = Color3.fromRGB(0, 229, 160)
 local function addRGBStroke(btn, phase)
     local s = Instance.new("UIStroke", btn)
     s.Name = "RGB"
     s.Thickness = 2.4
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Transparency = 0
-    table.insert(floatRGB, { s = s, phase = phase })
+    table.insert(floatRGB, { s = s, phase = phase, btn = btn })
     return s
 end
 task.spawn(function()
@@ -118,14 +121,22 @@ task.spawn(function()
     while true do
         t = t + 0.06
         for _, e in ipairs(floatRGB) do
-            e.s.Color = rainbowAt((t + e.phase) % 7)
+            if ledOn then
+                if ledMode == "rainbow" then
+                    e.s.Color = rainbowAt((t + e.phase) % 7)
+                else
+                    e.s.Color = ledFixedColor
+                end
+                e.s.Transparency = 0
+            else
+                e.s.Transparency = 1
+            end
         end
         task.wait(0.03)
     end
 end)
 
--- Chase ring rieng cho statPanel (hinh chu nhat, giu nguyen)
-local ledOn = true
+-- Chase ring rieng cho statPanel
 local statRingSegs = {}
 local statRingFrame = nil
 local function makeStatRing(target, W, H, inset, T, n1, n2)
@@ -160,16 +171,19 @@ local function makeStatRing(target, W, H, inset, T, n1, n2)
 end
 task.spawn(function()
     local t = 0
-    local n = 0
     while true do
         t = t + 0.06
-        n = #statRingSegs
+        local n = #statRingSegs
         if statRingFrame and ledOn then
             statRingFrame.Position = statPanel and statPanel.Position or statRingFrame.Position
             statRingFrame.Visible = statPanel and statPanel.Visible or false
             if statRingFrame.Visible and n > 0 then
                 for i, seg in ipairs(statRingSegs) do
-                    seg.BackgroundColor3 = rainbowAt((t + (i - 1) * 7 / n) % 7)
+                    if ledMode == "rainbow" then
+                        seg.BackgroundColor3 = rainbowAt((t + (i - 1) * 7 / n) % 7)
+                    else
+                        seg.BackgroundColor3 = ledFixedColor
+                    end
                 end
             end
         end
@@ -225,6 +239,7 @@ ToggleBtn.Text = "👑"
 ToggleBtn.TextSize = 22
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.Draggable = true
+ToggleBtn.ZIndex = 10
 ToggleBtn.Parent = ScreenGui
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 7)
 
@@ -238,6 +253,7 @@ AutoTFloatingBtn.TextSize = 22
 AutoTFloatingBtn.Font = Enum.Font.GothamBold
 AutoTFloatingBtn.Draggable = true
 AutoTFloatingBtn.Visible = false
+AutoTFloatingBtn.ZIndex = 10
 AutoTFloatingBtn.Parent = ScreenGui
 Instance.new("UICorner", AutoTFloatingBtn).CornerRadius = UDim.new(0, 7)
 local strokeAutoTFloat = Instance.new("UIStroke", AutoTFloatingBtn)
@@ -254,6 +270,7 @@ BodyManagerFloatingBtn.TextSize = 22
 BodyManagerFloatingBtn.Font = Enum.Font.GothamBold
 BodyManagerFloatingBtn.Draggable = true
 BodyManagerFloatingBtn.Visible = false
+BodyManagerFloatingBtn.ZIndex = 10
 BodyManagerFloatingBtn.Parent = ScreenGui
 Instance.new("UICorner", BodyManagerFloatingBtn).CornerRadius = UDim.new(0, 7)
 local strokeBodyFloat = Instance.new("UIStroke", BodyManagerFloatingBtn)
@@ -401,7 +418,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- KHOI 1: HUB UI
+-- KHOI 1: HUB UI (FIX ZIndex + align Y)
 -- ============================================================
 do
     HubFrame = Instance.new("Frame")
@@ -421,15 +438,17 @@ do
     hubStroke.Thickness = 1.5
     hubStroke.Transparency = 0.25
 
+    -- TIEU DE (khong con "4080")
     hubHeader = Instance.new("TextLabel")
     hubHeader.Size = UDim2.new(1, -40, 0, 34)
     hubHeader.Position = UDim2.new(0, 12, 0, 0)
     hubHeader.BackgroundTransparency = 1
-    hubHeader.Text = "👑 KHANGLE DDS HUB — 4080 REMIX"
+    hubHeader.Text = "👑 KHANGLE DDS HUB"
     hubHeader.TextColor3 = themeColor
     hubHeader.TextSize = 13
     hubHeader.Font = Enum.Font.GothamBold
     hubHeader.TextXAlignment = Enum.TextXAlignment.Left
+    hubHeader.ZIndex = 18
     hubHeader.Parent = HubFrame
     makeHeaderDraggable(hubHeader, HubFrame)
 
@@ -441,21 +460,26 @@ do
     hubClose.Text = "✕"
     hubClose.TextSize = 14
     hubClose.Font = Enum.Font.GothamBold
+    hubClose.ZIndex = 19
     hubClose.Parent = HubFrame
 
+    -- SIDEBAR: cung Y voi content, ZIndex cao de khong bi che
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 96, 1, -34)
     sidebar.Position = UDim2.new(0, 0, 0, 34)
     sidebar.BackgroundTransparency = 1
     sidebar.BorderSizePixel = 0
+    sidebar.ZIndex = 14
     sidebar.Parent = HubFrame
 
+    -- CONTENT: cung Y voi sidebar, ZIndex thap hon sidebar
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -104, 1, -42)
-    content.Position = UDim2.new(0, 100, 0, 38)
+    content.Position = UDim2.new(0, 100, 0, 34)
     content.BackgroundColor3 = HUB_BG
     content.BorderSizePixel = 0
     content.ClipsDescendants = true
+    content.ZIndex = 10
     content.Parent = HubFrame
     Instance.new("UICorner", content).CornerRadius = UDim.new(0, 12)
 
@@ -497,6 +521,7 @@ do
         b.TextColor3 = TXT_DIM
         b.TextSize = 11
         b.Font = Enum.Font.GothamBold
+        b.ZIndex = 15
         b.Parent = sidebar
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
         navIndex = navIndex + 1
@@ -782,17 +807,22 @@ do
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS
-    local setTitle = Instance.new("TextLabel")
-    setTitle.Size = UDim2.new(1, -20, 0, 20)
-    setTitle.Position = UDim2.new(0, 10, 0, 6)
-    setTitle.BackgroundTransparency = 1
-    setTitle.Text = "🎨 MÀU MENU CHÍNH"
-    setTitle.TextColor3 = themeColor
-    setTitle.TextSize = 11
-    setTitle.Font = Enum.Font.GothamBold
-    setTitle.TextXAlignment = Enum.TextXAlignment.Left
-    setTitle.Parent = settingsPage
+    -- SETTINGS: mau menu + LED RGB + antiAFK + FPS
+    local function sectionTitle(y, text, color)
+        local t = Instance.new("TextLabel")
+        t.Size = UDim2.new(1, -20, 0, 20)
+        t.Position = UDim2.new(0, 10, 0, y)
+        t.BackgroundTransparency = 1
+        t.Text = text
+        t.TextColor3 = color or themeColor
+        t.TextSize = 11
+        t.Font = Enum.Font.GothamBold
+        t.TextXAlignment = Enum.TextXAlignment.Left
+        t.ZIndex = 12
+        t.Parent = settingsPage
+        return t
+    end
+    sectionTitle(6, "🎨 MÀU MENU CHÍNH", themeColor)
     local themePresets = {
         Color3.fromRGB(0, 229, 160),
         Color3.fromRGB(56, 189, 248),
@@ -812,8 +842,129 @@ do
         Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
         sw.MouseButton1Click:Connect(function()
             applyTheme(c)
+        end
+    )
+    end
+
+    -- MUC DOI MAU LED RGB
+    sectionTitle(62, "🌈 ĐỔI MÀU LED RGB (NÚT NỔI + VIỀN STATUS)", ACCENT2)
+    -- 6 preset mau co dinh
+    local ledPresets = {
+        { name = "Cầu vồng", c = nil },
+        { name = "Xanh dương", c = Color3.fromRGB(0, 150, 255) },
+        { name = "Đỏ", c = Color3.fromRGB(255, 40, 60) },
+        { name = "Vàng", c = Color3.fromRGB(255, 210, 40) },
+        { name = "Tím", c = Color3.fromRGB(180, 80, 255) },
+        { name = "Trắng", c = Color3.fromRGB(240, 240, 255) },
+    }
+    for i, p in ipairs(ledPresets) do
+        local sw = Instance.new("TextButton")
+        sw.Size = UDim2.new(0, 52, 0, 24)
+        sw.Position = UDim2.new(0, 10 + (i - 1) * 56, 0, 84)
+        sw.BackgroundColor3 = p.c or Color3.fromRGB(60, 60, 80)
+        if p.c == nil then
+            local g = Instance.new("UIGradient", sw)
+            g.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
+                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(90, 230, 90)),
+                ColorSequenceKeypoint.new(0.66, Color3.fromRGB(70, 160, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(225, 80, 220)),
+            }
+        end
+        sw.Text = p.name
+        sw.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sw.TextSize = 9
+        sw.Font = Enum.Font.GothamBold
+        sw.ZIndex = 13
+        sw.Parent = settingsPage
+        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
+        local st = Instance.new("UIStroke", sw)
+        st.Color = Color3.fromRGB(255, 255, 255)
+        st.Transparency = 0.7
+        st.Thickness = 1
+        sw.MouseButton1Click:Connect(function()
+            if p.c == nil then
+                ledMode = "rainbow"
+            else
+                ledMode = "fixed"
+                ledFixedColor = p.c
+            end
+            print("[hub] LED = " .. p.name)
         end)
     end
+    -- O nhap hex mau
+    local hexLbl = Instance.new("TextLabel")
+    hexLbl.Size = UDim2.new(0.35, 0, 0, 22)
+    hexLbl.Position = UDim2.new(0, 10, 0, 114)
+    hexLbl.BackgroundTransparency = 1
+    hexLbl.Text = "HEX (#RRGGBB):"
+    hexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    hexLbl.TextSize = 10
+    hexLbl.Font = Enum.Font.GothamBold
+    hexLbl.TextXAlignment = Enum.TextXAlignment.Left
+    hexLbl.ZIndex = 12
+    hexLbl.Parent = settingsPage
+    local hexBox = Instance.new("TextBox")
+    hexBox.Size = UDim2.new(0.3, 0, 0, 22)
+    hexBox.Position = UDim2.new(0.35, 0, 0, 114)
+    hexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    hexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    hexBox.PlaceholderText = "#FF00AA"
+    hexBox.Text = ""
+    hexBox.TextSize = 10
+    hexBox.Font = Enum.Font.GothamBold
+    hexBox.BorderSizePixel = 0
+    hexBox.ZIndex = 12
+    hexBox.Parent = settingsPage
+    Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
+    local hexStroke = Instance.new("UIStroke", hexBox)
+    hexStroke.Color = Color3.fromRGB(60, 60, 75)
+    hexStroke.Thickness = 1
+    local hexApply = Instance.new("TextButton")
+    hexApply.Size = UDim2.new(0, 70, 0, 22)
+    hexApply.Position = UDim2.new(0.66, 0, 0, 114)
+    hexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
+    hexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
+    hexApply.Text = "ÁP DỤNG"
+    hexApply.TextSize = 10
+    hexApply.Font = Enum.Font.GothamBold
+    hexApply.ZIndex = 12
+    hexApply.Parent = settingsPage
+    Instance.new("UICorner", hexApply).CornerRadius = UDim.new(0, 6)
+    local hexStatus = Instance.new("TextLabel")
+    hexStatus.Size = UDim2.new(0.9, 0, 0, 14)
+    hexStatus.Position = UDim2.new(0.05, 0, 0, 140)
+    hexStatus.BackgroundTransparency = 1
+    hexStatus.Text = ""
+    hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    hexStatus.TextSize = 9
+    hexStatus.Font = Enum.Font.GothamBold
+    hexStatus.TextXAlignment = Enum.TextXAlignment.Left
+    hexStatus.ZIndex = 12
+    hexStatus.Parent = settingsPage
+    hexApply.MouseButton1Click:Connect(function()
+        local input = hexBox.Text:gsub("^#", "")
+        if #input ~= 6 then
+            hexStatus.Text = "❌ hex phải đủ 6 ký tự (VD: FF00AA)"
+            hexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+            return
+        end
+        local r = tonumber(input:sub(1,2), 16)
+        local g = tonumber(input:sub(3,4), 16)
+        local b = tonumber(input:sub(5,6), 16)
+        if not (r and g and b) then
+            hexStatus.Text = "❌ ký tự không hợp lệ (chỉ 0-9 A-F)"
+            hexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+            return
+        end
+        ledMode = "fixed"
+        ledFixedColor = Color3.fromRGB(r, g, b)
+        hexStatus.Text = "✔ đã đổi LED sang #" .. input:upper()
+        hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+        print("[hub] LED fixed = #" .. input:upper())
+    end)
+
+    -- cac cong tac con lai
     local function makeSetSwitch(y, label, defaultOn, cb)
         local lbl2 = Instance.new("TextLabel")
         lbl2.Size = UDim2.new(0.6, 0, 0, 24)
@@ -834,25 +985,19 @@ do
         end)
         return sw2
     end
-    makeSetSwitch(64, "🌈 LED RGB NÚT NỔI", true, function(v)
+    makeSetSwitch(160, "🌈 BẬT/TẮT LED NÚT NỔI", true, function(v)
         ledOn = v
-        for _, e in ipairs(floatRGB) do
-            e.s.Enabled = v
-        end
-        for _, seg in ipairs(statRingSegs) do
-            seg.Visible = v
-        end
     end)
-    makeSetSwitch(96, "🛡️ ANTI-AFK", true, function(v)
+    makeSetSwitch(192, "🛡️ ANTI-AFK", true, function(v)
         antiAfk = v
     end)
-    makeSetSwitch(128, "📊 HIỆN FPS / PING", false, function(v)
+    makeSetSwitch(224, "📊 HIỆN FPS / PING", false, function(v)
         perfOn = v
         perfFrame.Visible = v
     end)
     local perfPosBtn = Instance.new("TextButton")
     perfPosBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 160)
+    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 256)
     perfPosBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     perfPosBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     perfPosBtn.Text = "📌 ĐỔI GÓC HIỆN FPS/PING"
@@ -1012,7 +1157,7 @@ do
     optBtn(114,"fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
     optBtn(150,"gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
 
-    -- GUIDE (noi dung truoc, hien sau, clip chong phinh)
+    -- GUIDE
     guideOpenBtn = Instance.new("TextButton")
     guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
     guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
@@ -1127,7 +1272,6 @@ do
     CloseGuideBtn.ZIndex = 10
     CloseGuideBtn.Parent = GuideFrame
     Instance.new("UICorner", CloseGuideBtn).CornerRadius = UDim.new(0, 8)
-    -- kich thuoc + vi tri sau cung, roi moi hien
     GuideFrame.Size = UDim2.new(0, 540, 0, 350)
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
@@ -2594,13 +2738,11 @@ fcOpenBtn.MouseButton1Click:Connect(function()
     fcOpenBtn.BackgroundColor3 = fcOn and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(30, 30, 40)
 end)
 
--- LED RGB don gian, bo tron theo tung nut noi
 addRGBStroke(ToggleBtn, 0)
 addRGBStroke(AutoTFloatingBtn, 1)
 addRGBStroke(BodyManagerFloatingBtn, 2)
 addRGBStroke(FreecamFloatingBtn, 3)
 addRGBStroke(hideFloatBtn, 4)
--- chase ring rieng cho statPanel (giu nguyen vi tri statPanel)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v6] san sang — LED RGB bo tron nut noi, status giu cho, guide het phinh")
+print("[hub remix v7] san sang — fix menu, title sach, LED RGB co preset + hex")
