@@ -1,7 +1,7 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v13
--- v13: XOA thanh thong bao "Script By KhangLe"
---      guide canvas/content = 1500 (popup + trong menu)
+-- KHANGLE DDS HUB — 4080 REMIX v14
+-- v14: Settings + AN TEN TREN DAU + DOI TEN TUY CHINH
+--      popup guide canvas/content = 1400 (guide menu giu 1500)
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -34,7 +34,7 @@ pcall(function()
 end)
 if not parent then
     parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+end)
 if parent:FindFirstChild("KhangLeCustomTuner") then
     parent.KhangLeCustomTuner:Destroy()
 end
@@ -399,7 +399,88 @@ task.spawn(function()
     end
 end)
 
--- ============ NOI DUNG GUIDE (1500) ============
+-- ============ CHUC NANG AN TEN / DOI TEN ============
+local hideNameOn = false
+local customName = ""
+
+local function getChar() return LocalPlayer.Character end
+
+local function hideNameTags()
+    local c = getChar()
+    if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if h then
+        pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
+    end
+    for _, d in ipairs(c:GetDescendants()) do
+        if d:IsA("BillboardGui") then
+            pcall(function() d.Enabled = false end)
+        end
+    end
+end
+
+local function showNameTags()
+    local c = getChar()
+    if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if h then
+        pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer end)
+    end
+    for _, d in ipairs(c:GetDescendants()) do
+        if d:IsA("BillboardGui") then
+            pcall(function() d.Enabled = true end)
+        end
+    end
+end
+
+local function applyCustomName()
+    local c = getChar()
+    if not c then return end
+    pcall(function() LocalPlayer.DisplayName = customName end)
+    local myName = LocalPlayer.Name
+    for _, d in ipairs(c:GetDescendants()) do
+        if d:IsA("BillboardGui") then
+            for _, t in ipairs(d:GetDescendants()) do
+                if t:IsA("TextLabel") and t.Text:find(myName, 1, true) then
+                    t.Text = customName
+                end
+            end
+        end
+    end
+end
+
+local function watchChar(c)
+    if not c then return end
+    c.DescendantAdded:Connect(function(d)
+        if d:IsA("BillboardGui") then
+            if hideNameOn then
+                pcall(function() d.Enabled = false end)
+            end
+            if customName ~= "" then
+                task.wait(0.2)
+                applyCustomName()
+            end
+        end
+    end)
+end
+LocalPlayer.CharacterAdded:Connect(function(c)
+    watchChar(c)
+    task.wait(0.5)
+    if hideNameOn then hideNameTags() end
+    if customName ~= "" then applyCustomName() end
+end)
+if LocalPlayer.Character then watchChar(LocalPlayer.Character) end
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if hideNameOn then
+            hideNameTags()
+        end
+    end
+end)
+
+-- ============ NOI DUNG GUIDE (popup 1400 / menu 1500) ============
 local guideLines = {
     "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
     "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
@@ -821,7 +902,7 @@ do
     settingsScroll.Size = UDim2.new(1, 0, 1, 0)
     settingsScroll.BackgroundTransparency = 1
     settingsScroll.BorderSizePixel = 0
-    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 360)
+    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 460)
     settingsScroll.ScrollBarThickness = 4
     settingsScroll.ZIndex = 12
     settingsScroll.Parent = settingsPage
@@ -1128,6 +1209,70 @@ do
         end
     end)
 
+    -- AN TEN / DOI TEN
+    toggleBtn(352, false, "👤 ẨN TÊN TRÊN ĐẦU: ĐANG BẬT", "👤 ẨN TÊN TRÊN ĐẦU: ĐANG TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+        hideNameOn = v
+        if v then hideNameTags() else showNameTags() end
+    end)
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size = UDim2.new(0, 88, 0, 24)
+    nameLbl.Position = UDim2.new(0, 10, 0, 386)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text = "TÊN TÙY CHỈNH:"
+    nameLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    nameLbl.TextSize = 10
+    nameLbl.Font = Enum.Font.GothamBold
+    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    nameLbl.ZIndex = 13
+    nameLbl.Parent = settingsScroll
+    local nameBox = Instance.new("TextBox")
+    nameBox.Size = UDim2.new(0, 110, 0, 24)
+    nameBox.Position = UDim2.new(0, 102, 0, 386)
+    nameBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameBox.PlaceholderText = "Nhập tên mới"
+    nameBox.Text = ""
+    nameBox.TextSize = 10
+    nameBox.Font = Enum.Font.GothamBold
+    nameBox.BorderSizePixel = 0
+    nameBox.ZIndex = 13
+    nameBox.Parent = settingsScroll
+    Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+    local nameApply = Instance.new("TextButton")
+    nameApply.Size = UDim2.new(0, 70, 0, 24)
+    nameApply.Position = UDim2.new(0, 220, 0, 386)
+    nameApply.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
+    nameApply.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameApply.Text = "ĐỔI TÊN"
+    nameApply.TextSize = 10
+    nameApply.Font = Enum.Font.GothamBold
+    nameApply.ZIndex = 13
+    nameApply.Parent = settingsScroll
+    Instance.new("UICorner", nameApply).CornerRadius = UDim.new(0, 6)
+    local nameStatus = Instance.new("TextLabel")
+    nameStatus.Size = UDim2.new(1, -20, 0, 14)
+    nameStatus.Position = UDim2.new(0, 10, 0, 414)
+    nameStatus.BackgroundTransparency = 1
+    nameStatus.Text = ""
+    nameStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    nameStatus.TextSize = 9
+    nameStatus.Font = Enum.Font.GothamBold
+    nameStatus.TextXAlignment = Enum.TextXAlignment.Left
+    nameStatus.ZIndex = 13
+    nameStatus.Parent = settingsScroll
+    nameApply.MouseButton1Click:Connect(function()
+        local input = nameBox.Text
+        if input == "" then
+            nameStatus.Text = "❌ nhập tên trước"
+            nameStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
+            return
+        end
+        customName = input
+        applyCustomName()
+        nameStatus.Text = "✔ đã đổi tên hiển thị"
+        nameStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    end)
+
     -- GUIDE (nhung thang, 1500)
     local guideHint = Instance.new("TextLabel")
     guideHint.Size = UDim2.new(0.9, 0, 0, 20)
@@ -1177,7 +1322,7 @@ do
         end
     end
 
-    -- GUIDE FRAME popup (1500)
+    -- GUIDE FRAME popup (1400)
     GuideFrame = Instance.new("Frame")
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
@@ -1231,8 +1376,8 @@ do
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1350)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1350)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1400)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1400)
     CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
     CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     GuideFrame.Visible = true
