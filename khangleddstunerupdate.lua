@@ -1,9 +1,7 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v12
--- v12: card Dan Ao/Freecam cao 110 (nut y=70 het de chu)
---      guide canvas/content = 1400
---      XOA MOI print/warn (console sach)
---      notify bar "Script By KhangLe" vien LED
+-- KHANGLE DDS HUB — 4080 REMIX v13
+-- v13: XOA thanh thong bao "Script By KhangLe"
+--      guide canvas/content = 1500 (popup + trong menu)
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -401,7 +399,7 @@ task.spawn(function()
     end
 end)
 
--- ============ NOI DUNG GUIDE (1400) ============
+-- ============ NOI DUNG GUIDE (1500) ============
 local guideLines = {
     "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
     "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
@@ -720,7 +718,7 @@ do
         end)
     end)
 
-    -- CHUNG (card cao 110, nut y=70 het de chu)
+    -- CHUNG (card cao 110, nut y=70)
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
@@ -1130,7 +1128,7 @@ do
         end
     end)
 
-    -- GUIDE (nhung thang, 1400)
+    -- GUIDE (nhung thang, 1500)
     local guideHint = Instance.new("TextLabel")
     guideHint.Size = UDim2.new(0.9, 0, 0, 20)
     guideHint.Position = UDim2.new(0.05, 0, 0, 6)
@@ -1147,12 +1145,12 @@ do
     guideScroll.Position = UDim2.new(0, 4, 0, 30)
     guideScroll.BackgroundTransparency = 1
     guideScroll.BorderSizePixel = 0
-    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1400)
+    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1500)
     guideScroll.ScrollBarThickness = 4
     guideScroll.ZIndex = 12
     guideScroll.Parent = guidePage
     local guideText = Instance.new("TextLabel")
-    guideText.Size = UDim2.new(1, -10, 0, 1400)
+    guideText.Size = UDim2.new(1, -10, 0, 1500)
     guideText.BackgroundTransparency = 1
     guideText.Text = guideFullText
     guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -1179,7 +1177,7 @@ do
         end
     end
 
-    -- GUIDE FRAME popup (1400)
+    -- GUIDE FRAME popup (1500)
     GuideFrame = Instance.new("Frame")
     GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
     GuideFrame.BorderSizePixel = 0
@@ -1193,6 +1191,7 @@ do
     local strokeGuide = Instance.new("UIStroke", GuideFrame)
     strokeGuide.Color = Color3.fromRGB(255, 215, 0)
     strokeGuide.Thickness = 1.8
+    strokeGuide.Parent = GuideFrame
     local GuideTitle = Instance.new("TextLabel")
     GuideTitle.Size = UDim2.new(1, 0, 0, 42)
     GuideTitle.BackgroundTransparency = 1
@@ -1200,7 +1199,6 @@ do
     GuideTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
     GuideTitle.TextSize = 12
     GuideTitle.Font = Enum.Font.GothamBold
-    GuideTitle.ZIndex = 10
     GuideTitle.Parent = GuideFrame
     makeHeaderDraggable(GuideTitle, GuideFrame)
     local ScrollGuide = Instance.new("ScrollingFrame")
@@ -1233,8 +1231,8 @@ do
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1400)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1400)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1500)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1500)
     CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
     CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     GuideFrame.Visible = true
@@ -2683,48 +2681,3 @@ addRGBStroke(BodyManagerFloatingBtn)
 addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
-
--- ============ THANH THONG BAO "Script By KhangLe" ============
-do
-    local notifyBar = Instance.new("Frame")
-    notifyBar.Size = UDim2.new(0, 340, 0, 46)
-    notifyBar.Position = UDim2.new(0.5, -170, 0, 64)
-    notifyBar.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-    notifyBar.BackgroundTransparency = 0.15
-    notifyBar.BorderSizePixel = 0
-    notifyBar.ZIndex = 60
-    notifyBar.Parent = ScreenGui
-    Instance.new("UICorner", notifyBar).CornerRadius = UDim.new(0, 10)
-    local notifyStroke = Instance.new("UIStroke", notifyBar)
-    notifyStroke.Thickness = 2
-    notifyStroke.Parent = notifyBar
-    local notifyLabel = Instance.new("TextLabel")
-    notifyLabel.Size = UDim2.new(1, -20, 1, 0)
-    notifyLabel.Position = UDim2.new(0, 10, 0, 0)
-    notifyLabel.BackgroundTransparency = 1
-    notifyLabel.Text = "👑 Script By KhangLe"
-    notifyLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-    notifyLabel.TextSize = 16
-    notifyLabel.Font = Enum.Font.GothamBold
-    notifyLabel.TextXAlignment = Enum.TextXAlignment.Center
-    notifyLabel.ZIndex = 61
-    notifyLabel.Parent = notifyBar
-    task.spawn(function()
-        local t = 0
-        while notifyBar.Visible do
-            t = t + 0.15
-            notifyStroke.Color = rainbowAt(t)
-            task.wait(0.03)
-        end
-    end)
-    task.spawn(function()
-        task.wait(8)
-        for i = 0, 20 do
-            notifyBar.BackgroundTransparency = 0.15 + (i / 20) * 0.85
-            notifyLabel.TextTransparency = i / 20
-            notifyStroke.Transparency = i / 20
-            task.wait(0.05)
-        end
-        notifyBar.Visible = false
-    end)
-end
