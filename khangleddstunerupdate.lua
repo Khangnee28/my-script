@@ -34,7 +34,7 @@ pcall(function()
 end)
 if not parent then
     parent = LocalPlayer:WaitForChild("PlayerGui")
-end)
+end
 if parent:FindFirstChild("KhangLeCustomTuner") then
     parent.KhangLeCustomTuner:Destroy()
 end
