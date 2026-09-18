@@ -1231,8 +1231,8 @@ do
     GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
     ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
     ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1500)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1500)
+    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1350)
+    GuideContent.Size = UDim2.new(1, -10, 0, 1350)
     CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
     CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
     GuideFrame.Visible = true
