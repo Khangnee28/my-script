@@ -1,8 +1,8 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v7
--- v7: FIX menu (sidebar/content cung Y, sidebar ZIndex cao)
---     XOA "4080" ra khoi title
---     Settings them muc DOI MAU LED RGB (6 preset + nhap hex)
+-- KHANGLE DDS HUB — 4080 REMIX v8
+-- v8: FIX trang TRONG (ZIndex Sibling + moi phan tu ZIndex 12-13)
+--     BO cong tac BAT/TAT LED trong Settings
+--     Anti-AFK + FPS/PING = nut ON/OF ro rang
 -- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -43,6 +43,7 @@ end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "KhangLeCustomTuner"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = parent
 
 local function makeHeaderDraggable(header, frame)
@@ -102,10 +103,9 @@ local function rainbowAt(pos)
     return a:Lerp(b, f)
 end
 
--- LED RGB cho nut noi (doi mau lien tuc, bo tron theo nut)
 local floatRGB = {}
 local ledOn = true
-local ledMode = "rainbow"  -- "rainbow" hoac "fixed"
+local ledMode = "rainbow"
 local ledFixedColor = Color3.fromRGB(0, 229, 160)
 local function addRGBStroke(btn, phase)
     local s = Instance.new("UIStroke", btn)
@@ -136,7 +136,6 @@ task.spawn(function()
     end
 end)
 
--- Chase ring rieng cho statPanel
 local statRingSegs = {}
 local statRingFrame = nil
 local function makeStatRing(target, W, H, inset, T, n1, n2)
@@ -377,7 +376,7 @@ perfFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 perfFrame.BackgroundTransparency = 0.35
 perfFrame.BorderSizePixel = 0
 perfFrame.Visible = false
-perfFrame.ZIndex = 30
+perfFrame.ZIndex = 50
 perfFrame.Parent = ScreenGui
 Instance.new("UICorner", perfFrame).CornerRadius = UDim.new(0, 8)
 local perfLabel = Instance.new("TextLabel")
@@ -389,7 +388,7 @@ perfLabel.TextColor3 = Color3.fromRGB(140, 255, 140)
 perfLabel.TextSize = 11
 perfLabel.Font = Enum.Font.GothamBold
 perfLabel.TextXAlignment = Enum.TextXAlignment.Left
-perfLabel.ZIndex = 31
+perfLabel.ZIndex = 51
 perfLabel.Parent = perfFrame
 local perfCorners = {
     UDim2.new(1, -160, 0, 96),
@@ -418,7 +417,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- KHOI 1: HUB UI (FIX ZIndex + align Y)
+-- KHOI 1: HUB UI (ZIndex dong bo)
 -- ============================================================
 do
     HubFrame = Instance.new("Frame")
@@ -438,7 +437,6 @@ do
     hubStroke.Thickness = 1.5
     hubStroke.Transparency = 0.25
 
-    -- TIEU DE (khong con "4080")
     hubHeader = Instance.new("TextLabel")
     hubHeader.Size = UDim2.new(1, -40, 0, 34)
     hubHeader.Position = UDim2.new(0, 12, 0, 0)
@@ -463,7 +461,6 @@ do
     hubClose.ZIndex = 19
     hubClose.Parent = HubFrame
 
-    -- SIDEBAR: cung Y voi content, ZIndex cao de khong bi che
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 96, 1, -34)
     sidebar.Position = UDim2.new(0, 0, 0, 34)
@@ -472,7 +469,6 @@ do
     sidebar.ZIndex = 14
     sidebar.Parent = HubFrame
 
-    -- CONTENT: cung Y voi sidebar, ZIndex thap hon sidebar
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -104, 1, -42)
     content.Position = UDim2.new(0, 100, 0, 34)
@@ -492,6 +488,7 @@ do
         pg.Size = UDim2.new(1, 0, 1, 0)
         pg.BackgroundTransparency = 1
         pg.Visible = false
+        pg.ZIndex = 11
         pg.Parent = content
         pages[name] = pg
         return pg
@@ -544,7 +541,7 @@ do
     local optPage = pages["TỐI ƯU"]
     local guidePage = pages["GUIDE"]
 
-    -- TUNER
+    -- TUNER (ZIndex 12+)
     local function createInput(name, defaultVal, posY, pg)
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.9, 0, 0, 14)
@@ -555,6 +552,7 @@ do
         lbl.TextSize = 10
         lbl.Font = Enum.Font.GothamMedium
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 12
         lbl.Parent = pg
         local box = Instance.new("TextBox")
         box.Size = UDim2.new(0.9, 0, 0, 24)
@@ -565,6 +563,7 @@ do
         box.TextSize = 11
         box.Font = Enum.Font.GothamBold
         box.BorderSizePixel = 0
+        box.ZIndex = 12
         box.Parent = pg
         Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
         local stroke = Instance.new("UIStroke", box)
@@ -585,6 +584,7 @@ do
     Status.TextSize = 10
     Status.Font = Enum.Font.GothamBold
     Status.TextXAlignment = Enum.TextXAlignment.Center
+    Status.ZIndex = 12
     Status.Parent = tunerPage
     local InjectBtn = Instance.new("TextButton")
     InjectBtn.Size = UDim2.new(0.9, 0, 0, 28)
@@ -594,6 +594,7 @@ do
     InjectBtn.Text = "⚡ ÁP DỤNG TUNER"
     InjectBtn.TextSize = 11
     InjectBtn.Font = Enum.Font.GothamBold
+    InjectBtn.ZIndex = 12
     InjectBtn.Parent = tunerPage
     Instance.new("UICorner", InjectBtn).CornerRadius = UDim.new(0, 7)
     ToggleFloatMenuBtn = Instance.new("TextButton")
@@ -604,6 +605,7 @@ do
     ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG TẮT"
     ToggleFloatMenuBtn.TextSize = 11
     ToggleFloatMenuBtn.Font = Enum.Font.GothamBold
+    ToggleFloatMenuBtn.ZIndex = 12
     ToggleFloatMenuBtn.Parent = tunerPage
     Instance.new("UICorner", ToggleFloatMenuBtn).CornerRadius = UDim.new(0, 7)
     local statusThread = nil
@@ -705,13 +707,14 @@ do
         end)
     end)
 
-    -- CHUNG
+    -- CHUNG (ZIndex 12+)
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 1, 0)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
     scroll.CanvasSize = UDim2.new(0, 0, 0, 400)
     scroll.ScrollBarThickness = 4
+    scroll.ZIndex = 12
     scroll.Parent = chungPage
     local function makeCard(y, title, desc, strokeColor)
         local card = Instance.new("Frame")
@@ -719,6 +722,7 @@ do
         card.Position = UDim2.new(0, 4, 0, y)
         card.BackgroundColor3 = CARD_BG
         card.BorderSizePixel = 0
+        card.ZIndex = 12
         card.Parent = scroll
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
         local cs = Instance.new("UIStroke", card)
@@ -734,6 +738,7 @@ do
         t.TextSize = 12
         t.Font = Enum.Font.GothamBold
         t.TextXAlignment = Enum.TextXAlignment.Left
+        t.ZIndex = 13
         t.Parent = card
         local d = Instance.new("TextLabel")
         d.Size = UDim2.new(1, -24, 0, 30)
@@ -745,6 +750,7 @@ do
         d.Font = Enum.Font.GothamMedium
         d.TextXAlignment = Enum.TextXAlignment.Left
         d.TextWrapped = true
+        d.ZIndex = 13
         d.Parent = card
         return card
     end
@@ -758,6 +764,7 @@ do
     farmStatLbl.TextSize = 10
     farmStatLbl.Font = Enum.Font.GothamBold
     farmStatLbl.TextXAlignment = Enum.TextXAlignment.Left
+    farmStatLbl.ZIndex = 13
     farmStatLbl.Parent = cardFarm
     local function makeSwitch(par, posY)
         local track = Instance.new("TextButton")
@@ -765,14 +772,14 @@ do
         track.Position = UDim2.new(1, -64, 0, posY)
         track.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
         track.Text = ""
-        track.ZIndex = 12
+        track.ZIndex = 14
         track.Parent = par
         Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
         local knob = Instance.new("Frame")
         knob.Size = UDim2.new(0, 20, 0, 20)
         knob.Position = UDim2.new(0, 3, 0.5, -10)
         knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-        knob.ZIndex = 13
+        knob.ZIndex = 15
         knob.Parent = track
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
         local on = false
@@ -793,6 +800,7 @@ do
     bodyOpenBtn.Text = "🚗 DÀN ÁO: ĐANG TẮT"
     bodyOpenBtn.TextSize = 10
     bodyOpenBtn.Font = Enum.Font.GothamBold
+    bodyOpenBtn.ZIndex = 13
     bodyOpenBtn.Parent = cardBody
     Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
     local cardFc = makeCard(240, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
@@ -804,10 +812,11 @@ do
     fcOpenBtn.Text = "📷 FREECAM: ĐANG TẮT"
     fcOpenBtn.TextSize = 10
     fcOpenBtn.Font = Enum.Font.GothamBold
+    fcOpenBtn.ZIndex = 13
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS: mau menu + LED RGB + antiAFK + FPS
+    -- SETTINGS (BO toggle LED; Anti-AFK + FPS = nut ON/OFF)
     local function sectionTitle(y, text, color)
         local t = Instance.new("TextLabel")
         t.Size = UDim2.new(1, -20, 0, 20)
@@ -842,13 +851,10 @@ do
         Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
         sw.MouseButton1Click:Connect(function()
             applyTheme(c)
-        end
-    )
+        end)
     end
 
-    -- MUC DOI MAU LED RGB
     sectionTitle(62, "🌈 ĐỔI MÀU LED RGB (NÚT NỔI + VIỀN STATUS)", ACCENT2)
-    -- 6 preset mau co dinh
     local ledPresets = {
         { name = "Cầu vồng", c = nil },
         { name = "Xanh dương", c = Color3.fromRGB(0, 150, 255) },
@@ -892,7 +898,6 @@ do
             print("[hub] LED = " .. p.name)
         end)
     end
-    -- O nhap hex mau
     local hexLbl = Instance.new("TextLabel")
     hexLbl.Size = UDim2.new(0.35, 0, 0, 22)
     hexLbl.Position = UDim2.new(0, 10, 0, 114)
@@ -964,40 +969,41 @@ do
         print("[hub] LED fixed = #" .. input:upper())
     end)
 
-    -- cac cong tac con lai
-    local function makeSetSwitch(y, label, defaultOn, cb)
-        local lbl2 = Instance.new("TextLabel")
-        lbl2.Size = UDim2.new(0.6, 0, 0, 24)
-        lbl2.Position = UDim2.new(0, 10, 0, y)
-        lbl2.BackgroundTransparency = 1
-        lbl2.Text = label
-        lbl2.TextColor3 = Color3.fromRGB(220, 220, 220)
-        lbl2.TextSize = 10
-        lbl2.Font = Enum.Font.GothamBold
-        lbl2.TextXAlignment = Enum.TextXAlignment.Left
-        lbl2.ZIndex = 12
-        lbl2.Parent = settingsPage
-        local sw2 = makeSwitch(settingsPage, y)
-        sw2.track.Position = UDim2.new(1, -62, 0, y)
-        sw2.set(defaultOn)
-        sw2.track.MouseButton1Click:Connect(function()
-            cb(sw2.isOn())
+    -- Nut ON/OFF ro rang (thay cong tac)
+    local function toggleBtn(y, defaultOn, labelOn, labelOff, colorOn, colorOff, cb)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0.9, 0, 0, 30)
+        b.Position = UDim2.new(0.05, 0, 0, y)
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.TextSize = 10
+        b.Font = Enum.Font.GothamBold
+        b.ZIndex = 13
+        b.Parent = settingsPage
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
+        local on = defaultOn
+        local function paint()
+            b.Text = (on and labelOn or labelOff)
+            b.BackgroundColor3 = on and colorOn or colorOff
+        end
+        paint()
+        b.MouseButton1Click:Connect(function()
+            on = not on
+            paint()
+            cb(on)
+            print("[hub] " .. (on and "ON: " or "OFF: ") .. labelOn)
         end)
-        return sw2
+        return b
     end
-    makeSetSwitch(160, "🌈 BẬT/TẮT LED NÚT NỔI", true, function(v)
-        ledOn = v
-    end)
-    makeSetSwitch(192, "🛡️ ANTI-AFK", true, function(v)
+    toggleBtn(168, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
         antiAfk = v
     end)
-    makeSetSwitch(224, "📊 HIỆN FPS / PING", false, function(v)
+    toggleBtn(204, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
         perfOn = v
         perfFrame.Visible = v
     end)
     local perfPosBtn = Instance.new("TextButton")
     perfPosBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 256)
+    perfPosBtn.Position = UDim2.new(0.05, 0, 0, 240)
     perfPosBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     perfPosBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     perfPosBtn.Text = "📌 ĐỔI GÓC HIỆN FPS/PING"
@@ -1035,6 +1041,7 @@ do
     optInfo.TextSize = 10
     optInfo.Font = Enum.Font.GothamBold
     optInfo.TextXAlignment = Enum.TextXAlignment.Left
+    optInfo.ZIndex = 12
     optInfo.Parent = optPage
     local function setQualityLevel(idx)
         pcall(function()
@@ -1157,7 +1164,7 @@ do
     optBtn(114,"fps", "⚡ TỐI ƯU FPS (tự động)", Color3.fromRGB(40, 110, 180))
     optBtn(150,"gem", "💎 TĂNG CHẤT LƯỢNG ĐỒ HỌA (chỉ dành cho máy mạnh)", Color3.fromRGB(200, 70, 120))
 
-    -- GUIDE
+    -- GUIDE (ZIndex 12+)
     guideOpenBtn = Instance.new("TextButton")
     guideOpenBtn.Size = UDim2.new(0.9, 0, 0, 34)
     guideOpenBtn.Position = UDim2.new(0.05, 0, 0, 10)
@@ -1166,6 +1173,7 @@ do
     guideOpenBtn.Text = "📜 MỞ HƯỚNG DẪN SỬ DỤNG"
     guideOpenBtn.TextSize = 11
     guideOpenBtn.Font = Enum.Font.GothamBold
+    guideOpenBtn.ZIndex = 12
     guideOpenBtn.Parent = guidePage
     Instance.new("UICorner", guideOpenBtn).CornerRadius = UDim.new(0, 7)
     local guideHint = Instance.new("TextLabel")
@@ -1178,6 +1186,7 @@ do
     guideHint.Font = Enum.Font.GothamMedium
     guideHint.TextXAlignment = Enum.TextXAlignment.Left
     guideHint.TextWrapped = true
+    guideHint.ZIndex = 12
     guideHint.Parent = guidePage
 
     selectPage("TUNER")
@@ -1377,6 +1386,7 @@ do
     local ControlStroke = Instance.new("UIStroke", ControlPanel)
     ControlStroke.Color = Color3.fromRGB(0, 230, 180)
     ControlStroke.Thickness = 1.5
+    ControlStroke.Parent = ControlPanel
     local ControlTitle = Instance.new("TextLabel")
     ControlTitle.Parent = ControlPanel
     ControlTitle.BackgroundTransparency = 1
@@ -2745,4 +2755,4 @@ addRGBStroke(FreecamFloatingBtn, 3)
 addRGBStroke(hideFloatBtn, 4)
 statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
 
-print("[hub remix v7] san sang — fix menu, title sach, LED RGB co preset + hex")
+print("[hub remix v8] san sang — trang hien day du, settings gon, FPS/PING bat duoc")
