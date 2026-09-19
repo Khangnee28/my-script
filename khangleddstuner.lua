@@ -874,7 +874,7 @@ end)
             track.BackgroundColor3 = v and themeColor or Color3.fromRGB(60, 60, 70)
             knob.Position = v and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
         end
-        return { track = track, set = set, isOn = function() return on end }
+        return { track = track, knob = knob, set = set, isOn = function() return on end }
     end
     farmSwitch = makeSwitch(cardFarm, 10)
     -- v17: map khac => khoa nut + bao loi; Surakarta => khong hien gi
