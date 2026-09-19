@@ -31,10 +31,7 @@ pcall(function()
 end)
 
 -- v17: nhan dien map — office (Computers) chi co o Surakarta
-local farmOK = false
-local function checkFarmOK()
-    return workspace:FindFirstChild("Computers") ~= nil
-end
+local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
 
 local parent = nil
 pcall(function()
@@ -880,6 +877,25 @@ end)
         end
         return { track = track, knob = knob, set = set, isOn = function() return on end }
     end
+farmNote = Instance.new("TextLabel")
+farmNote.Size = UDim2.new(1, -70, 0, 14)
+farmNote.Position = UDim2.new(0, 12, 0, 86)
+farmNote.BackgroundTransparency = 1
+farmNote.Text = ""
+farmNote.TextColor3 = Color3.fromRGB(255, 120, 80)
+farmNote.TextSize = 10
+farmNote.Font = Enum.Font.GothamBold
+farmNote.TextXAlignment = Enum.TextXAlignment.Left
+farmNote.TextWrapped = true
+farmNote.ZIndex = 13
+farmNote.Parent = cardFarm
+if not farmOK then
+    farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
+    farmSwitch.track.Active = false
+    farmSwitch.track.AutoButtonColor = false
+    farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+    if farmSwitch.knob then farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125) end
+end
      farmSwitch = makeSwitch(cardFarm, 10)
     farmNote = Instance.new("TextLabel")
     farmNote.Size = UDim2.new(1, -24, 0, 16)
@@ -2274,7 +2290,7 @@ do
     local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
-    local Computers = nil
+    local Computers = workspace:WaitForChild("Computers")
     local PATTERN = { "CHOICE", "QID" }
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
@@ -2806,6 +2822,7 @@ do
             task.wait(0.2)
         end
         if farmOffice and of_printAssigned then
+if not Computers then return end
             of_doPrint(of_printAssigned)
         end
     end
@@ -2836,6 +2853,7 @@ do
     end
     farmSwitch.track.MouseButton1Click:Connect(function()
         if not farmOK then return end
+        local want = not farmOffice
         if farmOffice then
             stopOffice()
             return
