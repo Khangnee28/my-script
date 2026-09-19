@@ -2868,4 +2868,31 @@ addRGBStroke(AutoTFloatingBtn)
 addRGBStroke(BodyManagerFloatingBtn)
 addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
-statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7)
+statRingFrame = makeStatRing(statPanel, 250, 134, 4, 3, 14, 7) 
+-- ============================================================
+-- OFFICE STATUS: VIEN CAU VONG MUOT (giong Brainrot Finder)
+-- Dan vao CUOI script chinh, sau dong statRingFrame = makeStatRing(...)
+-- ============================================================
+-- 1) Bo vien LED cu (dang segment bi dut) di
+if statRingFrame then
+    statRingFrame:Destroy()
+    statRingFrame = nil
+end
+-- 2) Them vien UIStroke cau vong muot, chay doc lap luon on (giong Brainrot)
+local statStroke = Instance.new("UIStroke")
+statStroke.Name = "RainbowBorder"
+statStroke.Thickness = 2
+statStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+statStroke.Transparency = 0
+statStroke.Parent = statPanel
+task.spawn(function()
+    local t = 0
+    while true do
+        t = t + 0.12
+        local pos = t % RN
+        local idx = math.floor(pos) + 1
+        local f = pos - (idx - 1)
+        statStroke.Color = RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
+        task.wait(0.03)
+    end
+end)
