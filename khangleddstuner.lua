@@ -1,4 +1,4 @@
-- ============================================================
+-- ============================================================
 -- KHANGLE DDS HUB — 4080 REMIX v14
 -- v14: Settings + AN TEN TREN DAU + DOI TEN TUY CHINH
 --      popup guide canvas/content = 1400 (guide menu giu 1500)
