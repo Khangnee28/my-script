@@ -1,4 +1,4 @@
--- ============================================================
+- ============================================================
 -- KHANGLE DDS HUB — 4080 REMIX v14
 -- v14: Settings + AN TEN TREN DAU + DOI TEN TUY CHINH
 --      popup guide canvas/content = 1400 (guide menu giu 1500)
@@ -17,7 +17,7 @@ local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
 local farmSwitch.trackcamera = workspace.CurrentCamera
-
+local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
 pcall(function()
     Lighting.GlobalShadows = true
     Lighting.Brightness = 2
@@ -31,7 +31,7 @@ pcall(function()
 end)
 
 -- v17: nhan dien map — office (Computers) chi co o Surakarta
-local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
+
 
 local parent = nil
 pcall(function()
