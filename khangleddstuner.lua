@@ -732,45 +732,45 @@ do
         local finalMult = tonumber(finalDriveBox.Text) or 0.8
         local count = 0
         if typeof(getgc) == "function" then
-            pcall(function()
-                for _, obj in pairs(getgc(true)) do
-                    if typeof(obj) == "table" then
-                        pcall(function()
-                            for k, v in pairs(obj) do
-                                if type(k) == "string" then
-                                    if k == "Horsepower" or k == "Torque" or k == "MaxPower" then
-                                        if type(v) == "number" then
-                                            obj[k] = v * hpMult
-                                            count = count + 1
-                                        end
-                                    elseif k == "Redline" or k == "MaxRPM" or k == "RPM" then
-                                        if type(v) == "number" then
-                                            obj[k] = v + rpmAdd
-                                            count = count + 1
-                                        end
-                                    elseif k == "GearRatio" or k == "FinalDrive" then
-                                        local mult = (k == "FinalDrive") and finalMult or gearMult
-                                        if type(v) == "number" and v > 0 then
-                                            obj[k] = v * mult
-                                            count = count + 1
-                                        end
-                                    elseif k == "GearRatios" or k == "Gears" then
-                                        if type(v) == "table" then
-                                            for i, gVal in pairs(v) do
-                                                if type(gVal) == "number" then
-                                                    v[i] = gVal * gearMult
-                                                    count = count + 1
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end)
-                        end
-                    end
-                end
-            end)
-        end
+pcall(function()
+for _, obj in pairs(getgc(true)) do
+if typeof(obj) == "table" then
+pcall(function()
+for k, v in pairs(obj) do
+if type(k) == "string" then
+if k == "Horsepower" or k == "Torque" or k == "MaxPower" then
+if type(v) == "number" then
+obj[k] = v * hpMult
+count = count + 1
+end
+elseif k == "Redline" or k == "MaxRPM" or k == "RPM" then
+if type(v) == "number" then
+obj[k] = v + rpmAdd
+count = count + 1
+end
+elseif k == "GearRatio" or k == "FinalDrive" then
+local mult = (k == "FinalDrive") and finalMult or gearMult
+if type(v) == "number" and v > 0 then
+obj[k] = v * mult
+count = count + 1
+end
+elseif k == "GearRatios" or k == "Gears" then
+if type(v) == "table" then
+for i, gVal in pairs(v) do
+if type(gVal) == "number" then
+v[i] = gVal * gearMult
+count = count + 1
+end
+end
+end
+end
+end
+end
+end)
+end
+end
+end)
+            end 
         local vehicleModel = seat.Parent
         if vehicleModel then
             for _, obj in pairs(vehicleModel:GetDescendants()) do
