@@ -2694,11 +2694,14 @@ end
     return fired
 end
     local function of_doPrint(name)
-        if not Computers then return end
-        local model = Computers:FindFirstChild(name)
-        if not model then
-            return
-        end
+local Computers = workspace:FindFirstChild("Computers")
+if not Computers then
+return
+end
+local model = Computers:FindFirstChild(name)
+if not model then
+return
+end
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
         if not part then return end
         of_standUp()
