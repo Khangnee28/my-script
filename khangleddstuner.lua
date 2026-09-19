@@ -889,13 +889,7 @@ farmNote.TextXAlignment = Enum.TextXAlignment.Left
 farmNote.TextWrapped = true
 farmNote.ZIndex = 13
 farmNote.Parent = cardFarm
-if not farmOK then
-    farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-    farmSwitch.track.Active = false
-    farmSwitch.track.AutoButtonColor = false
-    farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-    if farmSwitch.knob then farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125) end
-end
+
      farmSwitch = makeSwitch(cardFarm, 10)
     farmNote = Instance.new("TextLabel")
     farmNote.Size = UDim2.new(1, -24, 0, 16)
@@ -909,7 +903,13 @@ end
     farmNote.TextWrapped = true
     farmNote.ZIndex = 13
     farmNote.Parent = cardFarm
-    
+    if not farmOK then
+    farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
+    farmSwitch.track.Active = false
+    farmSwitch.track.AutoButtonColor = false
+    farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+    if farmSwitch.knob then farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125) end
+    end
     local cardBody = makeCard(120, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton")
     bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
