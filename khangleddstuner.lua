@@ -2262,7 +2262,7 @@ do
     local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
-    local Computers = workspace:WaitForChild("Computers")
+    local Computers = workspace:FindFirstChild("Computers")
     local PATTERN = { "CHOICE", "QID" }
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
