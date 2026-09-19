@@ -2240,7 +2240,7 @@ do
 end
 
 -- ============================================================
--- KHOI 5: OFFICE FARM v20 (v17: FindFirstChild, khong treo)
+-- KHOI 5: OFFICE FARM v20 (logic officefarm v51 giu nguyen)
 -- ============================================================
 do
     local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
@@ -2249,7 +2249,7 @@ do
     local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
-    local Computers = workspace:FindFirstChild("Computers")
+    local Computers = workspace:WaitForChild("Computers")
     local PATTERN = { "CHOICE", "QID" }
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
@@ -2372,10 +2372,10 @@ do
             setStatus("đang giải")
         end
     end)
-    CorrectAnswer.OnClientEvent:Connect(function(st)
+    CorrectAnswer.OnClientEvent:Connect(function(status)
         of_awaitingAck = false
         of_refired = false
-        local s = type(st) == "string" and st:lower() or ""
+        local s = type(status) == "string" and status:lower() or ""
         if s == "success" then
             ofAnswers = ofAnswers + 1
             refreshStatPanel()
@@ -2491,6 +2491,9 @@ do
                 task.wait(0.1)
             end
         end)
+        if not ok then
+            warn("[farm] fly loi, ha canh di bo")
+        end
         of_killBV()
         task.wait(0.3)
     end
@@ -2548,6 +2551,7 @@ do
                 if flat.Magnitude <= stopDist then break end
                 h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
                 if hrp.Position.Y < target.Y - 120 then
+                    warn("[farm] rot void — tu respawn de tiep tuc")
                     pcall(function() h.Health = 0 end)
                     break
                 end
@@ -2564,6 +2568,7 @@ do
                         slip = 0.5
                         pulses += 1
                         stuckTime = 0
+                        print("[farm] tuong chan — mo tuong 0.5s")
                     end
                 end
                 if slip > 0 then
@@ -2597,6 +2602,9 @@ do
         if h and hrp then
             h:MoveTo(hrp.Position)
             of_endSprint(h)
+        end
+        if not ok then
+            warn("[farm] walk loi")
         end
     end
     local function of_forceSit(h)
@@ -2649,18 +2657,29 @@ do
         of_killBV()
         return (h and h.Sit) or false
     end
-    local function of_compute(q)
-    if not q or type(q.text) ~= "string" then return nil end
-    local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
-    if not a then return nil end
-    a, b = tonumber(a), tonumber(b)
-    if op == "+" then return a + b
-    elseif op == "-" then return a - b
-    elseif op == "*" or op:lower() == "x" then return a * b
-    elseif op == "/" then if b ~= 0 then return a / b end
+    local function of_solve(q)
+        if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then
+            return nil
+        end
+        local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
+        if not a then return nil end
+        a, b = tonumber(a), tonumber(b)
+        local r
+        if op == "+" then r = a + b
+        elseif op == "-" then r = a - b
+        elseif op == "*" or op:lower() == "x" then r = a * b
+        elseif op == "/" then
+            if b == 0 then return nil end
+            r = a / b
+        end
+        for _, c in ipairs(q.choices) do
+            local v = tonumber(c.Text)
+            if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then
+                return c
+            end
+        end
+        return nil
     end
-    return nil
-end
     local function of_buildArgs(q, c)
         local out = {}
         for i, v in ipairs(PATTERN) do
@@ -2672,36 +2691,31 @@ end
         return out
     end
     local function of_fireAnswer(q)
-    local r = of_compute(q)
-    local choice = of_solve(q)
-    local fired = false
-    if choice then
-        local btn = of_findButton(choice.Text)
-        if btn and of_clickButton(btn) then fired = true end
-        if not fired and choice.ID ~= nil then
-            fired = pcall(function() CorrectAnswer:FireServer(choice.ID, q.questionID) end)
+        local choice = of_solve(q)
+        if not choice then
+            warn("[farm] khong parse duoc: " .. tostring(q and q.text))
+            return false
         end
+        local btn = of_findButton(choice.Text)
+        local how = btn and of_clickButton(btn) or nil
+        if how then
+            print("[farm] bam nut Text=" .. tostring(choice.Text) .. " cach=" .. tostring(how))
+        else
+            print("[farm] duong cung remote Text=" .. tostring(choice.Text))
+            pcall(function()
+                CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice)))
+            end)
+        end
+        of_awaitingAck = true
+        of_lastFireAt = os.clock()
+        return true
     end
-    if not fired and r then
-        local btn2 = of_findButton(tostring(r))
-        if btn2 and of_clickButton(btn2) then fired = true end
-    end
-    if not fired and r then
-        fired = pcall(function() CorrectAnswer:FireServer(r, q.questionID) end)
-    end
-    of_awaitingAck = fired
-    of_lastFireAt = os.clock()
-    return fired
-end
     local function of_doPrint(name)
-local Computers = workspace:FindFirstChild("Computers")
-if not Computers then
-return
-end
-local model = Computers:FindFirstChild(name)
-if not model then
-return
-end
+        local model = Computers:FindFirstChild(name)
+        if not model then
+            warn("[farm] khong thay may in: " .. tostring(name))
+            return
+        end
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
         if not part then return end
         of_standUp()
@@ -2735,6 +2749,7 @@ end
         if not farmOffice then return end
         if not of_sitAtChair() then
             if farmOffice then
+                warn("[farm] khong ngoi duoc ghe, thu lai")
                 task.wait(2)
             end
             return
@@ -2742,31 +2757,27 @@ end
         setStatus("ngồi ghế, chờ câu hỏi")
         local idleStart = os.clock()
         while farmOffice do
-        if of_printAssigned then break end
-        -- choi chong ket: neu cho ack qua lau ma khong thay server tra ve thi mo khoa + queue lai cau hoi
-        if of_awaitingAck and os.clock() - of_lastFireAt > 12 then
-            of_awaitingAck = false
-            of_refired = false
-            if of_lastKnownQuestion then
-                of_pendingQuestion = of_lastKnownQuestion
-            end
-        end
-        if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
-            local q = of_pendingQuestion
-            local fired = of_fireAnswer(q)
-            if fired then
+            if of_printAssigned then break end
+            if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
+                local q = of_pendingQuestion
                 of_pendingQuestion = nil
+                of_fireAnswer(q)
                 setStatus("đã giải")
                 of_nextDelay = math.random(20, 28) / 10
-            else
-                of_awaitingAck = false
-                of_nextDelay = 1.0
+                idleStart = os.clock()
             end
-            idleStart = os.clock()
+            if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
+                of_refired = true
+                print("[farm] khong thay xac nhan — thu lai 1 lan")
+                if of_lastKnownQuestion then
+                    of_fireAnswer(of_lastKnownQuestion)
+                    setStatus("đã giải")
+                end
+                idleStart = os.clock()
+            end
+            if os.clock() - idleStart > 60 then break end
+            task.wait(0.2)
         end
-        if os.clock() - idleStart > 60 then break end
-        task.wait(0.2)
-    end
         if farmOffice and of_printAssigned then
             of_doPrint(of_printAssigned)
         end
@@ -2774,9 +2785,10 @@ end
     task.spawn(function()
         while true do
             if farmOffice then
-                local ok = pcall(of_runCycle)
+                local ok, err = pcall(of_runCycle)
                 if not ok then
                     of_killBV()
+                    warn("[farm] LOOP ERR: " .. tostring(err))
                     task.wait(1)
                 end
             else
@@ -2784,6 +2796,7 @@ end
             end
         end
     end)
+    -- DIEU KHIEN (noi vao farmSwitch cua script chinh)
     local function stopOffice()
         farmOffice = false
         of_killBV()
@@ -2791,32 +2804,32 @@ end
             activeMode = nil
             statPanel.Visible = false
         end
-        refreshStatPanel()
+        farmSwitch.set(false)
         setStatus("tạm nghỉ")
     end
     farmSwitch.track.MouseButton1Click:Connect(function()
-        if not farmOK then return end
-        local want = not farmOffice
-        farmSwitch.set(want)
-        if want then
-            farmOffice = true
-            activeMode = "office"
-            farmStart = os.clock()
-            if not of_jobFired then
-                TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
-                of_jobFired = true
-                of_resetUntil = os.clock() + 5
-            end
-            local char = player.Character
-            of_enableSit(char)
-            statPanel.Visible = true
-            refreshStatPanel()
-            setStatus("khởi động office")
-        else
+        if farmOffice then
             stopOffice()
+            return
         end
+        farmOffice = true
+        activeMode = "office"
+        farmStart = os.clock()
+        if not of_jobFired then
+            TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
+            of_jobFired = true
+            of_resetUntil = os.clock() + 5
+        end
+        local char = player.Character
+        of_enableSit(char)
+        farmSwitch.set(true)
+        statPanel.Visible = true
+        refreshStatPanel()
+        setStatus("khởi động office")
     end)
 end
+-- ============ HET KHOI 5 ============
+
 
 -- ============ NOI DAY CUOI + LED RGB NUT NOI ============
 ToggleBtn.MouseButton1Click:Connect(function()
