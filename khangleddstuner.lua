@@ -1,7 +1,7 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v16
--- = new.lua (v14) NGUYEN VAN + CHI THEM map-detect (4 cho)
--- guide concat / canvas / moi thu giu NGUYEN TRANG
+-- KHANGLE DDS HUB — 4080 REMIX v15
+-- v15: FIX guide — them khoang trong xuong dong (\n\n) + tu co gian (AutomaticSize)
+--      KHONG doi bat cu thu gi khac
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -40,8 +40,6 @@ ScreenGui.Name = "KhangLeCustomTuner"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = parent
--- [MAP-DETECT 1/4] nhan dien map co office hay khong (khong treo)
-local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
 local function makeHeaderDraggable(header, frame)
 header.Active = true
 local dragging = false
@@ -456,54 +454,35 @@ hideNameTags()
 end
 end
 end)
--- ============ NOI DUNG GUIDE (GIU NGUYEN TRANG new.lua) ============
+-- ============ NOI DUNG GUIDE (v15: \n\n + AutomaticSize) ============
 local guideLines = {
 "Hướng dẫn xài - đọc kĩ trước khi sử dụng:",
 "mọi người hãy để nguyên mặc định xài vì do mình đã test và set như vậy mọi người có thể tùy chỉnh nhưng cần đọc kĩ những cái sau đây:",
-
 "mã lực: tốc độ đề pa gia tốc mạnh hơn mã lực càng nhiều đề pa càng mạnh ( Lưu ý : để ít thôi nó xoáy bánh trơn không chạy được )",
-
 "rpm: tua máy ngắn lại hoặc dài ra có nghĩa là khi mọi người chỉnh tua thấp xuống quá và final drive để thấp thì max speed nó sẽ không nhanh hơn tí nào đâu mà còn chậm lại nữa giống kiểu mọi người khoá tua không cho nó chạy hết tua máy",
-
 "tips chỉnh rpm: mình để mặc định là 3500 mọi người chỉnh final drive khi nào chạy hết ga hết số rồi mà xe nó tằng tằng thì do mọi người chỉnh top speed nó cao hơn nên tới tua đó nó muốn lên thêm mà không được nên mọi người chỉnh rpm lên chút xíu xong khi nào nó k còn tằng nữa mọi người hạ xuống 50 hoặc 100 cho nó tằng để nghe tiếng cho nó hay nha",
-
 "ratio gear: tỷ lệ của số có nghĩa là khi mọi người chỉnh càng nhỏ số sẽ dài ra và tốc độ của số cũng sẽ tăng lên theo và khi chỉnh số lớn thì số sẽ hết số nhanh hơn phải sang số để chạy nhanh hơn ( không nên chỉnh cái này nếu đi xe tay ga )",
-
 "final drive: tỷ số truyền động cuối có nghĩa là khi mọi người giảm cái này thì lực tác động lên bánh sau sẽ yếu lại nhưng top speed sẽ tăng lên giống như mọi người đi xe máy nhông to sẽ đề pa mạnh nhưng top speed lại thấp còn nhông nhỏ đề pa yếu nhưng top speed lại nhanh hơn ( nếu hạ cái này nhiều quá thấy đề pa quá yếu thì nên tăng mã lực và rút ngắn cấp số lại nha )",
-
 "Lưu Ý Quan Trọng: mọi người chỉ nên chỉnh rpm và final drive và mã lực thôi nha khi chỉnh ratio gear và chỉnh cả final drive nữa rất sẽ gây xung đột và lỗi khiến xe chạy nhanh bất thường và tua máy dài mênh mông nên mọi người chọn chỉnh ratio gear hoặc final drive cái nào cũng được nếu mọi người muốn chạy nhanh hơn thì cứ chỉnh 1 trong 2 cái đó thấp xuống còn muốn xe nó tằng tằng đỡ phải canh sợ game kick thì chỉnh rpm thấp xuống cho nó tằng nha",
-
 "Lưu Ý Về Tốc Độ: khuyên mọi người đừng chỉnh quá nhanh chỉnh mã lực đề pa xoáy bánh cho ngầu thì được nếu chạy quá nhanh hoặc bất thường về tốc độ sẽ bị game kick, nếu mọi người muốn chạy nhanh 400+ km/h thì nên nhấp nhả ga để cho speed nó lên từ từ đừng kéo một phát lên cực nhanh game sẽ phát hiện và kick mọi người vì tốc độ bất thường tốc độ tầm 370 đổ xuống là mọi người có thể kéo hết ga cũng được không cần nhấp nhả nhưng tùy xe nó lên speed chậm hay nhanh nha nó lên speed nhanh quá vẫn bị kick như bình thường nên là mọi người lưu ý với game này không ban người chơi nên bị kick thì mọi người đừng quá lo lắng.",
-
 "Lưu Ý Về Xe: sẽ có vài xe không áp dụng được top speed chỉ có thể tăng mã lực giúp xe đề pa sẽ mạnh hơn tăng tầm 7 - 12 km/h tùy vào xe còn top speed sẽ không hoạt động nha vì admin lock thông số xe đó nên script sẽ không can thiệp để thay đổi top speed được nhưng bù lại mọi người có thể chỉnh mã lực đề pa xoáy bánh và chỉnh rpm vẫn được nha nhưng đừng chỉnh ratio gear và final drive dễ gây xung đột và lỗi, rpm mình set mặc định là 3500 mọi người thấy chạy max speed mà nó vẫn còn dư cả khúc rpm ở thanh dưới thì mọi người giảm rpm xuống đến khi nào xe nó đờn tằng tằng nha nhưng nếu mọi người thấy xe nó tự chạy bấm dừng không được thì tăng rpm lên một chút tầm 50 - 100 gì đó để nó dư một khoản nhỏ xong lại giảm nhẹ lại 10 - 20 căn đến khi nào nó đờn tua nha để tránh lỗi tiếng pô và chạy cũng sướng hơn nữa",
-
 "Auto T: tự động bốc đầu cho ai muốn múa lửa",
 "cách dùng: mở menu lên và bật nó lên sau khi bật sẽ hiện một cái bong bóng nổi mọi người kéo đâu cũng được miễn thuận tiện là được sau khi lên xe mọi người bấm vào cái nút đó là được thì khi mọi người vặn ga xe sẽ tự bốc đầu lên cho cảm giác chạy rất phê",
-
 "lưu ý: sau khi té rất dễ bị lỗi mất nút di chuyển khi bị mọi người chỉ cần ấn vài lần vào màn hình hoặc bấm vào icon roblox trên góc phải vài lần là sẽ bình thường trở lại",
-
 "Tháo Dàn Áo: tháo mọi thứ của xe bánh xe áo xe cục máy bla bla..vv",
 "cách dùng: bật menu lên và bật quản lý dàn áo sau đó spawn xe muốn tháo và ngồi lên xe bấm quét xe để quét xe sau đó xuống xe bật free cam và click vào chỗ muốn tháo lưu ý bộ phận của xe được gọi là part và part có nhiều cụm tùy xe admin sẽ chia nhỏ từng cụm ra rất dễ tháo còn xe gộp một đống part vào một cụm nếu mọi người bấm vào một chỗ muốn xoá mà thấy cụm đó có tới 100 hoặc hơn 200 part có nghĩa là nó k chia nhỏ cụm ra và gộp thành 1 cụm to mọi người chịu khó bấm tới chỗ mình muốn xoá ví dụ phuộc bla bla có thể tháo luôn cục máy để chụp ảnh sau khi tháo mọi người vẫn chạy bình thường nha nhưng chịu khó xíu sau khi tháo xong hết thì mọi người tắt soi và tháo đi nha là ok",
-
 "lưu ý: vì xe admin không làm remote event nên khi xoá chỉ mọi người thấy được còn người khác thì không nha ai thích chụp ảnh thì dùng để tháo ra xem chi tiết rồi chụp cho đẹp nha",
-
 "cách tìm part muốn xoá: khi mọi người click sẽ hiện selection box có màu và tên cụm và part nếu xe được gộp nhiều cụm lại thì rất dễ tháo nó chia nhỏ ra từng part cho mỗi cụm có tên riêng mọi người muốn xoá dàn áo thì cứ di cam lại gần dàn áo rồi bấm vô xong bấm xoá cả mục là xoá hết dàn áo ngoài luôn nếu còn hình mờ hoặc tem có nghĩa xe đó có một cụm to nữa mọi người phải bấm tìm cụm to đó rồi dò từng part để xoá , sẽ có cụm trước và cụm sau là không có gộp chung đâu nha cứ click lên cụm trước hay sau rồi tìm chỗ muốn xoá ví dụ ốp đầu hay ghi đông là ở cụm trước còn cụm giữa là cái khung và mấy part nhỏ nhỏ như ốc máy bla bla nói chung muốn xoá gì thì ngồi mò chút xíu nha là hiểu !",
-
 "gợi ý: những mảnh dàn áo hay màu sơn và tem admin thường đặt tên part là (livery , paint) còn những xe khác có thể sẽ là những tên khác nhưng có selection box nên mọi người cứ đổi part đến khi nào thấy chỗ mình muốn xoá rồi xoá là được nha",
-
 "Freecam: freecam này do mình làm và mọi người có thể dùng để quay phim chụp ảnh có thể tùy chỉnh tốc độ xoay camera , di chuyển , zoom , up down như pc luôn nha",
 "cách dùng: mở menu chính lên và mở freecam sau đó mọi người tùy chỉnh tốc độ xoay camera và di chuyển freecam và trong menu có nút ẩn giao diện khi bật lên sẽ hiện nút nổi khi bấm vào sẽ ẩn toàn bộ cụm điều khiển nút nhảy nhưng vẫn bấm và di chuyển được bằng cụm điều khiển nha chỉ ẩn đi thôi chứ không mất và khi ẩn sẽ ẩn luôn nút nổi mọi người chỉ cần nhớ chỗ để nút nổi và ấn lại vị trí đó là được khi mọi người bấm ẩn mình đã cố định ở chỗ mọi người để nút nổi rồi nha",
-
 "lưu ý: ẩn giao diện sẽ không ẩn được UI của game nha chỉ ẩn được của roblox thôi muốn ẩn UI của game một là mọi người bật freecam của game và bấm nút con mắt sẽ ẩn hết nhưng mà vẫn còn dấu x nha và cũng k có ích lợi gì :v",
-
 "gợi ý: mọi người nên dùng quay video hoặc chụp ảnh của roblox không cần chụp bằng điện thoại mọi người bấm vô dấu 3 gạch tìm mục chụp ảnh có hình camera sau đó sẽ hiện một cái nút  nổi có thể di chuyển của roblox bấm ở trên là quay video và ở dưới là chụp ảnh và khi dùng cái đó thì không có thứ gì gây cản trở trên màn hình nữa nha nó chỉ quay trong game không vướng víu UI hay script gì đâu nha mọi người có thể thoải mái dùng freecam của mình để quay video không cần ẩn giao diện nha và khi quay hoặc chụp xong mọi người bấm vào roblox trên góc trái màn hình tìm chỗ thư viện ảnh và video của mọi người sẽ ở đó và chỉ việc lưu về nha!",
-
 "Script By Khang Lê",
 "Id Tiktok: @khangdayy215",
-  
 "Cảm ơn đã tin tưởng và sử dụng script của mình!.",
 }
-local guideFullText = table.concat(guideLines, "\n")
+local guideFullText = table.concat(guideLines, "\n\n")
 -- ============================================================
 -- KHOI 1: HUB UI
 -- ============================================================
@@ -858,30 +837,6 @@ end
 return { track = track, set = set, isOn = function() return on end }
 end
 farmSwitch = makeSwitch(cardFarm, 10)
--- [MAP-DETECT 3/4] note duoi nut farm + xam nut khi map khong co office
-local farmNote = Instance.new("TextLabel")
-farmNote.Size = UDim2.new(1, -70, 0, 14)
-farmNote.Position = UDim2.new(0, 12, 0, 88)
-farmNote.BackgroundTransparency = 1
-farmNote.Text = ""
-farmNote.TextColor3 = Color3.fromRGB(255, 120, 80)
-farmNote.TextSize = 10
-farmNote.Font = Enum.Font.GothamBold
-farmNote.TextXAlignment = Enum.TextXAlignment.Left
-farmNote.TextWrapped = true
-farmNote.ZIndex = 13
-farmNote.Parent = cardFarm
-if farmOK then
-farmNote.Text = ""
-else
-farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-farmSwitch.track.Active = false
-farmSwitch.track.AutoButtonColor = false
-farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-if farmSwitch.knob then
-farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
-end
-end
 local cardBody = makeCard(120, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
 bodyOpenBtn = Instance.new("TextButton")
 bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
@@ -1275,7 +1230,7 @@ applyCustomName()
 nameStatus.Text = "✔ đã đổi tên hiển thị"
 nameStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
 end)
--- GUIDE (nhung thang, GIU NGUYEN new.lua: popup 1350 / menu 1500)
+-- GUIDE (nhung thang, v15 AutomaticSize)
 local guideHint = Instance.new("TextLabel")
 guideHint.Size = UDim2.new(0.9, 0, 0, 20)
 guideHint.Position = UDim2.new(0.05, 0, 0, 6)
@@ -1292,12 +1247,13 @@ guideScroll.Size = UDim2.new(1, -8, 1, -34)
 guideScroll.Position = UDim2.new(0, 4, 0, 30)
 guideScroll.BackgroundTransparency = 1
 guideScroll.BorderSizePixel = 0
-guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1500)
+guideScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 guideScroll.ScrollBarThickness = 4
 guideScroll.ZIndex = 12
 guideScroll.Parent = guidePage
 local guideText = Instance.new("TextLabel")
-guideText.Size = UDim2.new(1, -10, 0, 1500)
+guideText.Size = UDim2.new(1, -10, 0, 0)
+guideText.AutomaticSize = Enum.AutomaticSize.Y
 guideText.BackgroundTransparency = 1
 guideText.Text = guideFullText
 guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -1321,7 +1277,7 @@ if farmSwitch and farmSwitch.isOn() then
 farmSwitch.set(true)
 end
 end
--- GUIDE FRAME popup (GIU NGUYEN new.lua)
+-- GUIDE FRAME popup (v15 AutomaticSize)
 GuideFrame = Instance.new("Frame")
 GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 GuideFrame.BorderSizePixel = 0
@@ -1375,8 +1331,9 @@ GuideFrame.Size = UDim2.new(0, 540, 0, 350)
 GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
 ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
 ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1350)
-GuideContent.Size = UDim2.new(1, -10, 0, 1350)
+GuideContent.Size = UDim2.new(1, -10, 0, 0)
+GuideContent.AutomaticSize = Enum.AutomaticSize.Y
+ScrollGuide.AutomaticCanvasSize = Enum.AutomaticSize.Y
 CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
 CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
 GuideFrame.Visible = true
@@ -1796,12 +1753,12 @@ found = true
 break
 end
 end
-end
 if found then
 updateSelectionInfo()
 else
 selectedPart = nil
 SelectionBoxObj.Adornee = nil
+end
 end
 end)
 PrevPartBtn.MouseButton1Click:Connect(function()
@@ -1817,12 +1774,12 @@ found = true
 break
 end
 end
-end
 if found then
 updateSelectionInfo()
 else
 selectedPart = nil
 SelectionBoxObj.Adornee = nil
+end
 end
 end)
 DeselectBtn.MouseButton1Click:Connect(function()
@@ -2219,8 +2176,7 @@ local GenerateQuestion = JobEvents:WaitForChild("GenerateQuestion")
 local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
 local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
 local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
--- [MAP-DETECT 2/4] khong dung WaitForChild (treo o map khac)
-local Computers = workspace:FindFirstChild("Computers")
+local Computers = workspace:WaitForChild("Computers")
 local PATTERN = { "CHOICE", "QID" }
 local OF_FLY_SPEED = 55
 local OF_FLY_TIMEOUT = 240
@@ -2670,8 +2626,6 @@ of_lastFireAt = os.clock()
 return true
 end
 local function of_doPrint(name)
--- [MAP-DETECT 2/4 guard] Computers nil o map khac
-if not Computers then return end
 local model = Computers:FindFirstChild(name)
 if not model then
 return
@@ -2764,8 +2718,6 @@ refreshStatPanel()
 setStatus("tạm nghỉ")
 end
 farmSwitch.track.MouseButton1Click:Connect(function()
--- [MAP-DETECT 4/4] map khong co office => khong cho bat
-if not farmOK then return end
 local want = not farmOffice
 farmSwitch.set(want)
 if want then
