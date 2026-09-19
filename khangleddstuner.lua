@@ -909,35 +909,7 @@ end
     farmNote.TextWrapped = true
     farmNote.ZIndex = 13
     farmNote.Parent = cardFarm
-    local function applyFarmAvailability()
-        local ok = checkFarmOK()
-        farmOK = ok
-        if ok then
-            farmNote.Text = ""
-            farmSwitch.track.Active = true
-            farmSwitch.track.AutoButtonColor = true
-            if not farmSwitch.isOn() then
-                farmSwitch.track.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-            end
-        else
-            farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-            farmSwitch.track.Active = false
-            farmSwitch.track.AutoButtonColor = false
-            farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-            farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
-        end
-    end
-    applyFarmAvailability()
-    task.spawn(function()
-        while true do
-            task.wait(2)
-            local ok = checkFarmOK()
-            if ok ~= farmOK then
-                applyFarmAvailability()
-            end
-        end
-    end)
+    
     local cardBody = makeCard(120, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton")
     bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
