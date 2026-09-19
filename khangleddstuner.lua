@@ -16,7 +16,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
-local farmSwitch.trackcamera = workspace.CurrentCamera
+local camera = workspace.CurrentCamera
 local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
 pcall(function()
     Lighting.GlobalShadows = true
