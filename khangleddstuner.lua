@@ -740,7 +740,7 @@ InjectBtn.MouseButton1Click:Connect(function()
     local vehicleModel = seat.Parent
 
     if vehicleModel and tunedModels[vehicleModel] then
-        setStatusTmp("⚠ Xe này đã tune rồi — xuống xe lên lại để apply",
+        setStatusTmp("⚠ Xe này đã tune rồi — respawn xe để apply",
                      Color3.fromRGB(255, 180, 60), 4)
         return
     end
@@ -874,14 +874,14 @@ InjectBtn.MouseButton1Click:Connect(function()
     end
 
     if count == 0 then
-        setStatusTmp("⚠ Không tìm thấy gì để tune — xe này admin lock",
+        setStatusTmp("⚠ Không tìm thấy gì để tune",
                      Color3.fromRGB(255, 180, 60), 4)
         return
     end
 
     if vehicleModel then tunedModels[vehicleModel] = true end
 
-    setStatusTmp("✔ Đã tune " .. count .. " field (xuống xe lên lại)",
+    setStatusTmp("✔ Đã tune (xuống xe lên lại)",
                  Color3.fromRGB(0, 255, 120), 4)
 end)
 
