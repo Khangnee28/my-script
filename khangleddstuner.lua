@@ -2558,48 +2558,36 @@ do
         return out
     end
     local function of_flyTo(target, stopDist, timeout)
-        timeout = timeout or OF_FLY_TIMEOUT
-        local deadline = os.clock() + timeout
-        of_phasing = true
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        bv.Velocity = Vector3.zero
-        of_activeBV = bv
-        local hrp = of_root()
-        if hrp then bv.Parent = hrp end
-        local ok = pcall(function()
-            local prevPos = hrp and hrp.Position
-            local prevTime = os.clock()
-            local stuck = 0
-            while os.clock() < deadline and farmOffice do
-                hrp = of_root()
-                if not hrp then break end
-                if bv.Parent ~= hrp then bv.Parent = hrp end
-                local delta = target - hrp.Position
-                if delta.Magnitude <= stopDist then break end
-                local dir = Vector3.new(delta.X, math.clamp(delta.Y, -8, 8), delta.Z)
-                if dir.Magnitude > 0.01 then
-                    bv.Velocity = dir.Unit * OF_FLY_SPEED
-                end
-                if os.clock() - prevTime >= 0.5 then
-                    if prevPos and (hrp.Position - prevPos).Magnitude < 1 then
-                        stuck += 1
-                    else
-                        stuck = 0
-                    end
-                    prevPos = hrp.Position
-                    prevTime = os.clock()
-                    if stuck >= 6 then break end
-                end
-                task.wait(0.1)
-            end
-        end)
-        if not ok then
-            warn("[farm] fly loi, ha canh di bo")
-        end
-        of_killBV()
-        task.wait(0.3)
+    stopDist = stopDist or 8
+    timeout = timeout or OF_FLY_TIMEOUT
+    local deadline = os.clock() + timeout
+    local STEP_DIST = 150
+    local STEP_DELAY = 0.06
+
+    local hrp = of_root()
+    if not hrp then return false end
+
+    of_phasing = true
+    while os.clock() < deadline and farmOffice do
+        hrp = of_root()
+        if not hrp then break end
+        local delta = target - hrp.Position
+        local dist = delta.Magnitude
+        if dist <= stopDist then break end
+
+        local step = math.min(STEP_DIST, dist - stopDist)
+        local dir = delta.Unit
+        local nextPos = hrp.Position + dir * step
+        local look = Vector3.new(target.X, nextPos.Y, target.Z)
+        hrp.CFrame = CFrame.new(nextPos, look)
+
+        task.wait(STEP_DELAY)
     end
+    of_phasing = false
+    of_killBV()
+    task.wait(0.3)
+    return (of_root() and (of_root().Position - target).Magnitude <= stopDist + 5) or false
+end
     local function of_standUp()
         local h = of_humanoid()
         local hrp = of_root()
