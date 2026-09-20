@@ -16,7 +16,8 @@ local camera = workspace.CurrentCamera
 local function checkFarmOK()
     return workspace:FindFirstChild("Computers") ~= nil
 end
-pcall(local count = 0function()
+local count = 0
+pcall(function()
     Lighting.GlobalShadows = true
     Lighting.Brightness = 2
     Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
