@@ -761,73 +761,184 @@ local function tuneTable(t, depth)
                 for i, g in pairs(v) do
                     if type(g) == "number" then
                         if pcall(function() v[i] = g * gearMult end) then count = count + 1 end
+-- ============================================================
+-- TUNER — v3: chặn tune vào bảng nhân vật + bỏ mass/weight khỏi DRAG
+-- Giữ: depth 6, count feedback, idempotency guard, RPM filter
+-- ============================================================
+local statusThread = nil
+local tunedModels = setmetatable({}, { __mode = "k" })
+
+local function setStatusTmp(msg, color, revertDelay)
+    if not Status or not Status.Parent then return end
+    if statusThread then task.cancel(statusThread); statusThread = nil end
+    Status.Text = msg
+    Status.TextColor3 = color
+    statusThread = task.delay(revertDelay or 3, function()
+        if Status and Status.Parent then
+            Status.Text = "Trạng thái: Sẵn sàng."
+            Status.TextColor3 = Color3.fromRGB(255, 200, 0)
+        end
+    end)
+end
+
+InjectBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local seat = hum and hum.SeatPart
+    local isInVehicle = seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat"))
+
+    if not isInVehicle then
+        setStatusTmp("❌ Hãy ngồi lên xe rồi bấm áp dụng nhé!", Color3.fromRGB(255, 50, 50))
+        return
+    end
+
+    local vehicleModel = seat.Parent
+
+    if vehicleModel and tunedModels[vehicleModel] then
+        setStatusTmp("⚠ Xe này đã tune rồi — xuống xe lên lại để apply",
+                     Color3.fromRGB(255, 180, 60), 4)
+        return
+    end
+
+    local hpMult    = tonumber(hpBox.Text)         or 5.0
+    local rpmAdd    = tonumber(rpmBox.Text)        or 3500
+    local gearMult  = tonumber(gearRatioBox.Text)  or 0.8
+    local finalMult = tonumber(finalDriveBox.Text) or 0.8
+    local count = 0
+
+    -- v3: gom part của nhân vật để chặn tune bảng char-owned
+    local charParts = {}
+    if char then
+        for _, p in ipairs(char:GetDescendants()) do
+            if p:IsA("BasePart") then charParts[p] = true end
+        end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then charParts[hrp] = true end
+    end
+
+    local function isCharOwned(t)
+        -- chỉ quét 1 tầng key/value, không đệ quy
+        local ok1, res1 = pcall(function()
+            for _, v in pairs(t) do
+                if typeof(v) == "Instance" and charParts[v] then return true end
+            end
+            return false
+        end)
+        if ok1 and res1 then return true end
+        return false
+    end
+
+    local function unfreeze(t)
+        pcall(function() setreadonly(t, false) end)
+    end
+
+    local SPEED_KEYS = { topspeed=true, maxspeed=true, speedlimit=true, maxvelocity=true, topspeedkmh=true, maxthrottle=true, limiter=true }
+    local POWER_KEYS = { horsepower=true, torque=true, maxpower=true }
+    local RPM_KEYS   = { redline=true, maxrpm=true, rpm=true }
+    local GEAR_KEYS  = { gearratio=true, finaldrive=true }
+    local GEAR_TBL   = { gearratios=true, gears=true }
+    -- v3: bỏ mass / weight / weightkg — dính nhân vật
+    local DRAG_KEYS  = { drag=true, dragcoefficient=true, airresistance=true }
+    local seen = {}
+
+    local function tuneTable(t, depth)
+        if depth > 6 or seen[t] then return end
+        if isCharOwned(t) then return end   -- v3: chặn bảng thuộc nhân vật
+        seen[t] = true
+        unfreeze(t)
+        for k, v in pairs(t) do
+            if type(k) == "string" then
+                local lk = k:lower()
+                if SPEED_KEYS[lk] and type(v) == "number" and v > 0 then
+                    if pcall(function() t[k] = v * 1.6 end) then count = count + 1 end
+                elseif POWER_KEYS[lk] and type(v) == "number" then
+                    if pcall(function() t[k] = v * hpMult end) then count = count + 1 end
+                elseif RPM_KEYS[lk] and type(v) == "number" and v >= 1000 then
+                    if pcall(function() t[k] = v + rpmAdd end) then count = count + 1 end
+                elseif GEAR_KEYS[lk] and type(v) == "number" and v > 0 then
+                    if pcall(function() t[k] = v * gearMult end) then count = count + 1 end
+                elseif GEAR_TBL[lk] and type(v) == "table" then
+                    unfreeze(v)
+                    for i, g in pairs(v) do
+                        if type(g) == "number" then
+                            if pcall(function() v[i] = g * gearMult end) then count = count + 1 end
+                        end
                     end
+                elseif DRAG_KEYS[lk] and type(v) == "number" and v > 0 then
+                    if pcall(function() t[k] = v * 0.7 end) then count = count + 1 end
+                elseif type(v) == "table" then
+                    tuneTable(v, depth + 1)
                 end
-            elseif DRAG_KEYS[lk] and type(v) == "number" and v > 0 then
-                if pcall(function() t[k] = v * 0.7 end) then count = count + 1 end
             elseif type(v) == "table" then
                 tuneTable(v, depth + 1)
             end
-        elseif type(v) == "table" then
-            tuneTable(v, depth + 1)
         end
     end
-end
-if typeof(getgc) == "function" then
-    pcall(function()
-        for _, obj in pairs(getgc(true)) do
-            if typeof(obj) == "table" then
-                pcall(function() tuneTable(obj, 1) end)
-            end
-        end
-    end)
-end
-local vehicleModel = seat.Parent
-if vehicleModel then
-    for _, obj in pairs(vehicleModel:GetDescendants()) do
+
+    -- tầng 1: VM scan
+    if typeof(getgc) == "function" then
         pcall(function()
-            for an, av in pairs(obj:GetAttributes()) do
-                if type(av) == "number" then
-                    local ln = an:lower()
-                    if ln:find("topspeed") or ln:find("maxspeed") or ln:find("speedlimit") or ln:find("maxvelocity") then
-                        obj:SetAttribute(an, av * 1.6); count = count + 1
-                    elseif ln:find("horsepower") or ln:find("power") or ln:find("torque") then
-                        obj:SetAttribute(an, av * hpMult); count = count + 1
-                    elseif ln:find("drag") or ln:find("mass") or ln:find("weight") then
-                        obj:SetAttribute(an, av * 0.7); count = count + 1
+            for _, obj in pairs(getgc(true)) do
+                if typeof(obj) == "table" then
+                    pcall(function() tuneTable(obj, 1) end)
+                end
+            end
+        end)
+    end
+
+    -- tầng 2: quét xe (Attributes + NumberValue/IntValue)
+    if vehicleModel then
+        for _, obj in pairs(vehicleModel:GetDescendants()) do
+            pcall(function()
+                for an, av in pairs(obj:GetAttributes()) do
+                    if type(av) == "number" then
+                        local ln = an:lower()
+                        if ln:find("topspeed") or ln:find("maxspeed") or ln:find("speedlimit") or ln:find("maxvelocity") then
+                            obj:SetAttribute(an, av * 1.6); count = count + 1
+                        elseif ln:find("horsepower") or ln:find("power") or ln:find("torque") then
+                            obj:SetAttribute(an, av * hpMult); count = count + 1
+                        elseif ln:find("drag") then
+                            -- v3: bỏ mass / weight ở đây luôn
+                            obj:SetAttribute(an, av * 0.7); count = count + 1
+                        end
                     end
                 end
-            end
-        end)
-        if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-            pcall(function()
-                local name = obj.Name:lower()
-                if name:find("topspeed") or name:find("maxspeed") or name:find("speedlimit") then
-                    obj.Value = obj.Value * 1.6; count = count + 1
-                elseif name:find("horsepower") or name:find("power") or name:find("torque") then
-                    obj.Value = obj.Value * hpMult; count = count + 1
-                elseif name:find("rpm") or name:find("redline") then
-                    obj.Value = obj.Value + rpmAdd; count = count + 1
-                elseif name:find("gear") or name:find("ratio") then
-                    obj.Value = obj.Value * gearMult; count = count + 1
-                elseif name:find("drive") then
-                    obj.Value = obj.Value * finalMult; count = count + 1
-                elseif name:find("drag") or name:find("mass") or name:find("weight") then
-                    obj.Value = obj.Value * 0.7; count = count + 1
-                end
             end)
+            if obj:IsA("NumberValue") or obj:IsA("IntValue") then
+                pcall(function()
+                    local name = obj.Name:lower()
+                    if name:find("topspeed") or name:find("maxspeed") or name:find("speedlimit") then
+                        obj.Value = obj.Value * 1.6; count = count + 1
+                    elseif name:find("horsepower") or name:find("power") or name:find("torque") then
+                        obj.Value = obj.Value * hpMult; count = count + 1
+                    elseif name:find("rpm") or name:find("redline") then
+                        if obj.Value >= 1000 then
+                            obj.Value = obj.Value + rpmAdd; count = count + 1
+                        end
+                    elseif name:find("gear") or name:find("ratio") then
+                        obj.Value = obj.Value * gearMult; count = count + 1
+                    elseif name:find("drive") then
+                        obj.Value = obj.Value * finalMult; count = count + 1
+                    elseif name:find("drag") then
+                        -- v3: bỏ mass / weight
+                        obj.Value = obj.Value * 0.7; count = count + 1
+                    end
+                end)
+            end
         end
     end
-end
-        Status.Text = "✔ Đã áp dụng thành công (xuống xe lên lại)!"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 120)
-        statusThread = task.delay(3, function()
-            if Status and Status.Parent then
-                Status.Text = "Trạng thái: Sẵn sàng."
-                Status.TextColor3 = Color3.fromRGB(255, 200, 0)
-            end
-        end)
-    end)
+
+    if count == 0 then
+        setStatusTmp("⚠ Không tìm thấy gì để tune — xe này admin lock",
+                     Color3.fromRGB(255, 180, 60), 4)
+        return
+    end
+
+    if vehicleModel then tunedModels[vehicleModel] = true end
+
+    setStatusTmp("✔ Đã tune " .. count .. " field (xuống xe lên lại)",
+                 Color3.fromRGB(0, 255, 120), 4)
+end)
 
     -- CHUNG (card cao 110, nut y=70)
     local scroll = Instance.new("ScrollingFrame")
