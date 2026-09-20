@@ -7,12 +7,15 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
+local farmSwitch
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
 local camera = workspace.CurrentCamera
-local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
+local function checkFarmOK()
+    return workspace:FindFirstChild("Computers") ~= nil
+end
 pcall(local count = 0function()
     Lighting.GlobalShadows = true
     Lighting.Brightness = 2
@@ -897,25 +900,7 @@ end
         end
         return { track = track, knob = knob, set = set, isOn = function() return on end }
     end
-farmNote = Instance.new("TextLabel")
-farmNote.Size = UDim2.new(1, -70, 0, 14)
-farmNote.Position = UDim2.new(0, 12, 0, 86)
-farmNote.BackgroundTransparency = 1
-farmNote.Text = ""
-farmNote.TextColor3 = Color3.fromRGB(255, 120, 80)
-farmNote.TextSize = 10
-farmNote.Font = Enum.Font.GothamBold
-farmNote.TextXAlignment = Enum.TextXAlignment.Left
-farmNote.TextWrapped = true
-farmNote.ZIndex = 13
-farmNote.Parent = cardFarm
-if not farmOK then
-    farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-    farmSwitch.track.Active = false
-    farmSwitch.track.AutoButtonColor = false
-    farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-    if farmSwitch.knob then farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125) end
-end
+
      farmSwitch = makeSwitch(cardFarm, 10)
     farmNote = Instance.new("TextLabel")
     farmNote.Size = UDim2.new(1, -24, 0, 16)
@@ -2310,7 +2295,7 @@ do
     local CorrectAnswer   = JobEvents:WaitForChild("CorrectAnswer")
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
-    local Computers = workspace:WaitForChild("Computers")
+    local Computers = workspace:FindFirstChild("Computers")
     local PATTERN = { "CHOICE", "QID" }
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
