@@ -1,10 +1,5 @@
 -- ============================================================
 -- KHANGLE DDS HUB — 4080 REMIX v14
--- v14: Settings + AN TEN TREN DAU + DOI TEN TUY CHINH
---      popup guide canvas/content = 1400 (guide menu giu 1500)
--- logic giu nguyen: tuner / AutoT / dan ao / freecam / office farm
--- v17: map-detect Surakarta — map khac: khoa nut farm + bao loi;
---      fix treo WaitForChild("Computers")
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -16,7 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
-local farmSwitch.trackcamera = workspace.CurrentCamera
+local camera = workspace.CurrentCamera
 local farmOK = (workspace:FindFirstChild("Computers") ~= nil)
 pcall(local count = 0function()
     Lighting.GlobalShadows = true
