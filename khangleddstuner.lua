@@ -2590,24 +2590,15 @@ end
     end
 
     setStatus("tele tới ghế")
+
+    -- tele 1 lần, dùng CHAIR_POS + Y offset (đã verify trước đó hoạt động)
+    local landPos = CHAIR_POS + Vector3.new(0, 3, 0)
+
     local hrp = of_root()
     if not hrp then return false end
-
-    -- tìm ghế thật gần CHAIR_POS
-    local seat = of_findNearestSeat(CHAIR_POS, 20)
-
-    -- tele 1 lần duy nhất: đứng NGAY chỗ ngồi
-    local landPos
-    if seat then
-        -- land ở đúng tâm ghế, game tự detect overlap → auto-sit
-        landPos = seat.Position
-    else
-        -- không tìm được ghế: fallback về CHAIR_POS gốc
-        landPos = CHAIR_POS
-    end
-
     hrp.CFrame = CFrame.new(landPos)
-    task.wait(1.0)   -- chờ 1s để game tự sit
+
+    task.wait(0.5)
 
     h = of_humanoid()
     if h and h.Sit then
@@ -2615,12 +2606,22 @@ end
         return true
     end
 
-    -- 1s mà chưa sit → thử lùi lại đứng cạnh ghế
-    if seat and h and not h.Sit then
-        setStatus("lùi cạnh ghế")
-        local offset = Vector3.new(2, 0, 0)   -- lùi 2 studs sang ngang
-        hrp.CFrame = CFrame.new(seat.Position + offset)
+    -- chưa sit → tìm ghế gần, bán kính rộng 30 studs (ghế thật cách ~65 studs)
+    local seat = of_findNearestSeat(CHAIR_POS, 30)
+    if not seat then
+        seat = of_findNearestSeat(hrp.Position, 30)
+    end
+
+    if seat and h then
+        pcall(function() seat:Sit(h) end)
         task.wait(0.5)
+    else
+        -- không tìm được ghế → dùng of_forceSit
+        h = of_humanoid()
+        if h and not h.Sit then
+            of_forceSit(h)
+            task.wait(0.3)
+        end
     end
 
     h = of_humanoid()
