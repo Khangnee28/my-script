@@ -2823,7 +2823,7 @@ local function of_doPrint(name)
         if not part then return end
         of_standUp()
         setStatus("đi bộ tới máy in")
-of_walkViaPoints(OF_PRINT_PATH, part.Position, 4, 90)
+of_walkTo(part.Position, 4, 60, false, false)
 local hrpNow = of_root()
 if hrpNow then
     local dir = (part.Position - hrpNow.Position)
