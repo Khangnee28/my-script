@@ -2731,7 +2731,7 @@ end
         of_lastFireAt = os.clock()
         return true
     end
-   local function of_findNearestSeat(pos, radius)
+   
    local function of_findNearestSeat(pos, radius)
     radius = radius or 150
     local candidates = {}
