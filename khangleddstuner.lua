@@ -984,8 +984,8 @@ end)
             end
         else
             farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-            farmSwitch.track.Active = false
-            farmSwitch.track.AutoButtonColor = false
+            farmSwitch.track.Active = true
+            farmSwitch.track.AutoButtonColor = true
             farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
             farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
         end
