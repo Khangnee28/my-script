@@ -2557,7 +2557,7 @@ end
         end
         return out
     end
-    local function of_flyTo(target, stopDist, timeout)
+    
     local function of_flyTo(target, stopDist, timeout)
     stopDist = stopDist or 8
     timeout = timeout or OF_FLY_TIMEOUT
