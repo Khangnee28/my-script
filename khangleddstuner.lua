@@ -2408,16 +2408,16 @@ local function of_sprintToggle()
     end)
 end
 
+local of_sprintActivated = false
+
 local function of_ensureSprint(h)
-    if of_sprintOn then return end
-    of_sprintToggle()
-    of_sprintOn = true
+    if of_sprintActivated then return end
+    pcall(function() keypress(Enum.KeyCode.LeftShift) end)
+    of_sprintActivated = true
 end
 
 local function of_endSprint(h)
-    if not of_sprintOn then return end
-    of_sprintToggle()
-    of_sprintOn = false
+    -- không làm gì: sprint giữ nguyên bật suốt session
 end
     local function of_enableSit(char)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
