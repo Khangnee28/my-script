@@ -2565,11 +2565,17 @@ end
         task.wait(0.4)
 end
     
-
 local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     stopDist = stopDist or 3
     timeout = timeout or 60
     local deadline = os.clock() + timeout
+
+    local prevPos = of_root() and of_root().Position
+    local prevTime = os.clock()
+    local stuckTime = 0
+    local sideDir = 1
+    local lastSideStep = 0
+    local sideAttempts = 0
 
     pcall(function()
         while os.clock() < deadline and farmOffice do
@@ -2587,6 +2593,43 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
             if flat.Magnitude <= stopDist then break end
 
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+
+            -- stuck detect
+            if os.clock() - prevTime >= 0.6 then
+                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
+                if moved < 0.5 then
+                    stuckTime = stuckTime + 0.6
+                else
+                    stuckTime = 0
+                    sideAttempts = 0
+                end
+                prevPos = hrp.Position
+                prevTime = os.clock()
+
+                if stuckTime >= 1.2 and os.clock() >= lastSideStep then
+                    sideAttempts = sideAttempts + 1
+
+                    if sideAttempts <= 3 then
+                        -- nhích ngang 8 studs
+                        local perp = Vector3.new(-flat.Unit.Z, 0, flat.Unit.X) * sideDir
+                        h:MoveTo(hrp.Position + perp * 8)
+                        task.wait(0.4)
+                        sideDir = -sideDir
+                        lastSideStep = os.clock() + 1.2
+                    else
+                        -- lùi 6 studs, đổi hướng
+                        local back = -flat.Unit * 6
+                        h:MoveTo(hrp.Position + back)
+                        task.wait(0.6)
+                        sideDir = -sideDir
+                        sideAttempts = 0
+                        lastSideStep = os.clock() + 2.0
+                    end
+
+                    stuckTime = 0
+                end
+            end
+
             task.wait(0.15)
         end
     end)
@@ -2596,6 +2639,44 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     if h and hrp then
         h:MoveTo(hrp.Position)
     end
+end
+-- Waypoint cho đường đi từ ghế → máy in (né hàng ghế/vách)
+local OF_PRINT_PATH = {
+    Vector3.new(-5915.50, 3.58, -239.83),
+    Vector3.new(-5916.43, 3.58, -220.36),
+}
+
+-- Waypoint phụ (dùng khi cần, ví dụ đường về)
+local OF_RETURN_PATH = {
+    Vector3.new(-5914.07, 3.58, -219.54),
+    Vector3.new(-5983.97, 3.58, -220.68),
+}
+
+local function of_walkViaPoints(waypoints, finalTarget, stopDist, timeout)
+    stopDist = stopDist or 3
+    timeout = timeout or 60
+    local deadline = os.clock() + timeout
+
+    -- đi tuần tự qua từng waypoint
+    for i, wp in ipairs(waypoints) do
+        if not farmOffice then return false end
+        if os.clock() > deadline then return false end
+
+        setStatus("waypoint " .. i .. "/" .. #waypoints)
+        local remain = math.max(5, deadline - os.clock())
+        of_walkTo(wp, 3, remain, false, false)
+        task.wait(0.2)
+    end
+
+    -- waypoint cuối → target cuối
+    if finalTarget then
+        if not farmOffice then return false end
+        setStatus("tới đích")
+        local remain = math.max(5, deadline - os.clock())
+        of_walkTo(finalTarget, stopDist, remain, false, false)
+    end
+
+    return true
 end
 
 
@@ -2777,7 +2858,7 @@ local function of_doPrint(name)
         if not part then return end
         of_standUp()
         setStatus("đi bộ tới máy in")
-of_walkTo(part.Position, 4, 60, false, false)
+of_walkViaPoints(OF_PRINT_PATH, part.Position, 4, 90)
 local hrpNow = of_root()
 if hrpNow then
     local dir = (part.Position - hrpNow.Position)
