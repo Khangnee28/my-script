@@ -2739,7 +2739,7 @@ end
     end)
     if not ok or not parts then return nil end
 
-    for _, p in ipairs(parts)
+    for _, p in ipairs(parts) do
         if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
             local parentName = p.Parent and p.Parent.Name or ""
             local isWorkChair = (parentName == "Setup")
