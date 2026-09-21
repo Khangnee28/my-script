@@ -2751,7 +2751,7 @@ end
             table.insert(candidates, { seat = p, dist = d })
         end
     end
-end                        ← end này đóng for loop
+end                        
 
 local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
