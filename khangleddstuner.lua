@@ -2585,35 +2585,27 @@ end
     
     local function of_sitAtChair()
     local h = of_humanoid()
-    if h and h.Sit then
-        of_killBV()
-        return true
-    end
+    if h and h.Sit then return true end
 
     setStatus("tele tới ghế")
     local hrp = of_root()
     if not hrp then return false end
 
-    -- 1 CFrame set duy nhất giống King Akbar
-    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
-    task.wait(0.5)
+    -- DUY NHẤT 1 CFrame set, không offset lạ
+    hrp.CFrame = CFrame.new(CHAIR_POS)
+    task.wait(1.5)
 
     h = of_humanoid()
-    if h and h.Sit then
-        of_killBV()
-        return true
-    end
+    if h and h.Sit then return true end
 
-    -- ghế ở gần CHAIR_POS, tìm bán kính 20
-    local seat = of_findNearestSeat(CHAIR_POS, 20)
-        or of_findNearestSeat(hrp.Position, 20)
+    -- fallback: chỉ dùng seat:Sit, KHÔNG set CFrame
+    local seat = of_findNearestSeat(hrp.Position, 15)
     if seat and h then
         pcall(function() seat:Sit(h) end)
-        task.wait(0.4)
+        task.wait(0.5)
     end
 
     h = of_humanoid()
-    of_killBV()
     return (h and h.Sit) or false
 end
         
