@@ -2581,37 +2581,44 @@ end
         end
         return false
     end
+    
     local function of_sitAtChair()
-        local h = of_humanoid()
-        if h and h.Sit then
-            of_killBV()
-            return true
-        end
-        local hrp = of_root()
-        if hrp and (hrp.Position - CHAIR_POS).Magnitude > OF_FLY_ONLY_DIST then
-    setStatus("tele tới văn phòng")
-    of_flyTo(CHAIR_POS, 8, OF_FLY_TIMEOUT)
-end
-setStatus("tele vào ghế")
-local hrp2 = of_root()
-if hrp2 then
-    hrp2.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
-    task.wait(0.25)
-end
--- ghế office có 1 cái duy nhất ở CHAIR_POS
-local hSeat = of_humanoid()
-if hSeat and not hSeat.Sit then
-    local seat = of_findNearestSeat(CHAIR_POS, 15)
-    if seat then
-        pcall(function() seat:Sit(hSeat) end)
-        task.wait(0.3)
+    local h = of_humanoid()
+    if h and h.Sit then
+        of_killBV()
+        return true
     end
-end
-        h = of_humanoid()
-        if h and h.Sit then
-            of_killBV()
-            return true
+
+    setStatus("tele tới ghế office")
+    local hrp = of_root()
+    if not hrp then return false end
+
+    -- 1 lần tele duy nhất, đứng ngay vị trí ghế (Y +3 để không kẹt sàn)
+    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
+    task.wait(0.4)   -- đứng chờ 0.4s giống King Akbar
+
+    h = of_humanoid()
+    if h and h.Sit then
+        of_killBV()
+        return true
+    end
+
+    -- ép sit nếu game chưa auto
+    if farmOffice and h and not h.Sit then
+        local seat = of_findNearestSeat(CHAIR_POS, 15)
+        if seat then
+            pcall(function() seat:Sit(h) end)
+            task.wait(0.3)
+        else
+            setStatus("ép ngồi ghế")
+            of_forceSit(h)
         end
+    end
+
+    h = of_humanoid()
+    of_killBV()
+    return (h and h.Sit) or false
+end
         local t0 = os.clock()
         while os.clock() - t0 < 2 and farmOffice do
             h = of_humanoid()
