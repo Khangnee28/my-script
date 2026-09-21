@@ -2740,16 +2740,18 @@ end
     if not ok or not parts then return nil end
 
     for _, p in ipairs(parts) do
-        if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
-            local parentName = p.Parent and p.Parent.Name or ""
-            local isWorkChair = (parentName == "Setup")
-                or parentName:lower():find("chair")
-                or parentName:lower():find("seat")
-                or parentName:lower():find("office")
+    if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
+        local parentName = p.Parent and p.Parent.Name or ""
+        local isWorkChair = (parentName == "Setup")
+            or parentName:lower():find("chair")
+            or parentName:lower():find("seat")
 
-            
-    
-end
+        if isWorkChair then
+            local d = (p.Position - pos).Magnitude
+            table.insert(candidates, { seat = p, dist = d })
+        end
+    end
+end                        ← end này đóng for loop
 
 local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
