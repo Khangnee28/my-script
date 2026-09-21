@@ -2559,37 +2559,16 @@ end
     end
     
     local function of_flyTo(target, stopDist, timeout)
-    stopDist = stopDist or 8
-    timeout = timeout or OF_FLY_TIMEOUT
-    local deadline = os.clock() + timeout
-
     local hrp = of_root()
     if not hrp then return false end
 
-    of_phasing = true
-    while os.clock() < deadline and farmOffice do
-        hrp = of_root()
-        if not hrp then break end
-        local delta = target - hrp.Position
-        local dist = delta.Magnitude
-        if dist <= stopDist then break end
+    -- 1 frame, giống King Akbar. Không stepped, không BodyVelocity.
+    local look = Vector3.new(target.X, hrp.Position.Y, target.Z)
+    hrp.CFrame = CFrame.new(target, look)
+    task.wait(0.15)
 
-        -- step 20-50 studs, random. delay 0.10-0.16s, random.
-        local stepMax = math.min(50, dist - stopDist)
-        local stepMin = math.min(20, stepMax)
-        local step = stepMin + math.random() * (stepMax - stepMin)
-
-        local dir = delta.Unit
-        local nextPos = hrp.Position + dir * step
-        local look = Vector3.new(target.X, nextPos.Y, target.Z)
-        hrp.CFrame = CFrame.new(nextPos, look)
-
-        task.wait(0.10 + math.random() * 0.06)
-    end
-    of_phasing = false
-    of_killBV()
-    task.wait(0.3)
-    return (of_root() and (of_root().Position - target).Magnitude <= stopDist + 5) or false
+    local ok = hrp.Position and (hrp.Position - target).Magnitude <= (stopDist or 8) + 5
+    return ok or false
 end
     local function of_standUp()
         local h = of_humanoid()
