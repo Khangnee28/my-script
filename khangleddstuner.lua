@@ -2372,8 +2372,7 @@ end
     local of_awaitingAck = false
     local of_lastFireAt = 0
     local of_refired = false
-    local of_baseSpeed = 16
-    local of_boosted = false
+    
     local function of_killBV()
         if of_activeBV then
             pcall(function() of_activeBV.Velocity = Vector3.zero end)
@@ -2401,54 +2400,25 @@ end
             table.clear(of_savedCollide)
         end
     end)
-    local function of_grabBaseSpeed()
-        local char = player.Character
-        local h = char and char:FindFirstChildOfClass("Humanoid")
-        if h and h.WalkSpeed > 0 then
-            of_baseSpeed = h.WalkSpeed
-        end
-    end
-    of_grabBaseSpeed()
-    player.CharacterAdded:Connect(function()
-        of_resetUntil = os.clock() + 2.5
-        table.clear(of_savedCollide)
-        task.wait(1)
-        of_grabBaseSpeed()
+    local of_sprintOn = false
+
+local function of_sprintToggle()
+    pcall(function()
+        keypress(Enum.KeyCode.RightShift)
     end)
-    local of_shiftMode = nil
-    if type(keydown) == "function" then
-        of_shiftMode = "hold"
-    elseif type(keypress) == "function" then
-        of_shiftMode = "tap"
-    end
-    local function of_setSpeed(h, v)
-        pcall(function() h.WalkSpeed = v end)
-    end
-    local function of_ensureSprint(h)
-        of_boosted = false
-        if of_shiftMode == "hold" then
-            pcall(function() keydown(Enum.KeyCode.LeftShift) end)
-            task.wait(0.15)
-            if h.WalkSpeed > of_baseSpeed + 1 then return end
-        elseif of_shiftMode == "tap" then
-            if h.WalkSpeed <= of_baseSpeed + 1 then
-                pcall(function() keypress(Enum.KeyCode.LeftShift) end)
-                task.wait(0.2)
-            end
-            if h.WalkSpeed > of_baseSpeed + 1 then return end
-        end
-        of_setSpeed(h, of_baseSpeed * 2.3)
-        of_boosted = true
-    end
-    local function of_endSprint(h)
-        if of_shiftMode == "hold" then
-            pcall(function() keyup(Enum.KeyCode.LeftShift) end)
-        end
-        if of_boosted then
-            of_setSpeed(h, of_baseSpeed)
-            of_boosted = false
-        end
-    end
+end
+
+local function of_ensureSprint(h)
+    if of_sprintOn then return end
+    of_sprintToggle()
+    of_sprintOn = true
+end
+
+local function of_endSprint(h)
+    if not of_sprintOn then return end
+    of_sprintToggle()
+    of_sprintOn = false
+end
     local function of_enableSit(char)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then
@@ -2746,7 +2716,62 @@ end
         of_lastFireAt = os.clock()
         return true
     end
-    local function of_doPrint(name)
+    local function of_findNearestSeat(pos, radius)
+    radius = radius or 150
+    local candidates = {}
+    local ok, parts = pcall(function()
+        return workspace:GetPartBoundsInRadius(pos, radius)
+    end)
+    if not ok or not parts then return nil end
+    for _, p in ipairs(parts) do
+        if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
+            local d = (p.Position - pos).Magnitude
+            table.insert(candidates, { seat = p, dist = d })
+        end
+    end
+    if #candidates == 0 then return nil end
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+    return candidates[1].seat
+end
+
+local function of_sitAtNearestChair(fromPos)
+    local h = of_humanoid()
+    if not h then return false end
+    if h.Sit then return true end
+
+    local pos = fromPos or (of_root() and of_root().Position) or CHAIR_POS
+    local seat = of_findNearestSeat(pos, 150)
+    if not seat then
+        setStatus("không tìm ghế — về office cũ")
+        return of_sitAtChair()
+    end
+
+    setStatus("đi bộ tới ghế")
+    of_walkTo(seat.Position, 2, 60, true, false)
+
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    local t0 = os.clock()
+    while os.clock() - t0 < 2 and farmOffice do
+        h = of_humanoid()
+        if h and h.Sit then return true end
+        task.wait(0.2)
+    end
+
+    if farmOffice then
+        h = of_humanoid()
+        if h and not h.Sit then
+            pcall(function() seat:Sit(h) end)
+            task.wait(0.3)
+        end
+    end
+
+    h = of_humanoid()
+    return (h and h.Sit) or false
+end
+
+local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
         if not Computers then return end
         local model = Computers:FindFirstChild(name)
@@ -2773,12 +2798,15 @@ end
                 pcall(function() prompt:InputHoldEnd() end)
             end
         end
-        local t2 = os.clock()
-        while of_printAssigned and farmOffice and os.clock() - t2 < 6 do
-            task.wait(0.2)
-        end
-        setStatus("đã in")
+            local t2 = os.clock()
+    while of_printAssigned and farmOffice and os.clock() - t2 < 6 do
+        task.wait(0.2)
     end
+    setStatus("đã in")
+
+    task.wait(0.3)
+    of_sitAtNearestChair(part.Position)
+end
     local function of_runCycle()
         while farmOffice and os.clock() < of_resetUntil do
             setStatus("chờ reset nhân vật")
