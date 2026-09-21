@@ -2589,13 +2589,25 @@ end
         return true
     end
 
-    setStatus("tele tới ghế office")
+    setStatus("tele tới ghế")
     local hrp = of_root()
     if not hrp then return false end
 
-    -- 1 lần tele duy nhất, đứng ngay vị trí ghế (Y +3 để không kẹt sàn)
-    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
-    task.wait(0.4)   -- đứng chờ 0.4s giống King Akbar
+    -- tìm ghế thật gần CHAIR_POS
+    local seat = of_findNearestSeat(CHAIR_POS, 20)
+
+    -- tele 1 lần duy nhất: đứng NGAY chỗ ngồi
+    local landPos
+    if seat then
+        -- land ở đúng tâm ghế, game tự detect overlap → auto-sit
+        landPos = seat.Position
+    else
+        -- không tìm được ghế: fallback về CHAIR_POS gốc
+        landPos = CHAIR_POS
+    end
+
+    hrp.CFrame = CFrame.new(landPos)
+    task.wait(1.0)   -- chờ 1s để game tự sit
 
     h = of_humanoid()
     if h and h.Sit then
@@ -2603,16 +2615,12 @@ end
         return true
     end
 
-    -- ép sit nếu game chưa auto
-    if farmOffice and h and not h.Sit then
-        local seat = of_findNearestSeat(CHAIR_POS, 15)
-        if seat then
-            pcall(function() seat:Sit(h) end)
-            task.wait(0.3)
-        else
-            setStatus("ép ngồi ghế")
-            of_forceSit(h)
-        end
+    -- 1s mà chưa sit → thử lùi lại đứng cạnh ghế
+    if seat and h and not h.Sit then
+        setStatus("lùi cạnh ghế")
+        local offset = Vector3.new(2, 0, 0)   -- lùi 2 studs sang ngang
+        hrp.CFrame = CFrame.new(seat.Position + offset)
+        task.wait(0.5)
     end
 
     h = of_humanoid()
