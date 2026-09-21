@@ -2596,32 +2596,20 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
 
             -- stuck detect
             if os.clock() - prevTime >= 0.6 then
-                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
-                if moved < 0.5 then
-                    stuckTime = stuckTime + 0.6
-                else
-                    stuckTime = 0
-                end
-                prevPos = hrp.Position
-                prevTime = os.clock()
+    local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
+    if moved < 0.5 then
+        stuckTime = stuckTime + 0.6
+    else
+        stuckTime = 0
+    end
+    prevPos = hrp.Position
+    prevTime = os.clock()
 
-                -- kẹt >= 0.6s → nhảy
-                if stuckTime >= 0.6 and os.clock() >= jumpCooldown then
-                    pcall(function() h.Jump = true end)
-                    jumpCooldown = os.clock() + 0.8
-                    stuckTime = 0
-                end
-            end
-
-            task.wait(0.1)
-        end
-    end)
-
-    local h = of_humanoid()
-    local hrp = of_root()
-    if h and hrp then
-        h:MoveTo(hrp.Position)
-        of_endSprint(h)
+    -- kẹt 1.8s → nhảy 1 phát, cooldown 3s giữa các lần
+    if stuckTime >= 1.8 and os.clock() >= (jumpCooldown or 0) then
+        pcall(function() h.Jump = true end)
+        jumpCooldown = os.clock() + 3.0
+        stuckTime = 0
     end
 end
 
