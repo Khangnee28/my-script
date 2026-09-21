@@ -2646,42 +2646,7 @@ end
                     pcall(function() h.Health = 0 end)
                     break
                 end
-                if not useNoclip and os.clock() - prevTime >= 0.6 then
-                    local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
-                    if moved < 0.4 then
-                        stuckTime = stuckTime + 0.6
-                    else
-                        stuckTime = 0
-                    end
-                    prevPos = hrp.Position
-                    prevTime = os.clock()
-                    if stuckTime >= 0.8 and slip <= 0 and pulses < 8 then
-                        slip = 0.5
-                        pulses += 1
-                        stuckTime = 0
-                        print("[farm] tuong chan — mo tuong 0.5s")
-                    end
-                end
-                if slip > 0 then
-                    of_phasing = true
-                    if not holdBV then
-                        holdBV = Instance.new("BodyVelocity")
-                        holdBV.MaxForce = Vector3.new(0, 1e5, 0)
-                        holdBV.Velocity = Vector3.zero
-                        holdBV.Parent = hrp
-                    elseif holdBV.Parent ~= hrp then
-                        holdBV.Parent = hrp
-                    end
-                    slip = slip - 0.1
-                    if slip <= 0 then
-                        if not useNoclip then of_phasing = false end
-                        if holdBV then
-                            pcall(function() holdBV:Destroy() end)
-                            holdBV = nil
-                        end
-                    end
-                end
-                task.wait(0.1)
+                      task.wait(0.1)
             end
         end)
         if holdBV then
@@ -2813,7 +2778,7 @@ end
         if not part then return end
         of_standUp()
         setStatus("đi bộ tới máy in")
-        of_walkTo(part.Position, 3, 60, false, true)
+        of_walkTo(part.Position, 3, 60, false, false)
         setStatus("chuẩn bị in")
         task.wait(0.5)
         setStatus("đang in")
