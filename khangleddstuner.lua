@@ -2581,7 +2581,7 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     setStatus("tính đường")
 
     local path = PathfindingService:CreatePath({
-    AgentRadius = 4,       -- 2 → 4: navmesh tránh xa vật cản hơn
+    AgentRadius = 3       -- 2 → 4: navmesh tránh xa vật cản hơn
     AgentHeight = 5,
     AgentCanJump = false,  -- true → false: cấm nhảy qua ghế, ép đi vòng
     AgentCanClimb = false,
