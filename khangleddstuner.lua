@@ -2747,33 +2747,8 @@ end
                 or parentName:lower():find("seat")
                 or parentName:lower():find("office")
 
-            if not isWorkChair then
-                -- check có bàn/máy tính gần ghế không (bán kính 6 studs)
-                local ok2, nearParts = pcall(function()
-                    return workspace:GetPartBoundsInRadius(p.Position, 6)
-                end)
-                if ok2 and nearParts then
-                    for _, np in ipairs(nearParts) do
-                        local nn = np.Name:lower()
-                        if nn:find("desk") or nn:find("computer")
-                           or nn:find("table") or nn:find("monitor") then
-                            isWorkChair = true
-                            break
-                        end
-                    end
-                end
-            end
-
-            if isWorkChair then
-                local d = (p.Position - pos).Magnitude
-                table.insert(candidates, { seat = p, dist = d })
-            end
-        end
-    end
-
-    if #candidates == 0 then return nil end
-    table.sort(candidates, function(a, b) return a.dist < b.dist end)
-    return candidates[1].seat
+            
+    
 end
 
 local function of_sitAtNearestChair(fromPos)
