@@ -2569,7 +2569,6 @@ end
 
 
 
-end
     local function of_forceSit(h)
         for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
             if seat.Occupant == nil then
