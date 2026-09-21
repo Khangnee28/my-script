@@ -2357,7 +2357,7 @@ end
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
     local OF_FLY_ONLY_DIST = 150
-    local CHAIR_POS = Vector3.new(-5903, 4, -229)
+    local CHAIR_POS = Vector3.new(-5902.42, 2.71, -228.54)
     local UUID_PAT = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
     local of_phasing = false
     local of_activeBV = nil
@@ -2591,15 +2591,14 @@ end
     local hrp = of_root()
     if not hrp then return false end
 
-    -- DUY NHẤT 1 CFrame set, không offset lạ
     hrp.CFrame = CFrame.new(CHAIR_POS)
-    task.wait(1.5)
+    task.wait(1.0)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- fallback: chỉ dùng seat:Sit, KHÔNG set CFrame
-    local seat = of_findNearestSeat(hrp.Position, 15)
+    -- fallback: ghế bị chiếm → tìm ghế trống gần
+    local seat = of_findNearestSeat(CHAIR_POS, 15)
     if seat and h then
         pcall(function() seat:Sit(h) end)
         task.wait(0.5)
