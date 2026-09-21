@@ -2565,7 +2565,40 @@ end
         task.wait(0.4)
 end
     
+local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
+    stopDist = stopDist or 3
+    timeout = timeout or 60
+    local deadline = os.clock() + timeout
+    local h0 = of_humanoid()
+    if h0 then of_ensureSprint(h0) end
 
+    pcall(function()
+        while os.clock() < deadline and farmOffice do
+            local h = of_humanoid()
+            local hrp = of_root()
+            if not h or not hrp then break end
+
+            if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
+                if allowSit then break
+                else of_standUp() end
+            end
+
+            local delta = target - hrp.Position
+            local flat = Vector3.new(delta.X, 0, delta.Z)
+            if flat.Magnitude <= stopDist then break end
+
+            h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+            task.wait(0.1)
+        end
+    end)
+
+    local h = of_humanoid()
+    local hrp = of_root()
+    if h and hrp then
+        h:MoveTo(hrp.Position)
+        of_endSprint(h)
+    end
+end
 
 
 
@@ -2583,27 +2616,41 @@ end
     end
     
     
-    local function of_sitAtChair()
+    local of_initialTeleDone = false
+
+local function of_sitAtChair()
     local h = of_humanoid()
     if h and h.Sit then return true end
 
-    setStatus("tele tới ghế")
     local hrp = of_root()
     if not hrp then return false end
 
-    hrp.CFrame = CFrame.new(CHAIR_POS)
-    task.wait(1.0)
+    -- 1 lần duy nhất: ở spawn xa thì tele, sau đó đi bộ hết
+    if not of_initialTeleDone then
+        local dist = (hrp.Position - CHAIR_POS).Magnitude
+        if dist > 500 then
+            setStatus("tele lần đầu vào office")
+            hrp.CFrame = CFrame.new(CHAIR_POS)
+            task.wait(1.0)
+        end
+        of_initialTeleDone = true
+    end
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- fallback: ghế bị chiếm → tìm ghế trống gần
-    local seat = of_findNearestSeat(CHAIR_POS, 15)
+    setStatus("đi bộ tới ghế")
+    of_walkTo(CHAIR_POS, 3, 90, true, false)
+    task.wait(0.3)
+
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    local seat = of_findNearestSeat(CHAIR_POS, 20)
     if seat and h then
         pcall(function() seat:Sit(h) end)
         task.wait(0.5)
     end
-
     h = of_humanoid()
     return (h and h.Sit) or false
 end
@@ -2683,20 +2730,19 @@ local function of_sitAtNearestChair(fromPos)
     if h.Sit then return true end
 
     local pos = fromPos or (of_root() and of_root().Position) or CHAIR_POS
-    local seat = of_findNearestSeat(pos, 40)
-    if not seat then return of_sitAtChair() end
+    local seat = of_findNearestSeat(pos, 100)
+    if not seat then return false end   -- không tìm thấy → thoát, KHÔNG fallback tele
 
     setStatus("đi bộ tới ghế")
     of_walkTo(seat.Position, 3, 45, true, false)
+    task.wait(0.3)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    task.wait(0.4)
-    h = of_humanoid()
-    if h and not h.Sit then
+    if seat and h and not h.Sit then
         pcall(function() seat:Sit(h) end)
-        task.wait(0.3)
+        task.wait(0.4)
     end
     h = of_humanoid()
     return (h and h.Sit) or false
