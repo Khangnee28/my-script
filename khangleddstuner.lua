@@ -2565,6 +2565,8 @@ end
         task.wait(0.4)
 end
     
+local PathfindingService = game:GetService("PathfindingService")
+
 local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     stopDist = stopDist or 3
     timeout = timeout or 60
@@ -2572,6 +2574,73 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     local h0 = of_humanoid()
     if h0 then of_ensureSprint(h0) end
 
+    local hrp = of_root()
+    if not hrp then return end
+
+    -- 1. Thử compute path qua navmesh
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 3,
+        AgentHeight = 5,
+        AgentCanJump = true,
+        AgentCanClimb = false,
+        WaypointSpacing = 4,
+    })
+
+    local computeOk = pcall(function()
+        path:ComputeAsync(hrp.Position, target)
+    end)
+
+    local waypoints = {}
+    local usePath = (computeOk and path.Status == Enum.PathStatus.Success)
+
+    if usePath then
+        waypoints = path:GetWaypoints()
+        setStatus("path " .. #waypoints .. " điểm")
+    else
+        setStatus("path fail — đi thẳng")
+    end
+
+    -- 2. Nếu path OK → đi từng waypoint
+    if usePath and #waypoints > 1 then
+        for i = 2, #waypoints do
+            if not farmOffice then break end
+            if os.clock() > deadline then break end
+
+            local wp = waypoints[i]
+            local isLast = (i == #waypoints)
+            local threshold = isLast and stopDist or 3
+
+            if wp.Action == Enum.PathWaypointAction.Jump then
+                local h = of_humanoid()
+                if h then pcall(function() h.Jump = true end) end
+                task.wait(0.25)
+            end
+
+            local wpDeadline = os.clock() + 8
+            while os.clock() < wpDeadline and farmOffice do
+                local h = of_humanoid()
+                local hrp2 = of_root()
+                if not h or not hrp2 then return end
+                if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
+                    if allowSit then break end
+                    of_standUp()
+                end
+                if (wp.Position - hrp2.Position).Magnitude <= threshold then break end
+                h:MoveTo(wp.Position)
+                task.wait(0.1)
+            end
+        end
+
+        local h = of_humanoid()
+        local hrpF = of_root()
+        if h and hrpF then
+            h:MoveTo(hrpF.Position)
+            of_endSprint(h)
+        end
+        return
+    end
+
+    -- 3. Path fail → đi thẳng + nhảy khi kẹt
     local prevPos = of_root() and of_root().Position
     local prevTime = os.clock()
     local stuckTime = 0
@@ -2580,46 +2649,42 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     pcall(function()
         while os.clock() < deadline and farmOffice do
             local h = of_humanoid()
-            local hrp = of_root()
-            if not h or not hrp then break end
+            local hrp2 = of_root()
+            if not h or not hrp2 then break end
 
             if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
                 if allowSit then break
                 else of_standUp() end
             end
 
-            local delta = target - hrp.Position
+            local delta = target - hrp2.Position
             local flat = Vector3.new(delta.X, 0, delta.Z)
             if flat.Magnitude <= stopDist then break end
 
-            h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+            h:MoveTo(Vector3.new(target.X, hrp2.Position.Y, target.Z))
 
-            -- stuck detect
             if os.clock() - prevTime >= 0.6 then
-    local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
-    if moved < 0.5 then
-        stuckTime = stuckTime + 0.6
-    else
-        stuckTime = 0
-    end
-    prevPos = hrp.Position
-    prevTime = os.clock()
+                local moved = prevPos and (hrp2.Position - prevPos).Magnitude or 99
+                if moved < 0.5 then stuckTime = stuckTime + 0.6
+                else stuckTime = 0 end
+                prevPos = hrp2.Position
+                prevTime = os.clock()
 
-    -- kẹt 1.8s → nhảy 1 phát, cooldown 3s giữa các lần
-    if stuckTime >= 1.8 and os.clock() >= (jumpCooldown or 0) then
-        pcall(function() h.Jump = true end)
-        jumpCooldown = os.clock() + 3.0
-        stuckTime = 0
-    end
-end
+                if stuckTime >= 1.8 and os.clock() >= jumpCooldown then
+                    pcall(function() h.Jump = true end)
+                    jumpCooldown = os.clock() + 3.0
+                    stuckTime = 0
+                end
+            end
+
             task.wait(0.1)
         end
     end)
 
     local h = of_humanoid()
-    local hrp = of_root()
-    if h and hrp then
-        h:MoveTo(hrp.Position)
+    local hrpF = of_root()
+    if h and hrpF then
+        h:MoveTo(hrpF.Position)
         of_endSprint(h)
     end
 end
