@@ -2574,7 +2574,6 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     local prevPos = of_root() and of_root().Position
     local prevTime = os.clock()
     local stuckTime = 0
-    local lastNoclip = 0
 
     pcall(function()
         while os.clock() < deadline and farmOffice do
@@ -2593,7 +2592,6 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
 
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
 
-            -- stuck detect
             if os.clock() - prevTime >= 0.6 then
                 local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
                 if moved < 0.4 then
@@ -2604,15 +2602,12 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
                 prevPos = hrp.Position
                 prevTime = os.clock()
 
-                -- kẹt 1.5s → noclip 0.15s, cooldown 5s
-                if stuckTime >= 1.5 and (os.clock() - lastNoclip) >= 5 then
-                    setStatus("noclip nhẹ")
-                    local oldCollide = hrp.CanCollide
-                    hrp.CanCollide = false
-                    task.wait(0.15)
-                    hrp.CanCollide = oldCollide
-                    lastNoclip = os.clock()
-                    stuckTime = 0
+                -- kẹt 3s → tele 1 phát tới target
+                if stuckTime >= 1.0 then
+                    setStatus("kẹt — tele qua")
+                    hrp.CFrame = CFrame.new(target.X, hrp.Position.Y, target.Z)
+                    task.wait(0.4)
+                    break
                 end
             end
 
