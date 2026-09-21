@@ -2581,12 +2581,12 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     setStatus("tính đường")
 
     local path = PathfindingService:CreatePath({
-        AgentRadius = 2,
-        AgentHeight = 5,
-        AgentCanJump = true,
-        AgentCanClimb = false,
-        WaypointSpacing = 4,
-    })
+    AgentRadius = 4,       -- 2 → 4: navmesh tránh xa vật cản hơn
+    AgentHeight = 5,
+    AgentCanJump = false,  -- true → false: cấm nhảy qua ghế, ép đi vòng
+    AgentCanClimb = false,
+    WaypointSpacing = 3,   -- 4 → 3: path chi tiết hơn
+})
 
     local computeOk = pcall(function()
         path:ComputeAsync(hrp.Position, target)
