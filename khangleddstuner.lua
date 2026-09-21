@@ -2558,11 +2558,10 @@ do
         return out
     end
     local function of_flyTo(target, stopDist, timeout)
+    local function of_flyTo(target, stopDist, timeout)
     stopDist = stopDist or 8
     timeout = timeout or OF_FLY_TIMEOUT
     local deadline = os.clock() + timeout
-    local STEP_DIST = 150
-    local STEP_DELAY = 0.06
 
     local hrp = of_root()
     if not hrp then return false end
@@ -2575,13 +2574,17 @@ do
         local dist = delta.Magnitude
         if dist <= stopDist then break end
 
-        local step = math.min(STEP_DIST, dist - stopDist)
+        -- step 20-50 studs, random. delay 0.10-0.16s, random.
+        local stepMax = math.min(50, dist - stopDist)
+        local stepMin = math.min(20, stepMax)
+        local step = stepMin + math.random() * (stepMax - stepMin)
+
         local dir = delta.Unit
         local nextPos = hrp.Position + dir * step
         local look = Vector3.new(target.X, nextPos.Y, target.Z)
         hrp.CFrame = CFrame.new(nextPos, look)
 
-        task.wait(STEP_DELAY)
+        task.wait(0.10 + math.random() * 0.06)
     end
     of_phasing = false
     of_killBV()
