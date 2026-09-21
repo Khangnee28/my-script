@@ -2765,7 +2765,7 @@ local function of_sitAtNearestChair(fromPos)
     if h.Sit then return true end
 
     local pos = fromPos or (of_root() and of_root().Position) or CHAIR_POS
-    local seat = of_findNearestSeat(pos, 100)
+    local seat = of_findNearestSeat(pos, 50)
     if not seat then return false end   -- không tìm thấy → thoát, KHÔNG fallback tele
 
     setStatus("đi bộ tới ghế")
