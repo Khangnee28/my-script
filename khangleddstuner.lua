@@ -2661,11 +2661,24 @@ end
         end
         local hrp = of_root()
         if hrp and (hrp.Position - CHAIR_POS).Magnitude > OF_FLY_ONLY_DIST then
-            setStatus("bay tới văn phòng")
-            of_flyTo(CHAIR_POS, 8, OF_FLY_TIMEOUT)
-        end
-        setStatus("đi bộ vào ghế")
-        of_walkTo(CHAIR_POS, 2, 60, true, false)
+    setStatus("tele tới văn phòng")
+    of_flyTo(CHAIR_POS, 8, OF_FLY_TIMEOUT)
+end
+setStatus("tele vào ghế")
+local hrp2 = of_root()
+if hrp2 then
+    hrp2.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
+    task.wait(0.25)
+end
+-- ghế office có 1 cái duy nhất ở CHAIR_POS
+local hSeat = of_humanoid()
+if hSeat and not hSeat.Sit then
+    local seat = of_findNearestSeat(CHAIR_POS, 15)
+    if seat then
+        pcall(function() seat:Sit(hSeat) end)
+        task.wait(0.3)
+    end
+end
         h = of_humanoid()
         if h and h.Sit then
             of_killBV()
@@ -2772,29 +2785,24 @@ local function of_sitAtNearestChair(fromPos)
         return of_sitAtChair()
     end
 
-    setStatus("đi bộ tới ghế")
-    of_walkTo(seat.Position, 2, 60, true, false)
+    setStatus("tele tới ghế")
+    local hrp = of_root()
+    if not hrp then return false end
 
-    h = of_humanoid()
-    if h and h.Sit then return true end
+    -- tele tới vị trí ghế, land trên ghế luôn
+    local seatPos = seat.Position
+    hrp.CFrame = CFrame.new(seatPos + Vector3.new(0, 3, 0))
+    task.wait(0.25)
 
-    local t0 = os.clock()
-    while os.clock() - t0 < 2 and farmOffice do
-        h = of_humanoid()
-        if h and h.Sit then return true end
-        task.wait(0.2)
+    -- ép sit ngay
+    local h2 = of_humanoid()
+    if h2 and not h2.Sit then
+        pcall(function() seat:Sit(h2) end)
+        task.wait(0.3)
     end
 
-    if farmOffice then
-        h = of_humanoid()
-        if h and not h.Sit then
-            pcall(function() seat:Sit(h) end)
-            task.wait(0.3)
-        end
-    end
-
-    h = of_humanoid()
-    return (h and h.Sit) or false
+    h2 = of_humanoid()
+    return (h2 and h2.Sit) or false
 end
 
 local function of_doPrint(name)
@@ -2808,8 +2816,18 @@ local function of_doPrint(name)
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
         if not part then return end
         of_standUp()
-        setStatus("đi bộ tới máy in")
-        of_walkTo(part.Position, 3, 60, false, false)
+        setStatus("tele tới máy in")
+local hrpNow = of_root()
+if hrpNow then
+    local dir = (part.Position - hrpNow.Position)
+    dir = Vector3.new(dir.X, 0, dir.Z)
+    if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
+    dir = dir.Unit
+    local landPos = part.Position - dir * 4   -- đứng cách máy in 4 studs, mặt hướng vào
+    landPos = Vector3.new(landPos.X, hrpNow.Position.Y, landPos.Z)
+    hrpNow.CFrame = CFrame.new(landPos, Vector3.new(part.Position.X, landPos.Y, part.Position.Z))
+    task.wait(0.2)
+end
         setStatus("chuẩn bị in")
         task.wait(0.5)
         setStatus("đang in")
