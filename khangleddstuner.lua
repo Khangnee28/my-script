@@ -2732,15 +2732,21 @@ end)
     return candidates[1].seat
 end
 
+
 local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
     if not h then return false end
     if h.Sit then return true end
 
     local pos = fromPos or (of_root() and of_root().Position) or CHAIR_POS
-    local seat = of_findNearestSeat(pos, 40)   -- chỉ tìm ghế trong bán kính 40
+
+    -- thử bán kính tăng dần: 40 → 80 → 150
+    local seat = of_findNearestSeat(pos, 40)
+        or of_findNearestSeat(pos, 70)
+    
+
     if not seat then
-        -- không có ghế gần → về ghế office gốc
+        -- cuối cùng không có → ghế cố định
         return of_sitAtChair()
     end
 
@@ -2751,7 +2757,6 @@ local function of_sitAtNearestChair(fromPos)
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- walk tới xong chưa sit → ép sit
     if seat and h and not h.Sit then
         pcall(function() seat:Sit(h) end)
         task.wait(0.4)
