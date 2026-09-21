@@ -2566,6 +2566,8 @@ end
 end
     
 
+local PathfindingService = game:GetService("PathfindingService")
+
 local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     stopDist = stopDist or 3
     timeout = timeout or 120
@@ -2576,9 +2578,10 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     local hrp = of_root()
     if not hrp then return end
 
-    -- Compute path bằng Roblox built-in, tự tránh tường/ghế
+    setStatus("tính đường")
+
     local path = PathfindingService:CreatePath({
-        AgentRadius = 3,
+        AgentRadius = 2,
         AgentHeight = 5,
         AgentCanJump = true,
         AgentCanClimb = false,
@@ -2589,15 +2592,16 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
         path:ComputeAsync(hrp.Position, target)
     end)
 
-    local waypoints = {}
+    local waypoints
     if computeOk and path.Status == Enum.PathStatus.Success then
         waypoints = path:GetWaypoints()
     else
-        -- fallback: đi thẳng nếu không compute được
         waypoints = { { Position = target, Action = Enum.PathWaypointAction.Walk } }
     end
 
-    for i = 2, #waypoints do
+    -- luôn bắt đầu từ 1 — waypoint đầu khi thành công chính là vị trí hiện tại,
+    -- skip bằng check khoảng cách bên dưới
+    for i = 1, #waypoints do
         if not farmOffice then break end
         if os.clock() > deadline then break end
 
@@ -2605,25 +2609,28 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
         local isLast = (i == #waypoints)
         local threshold = isLast and stopDist or 3
 
-        if wp.Action == Enum.PathWaypointAction.Jump then
-            local h = of_humanoid()
-            if h then pcall(function() h.Jump = true end) end
-            task.wait(0.2)
-        end
-
-        local wpDeadline = os.clock() + 10
-        while os.clock() < wpDeadline and farmOffice do
-            local h = of_humanoid()
-            local hrp2 = of_root()
-            if not h or not hrp2 then return end
-            if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-                if allowSit then break end
-                of_standUp()
+        local hrpNow = of_root()
+        -- skip nếu waypoint gần vị trí hiện tại
+        if hrpNow and (wp.Position - hrpNow.Position).Magnitude >= 1.5 then
+            if wp.Action == Enum.PathWaypointAction.Jump then
+                local h = of_humanoid()
+                if h then pcall(function() h.Jump = true end) end
+                task.wait(0.2)
             end
-            local d = (wp.Position - hrp2.Position).Magnitude
-            if d <= threshold then break end
-            h:MoveTo(wp.Position)
-            task.wait(0.1)
+
+            local wpDeadline = os.clock() + 10
+            while os.clock() < wpDeadline and farmOffice do
+                local h = of_humanoid()
+                local hrp2 = of_root()
+                if not h or not hrp2 then return end
+                if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
+                    if allowSit then break end
+                    of_standUp()
+                end
+                if (wp.Position - hrp2.Position).Magnitude <= threshold then break end
+                h:MoveTo(wp.Position)
+                task.wait(0.1)
+            end
         end
     end
 
