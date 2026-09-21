@@ -984,8 +984,8 @@ end)
             end
         else
             farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-            farmSwitch.track.Active = true
-            farmSwitch.track.AutoButtonColor = true
+            farmSwitch.track.Active = false
+            farmSwitch.track.AutoButtonColor = false
             farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
             farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
         end
@@ -2645,7 +2645,7 @@ end
                 if flat.Magnitude <= stopDist then break end
                 h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
                 if hrp.Position.Y < target.Y - 120 then
-                    warn("[farm] rot void — tu respawn de tiep tuc")
+                    
                     pcall(function() h.Health = 0 end)
                     break
                 end
@@ -2663,7 +2663,7 @@ end
             of_endSprint(h)
         end
         if not ok then
-            warn("[farm] walk loi")
+            
         end
     end
     local function of_forceSit(h)
@@ -2758,9 +2758,7 @@ end
         local btn = of_findButton(choice.Text)
         local how = btn and of_clickButton(btn) or nil
         if how then
-            print("[farm] bam nut Text=" .. tostring(choice.Text) .. " cach=" .. tostring(how))
-        else
-            print("[farm] duong cung remote Text=" .. tostring(choice.Text))
+        
             pcall(function()
                 CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice)))
             end)
@@ -2774,7 +2772,7 @@ end
         if not Computers then return end
         local model = Computers:FindFirstChild(name)
         if not model then
-            warn("[farm] khong thay may in: " .. tostring(name))
+            
             return
         end
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
@@ -2810,7 +2808,7 @@ end
         if not farmOffice then return end
         if not of_sitAtChair() then
             if farmOffice then
-                warn("[farm] khong ngoi duoc ghe, thu lai")
+                
                 task.wait(2)
             end
             return
@@ -2829,7 +2827,7 @@ end
             end
             if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
                 of_refired = true
-                print("[farm] khong thay xac nhan — thu lai 1 lan")
+            
                 if of_lastKnownQuestion then
                     of_fireAnswer(of_lastKnownQuestion)
                     setStatus("đã giải")
