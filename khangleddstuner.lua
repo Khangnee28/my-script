@@ -2571,6 +2571,11 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     timeout = timeout or 60
     local deadline = os.clock() + timeout
 
+    local prevPos = of_root() and of_root().Position
+    local prevTime = os.clock()
+    local stuckTime = 0
+    local lastNoclip = 0
+
     pcall(function()
         while os.clock() < deadline and farmOffice do
             local h = of_humanoid()
@@ -2587,6 +2592,30 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
             if flat.Magnitude <= stopDist then break end
 
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+
+            -- stuck detect
+            if os.clock() - prevTime >= 0.6 then
+                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
+                if moved < 0.4 then
+                    stuckTime = stuckTime + 0.6
+                else
+                    stuckTime = 0
+                end
+                prevPos = hrp.Position
+                prevTime = os.clock()
+
+                -- kẹt 1.5s → noclip 0.15s, cooldown 5s
+                if stuckTime >= 1.5 and (os.clock() - lastNoclip) >= 5 then
+                    setStatus("noclip nhẹ")
+                    local oldCollide = hrp.CanCollide
+                    hrp.CanCollide = false
+                    task.wait(0.15)
+                    hrp.CanCollide = oldCollide
+                    lastNoclip = os.clock()
+                    stuckTime = 0
+                end
+            end
+
             task.wait(0.15)
         end
     end)
