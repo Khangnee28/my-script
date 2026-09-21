@@ -2619,26 +2619,7 @@ end
     of_killBV()
     return (h and h.Sit) or false
 end
-        local t0 = os.clock()
-        while os.clock() - t0 < 2 and farmOffice do
-            h = of_humanoid()
-            if h and h.Sit then
-                of_killBV()
-                return true
-            end
-            task.wait(0.2)
-        end
-        if farmOffice then
-            h = of_humanoid()
-            if h and not h.Sit then
-                setStatus("ép ngồi ghế")
-                of_forceSit(h)
-            end
-        end
-        h = of_humanoid()
-        of_killBV()
-        return (h and h.Sit) or false
-    end
+        
     local function of_solve(q)
         if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then
             return nil
