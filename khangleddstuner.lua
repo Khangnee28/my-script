@@ -2623,7 +2623,7 @@ end
         of_endSprint(h)
     end
 end
-
+end
 
 
     local function of_forceSit(h)
