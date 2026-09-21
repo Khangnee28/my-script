@@ -2612,6 +2612,17 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
         stuckTime = 0
     end
 end
+            task.wait(0.1)
+        end
+    end)
+
+    local h = of_humanoid()
+    local hrp = of_root()
+    if h and hrp then
+        h:MoveTo(hrp.Position)
+        of_endSprint(h)
+    end
+end
 
 
 
