@@ -2572,6 +2572,11 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     local h0 = of_humanoid()
     if h0 then of_ensureSprint(h0) end
 
+    local prevPos = of_root() and of_root().Position
+    local prevTime = os.clock()
+    local stuckTime = 0
+    local jumpCooldown = 0
+
     pcall(function()
         while os.clock() < deadline and farmOffice do
             local h = of_humanoid()
@@ -2588,6 +2593,26 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
             if flat.Magnitude <= stopDist then break end
 
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+
+            -- stuck detect
+            if os.clock() - prevTime >= 0.6 then
+                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
+                if moved < 0.5 then
+                    stuckTime = stuckTime + 0.6
+                else
+                    stuckTime = 0
+                end
+                prevPos = hrp.Position
+                prevTime = os.clock()
+
+                -- kẹt >= 0.6s → nhảy
+                if stuckTime >= 0.6 and os.clock() >= jumpCooldown then
+                    pcall(function() h.Jump = true end)
+                    jumpCooldown = os.clock() + 0.8
+                    stuckTime = 0
+                end
+            end
+
             task.wait(0.1)
         end
     end)
