@@ -2571,23 +2571,6 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     timeout = timeout or 60
     local deadline = os.clock() + timeout
 
-    local prevPos = of_root() and of_root().Position
-    local prevTime = os.clock()
-    local stuckTime = 0
-    local lastJump = 0
-
-    -- raycast phía trước xem có vật cản không
-    local function blocked_ahead(hrp, dir)
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        local char = player.Character
-        if char then params.FilterDescendantsInstances = {char} end
-        params.IgnoreWater = true
-        local origin = hrp.Position + Vector3.new(0, 1.5, 0)
-        local hit = workspace:Raycast(origin, dir * 6, params)
-        return hit ~= nil
-    end
-
     pcall(function()
         while os.clock() < deadline and farmOffice do
             local h = of_humanoid()
@@ -2603,37 +2586,8 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
             local flat = Vector3.new(delta.X, 0, delta.Z)
             if flat.Magnitude <= stopDist then break end
 
-            local dirUnit = flat.Unit
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
-
-            local canJump = (os.clock() - lastJump) >= 1.5
-
-            -- check 1: có vật cản phía trước 6 studs → nhảy
-            if canJump and blocked_ahead(hrp, dirUnit) then
-                pcall(function() h.Jump = true end)
-                lastJump = os.clock()
-                stuckTime = 0
-            end
-
-            -- check 2: kẹt 1s không nhích → nhảy
-            if os.clock() - prevTime >= 0.5 then
-                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
-                if moved < 0.4 then
-                    stuckTime = stuckTime + 0.5
-                else
-                    stuckTime = 0
-                end
-                prevPos = hrp.Position
-                prevTime = os.clock()
-
-                if stuckTime >= 1.0 and canJump then
-                    pcall(function() h.Jump = true end)
-                    lastJump = os.clock()
-                    stuckTime = 0
-                end
-            end
-
-            task.wait(0.1)
+            task.wait(0.15)
         end
     end)
 
