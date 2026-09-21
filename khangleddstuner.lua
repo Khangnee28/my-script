@@ -2736,8 +2736,8 @@ end
     radius = radius or 150
     local candidates = {}
     local ok, parts = pcall(function()
-        return workspace:GetPartBoundsInRadius(pos, radius)
-    end)
+    return workspace:GetPartBoundsInRadius(pos, math.min(radius, 40))
+end)
     if not ok or not parts then return nil end
 
     for _, p in ipairs(parts) do
