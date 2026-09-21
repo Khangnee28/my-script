@@ -2582,6 +2582,7 @@ end
         return false
     end
     
+    
     local function of_sitAtChair()
     local h = of_humanoid()
     if h and h.Sit then
@@ -2590,14 +2591,11 @@ end
     end
 
     setStatus("tele tới ghế")
-
-    -- tele 1 lần, dùng CHAIR_POS + Y offset (đã verify trước đó hoạt động)
-    local landPos = CHAIR_POS + Vector3.new(0, 3, 0)
-
     local hrp = of_root()
     if not hrp then return false end
-    hrp.CFrame = CFrame.new(landPos)
 
+    -- 1 CFrame set duy nhất giống King Akbar
+    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 3, 0))
     task.wait(0.5)
 
     h = of_humanoid()
@@ -2606,22 +2604,12 @@ end
         return true
     end
 
-    -- chưa sit → tìm ghế gần, bán kính rộng 30 studs (ghế thật cách ~65 studs)
-    local seat = of_findNearestSeat(CHAIR_POS, 30)
-    if not seat then
-        seat = of_findNearestSeat(hrp.Position, 30)
-    end
-
+    -- ghế ở gần CHAIR_POS, tìm bán kính 20
+    local seat = of_findNearestSeat(CHAIR_POS, 20)
+        or of_findNearestSeat(hrp.Position, 20)
     if seat and h then
         pcall(function() seat:Sit(h) end)
-        task.wait(0.5)
-    else
-        -- không tìm được ghế → dùng of_forceSit
-        h = of_humanoid()
-        if h and not h.Sit then
-            of_forceSit(h)
-            task.wait(0.3)
-        end
+        task.wait(0.4)
     end
 
     h = of_humanoid()
