@@ -2404,7 +2404,7 @@ end
 
 local function of_sprintToggle()
     pcall(function()
-        keypress(Enum.KeyCode.RightShift)
+        keypress(Enum.KeyCode.LeftShift)
     end)
 end
 
@@ -2563,58 +2563,116 @@ end
             task.wait(0.4)
         end
         task.wait(0.4)
-    end
+end
     local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
-        local deadline = os.clock() + (timeout or 120)
-        local h0 = of_humanoid()
-        if h0 then of_ensureSprint(h0) end
-        if useNoclip then
-            of_phasing = true
+    local deadline = os.clock() + (timeout or 120)
+    local h0 = of_humanoid()
+    if h0 then of_ensureSprint(h0) end
+
+    local prevPos = of_root() and of_root().Position
+    local prevTime = os.clock()
+    local stuckTime = 0
+    local sideDir = 1  -- 1 = phải, -1 = trái, đổi khi kẹt
+    local sidestepUntil = 0
+    local sidestepTarget = nil
+
+    local function try_raycast(origin, dir, dist)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        local char = player.Character
+        if char then
+            local ignore = {char}
+            params.FilterDescendantsInstances = ignore
         end
-        local holdBV = nil
-        local prevPos = of_root() and of_root().Position
-        local prevTime = os.clock()
-        local stuckTime = 0
-        local slip = 0
-        local pulses = 0
-        local ok = pcall(function()
-            while os.clock() < deadline and farmOffice do
-                local h = of_humanoid()
-                local hrp = of_root()
-                if not h or not hrp then break end
-                if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-                    if allowSit then
-                        break
-                    else
-                        of_standUp()
-                    end
-                end
-                local delta = target - hrp.Position
-                local flat = Vector3.new(delta.X, 0, delta.Z)
-                if flat.Magnitude <= stopDist then break end
-                h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
-                if hrp.Position.Y < target.Y - 120 then
-                    
-                    pcall(function() h.Health = 0 end)
-                    break
-                end
-                      task.wait(0.1)
-            end
-        end)
-        if holdBV then
-            pcall(function() holdBV:Destroy() end)
-        end
-        of_phasing = false
-        local h = of_humanoid()
-        local hrp = of_root()
-        if h and hrp then
-            h:MoveTo(hrp.Position)
-            of_endSprint(h)
-        end
-        if not ok then
-            
-        end
+        params.IgnoreWater = true
+        local r = workspace:Raycast(origin, dir * dist, params)
+        return r
     end
+
+    local ok = pcall(function()
+        while os.clock() < deadline and farmOffice do
+            local h = of_humanoid()
+            local hrp = of_root()
+            if not h or not hrp then break end
+
+            if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
+                if allowSit then break
+                else of_standUp() end
+            end
+
+            local delta = target - hrp.Position
+            local flat = Vector3.new(delta.X, 0, delta.Z)
+            if flat.Magnitude <= stopDist then break end
+
+            -- đang sidestep? đi tới điểm sidestep
+            if os.clock() < sidestepUntil and sidestepTarget then
+                h:MoveTo(Vector3.new(sidestepTarget.X, hrp.Position.Y, sidestepTarget.Z))
+            else
+                -- raycast phía trước, tầm 15 studs
+                local rayOrigin = hrp.Position + Vector3.new(0, 2, 0)
+                local rayDir = Vector3.new(flat.X, 0, flat.Z).Unit
+                local hit = try_raycast(rayOrigin, rayDir, 12)
+
+                if hit and hit.Instance and not hit.Instance:IsDescendantOf(player.Character) then
+                    -- có vật cản: sidestep sang ngang 8 studs
+                    local perp = Vector3.new(-rayDir.Z, 0, rayDir.X) * sideDir
+                    local sideTarget = hrp.Position + perp * 8
+                    -- check xem hướng sidestep có trống không
+                    local sideHit = try_raycast(rayOrigin, perp, 10)
+                    if sideHit and sideHit.Instance and not sideHit.Instance:IsDescendantOf(player.Character) then
+                        -- cả 2 bên kẹt? đổi hướng
+                        sideDir = -sideDir
+                        perp = Vector3.new(-rayDir.Z, 0, rayDir.X) * sideDir
+                        sideTarget = hrp.Position + perp * 8
+                    end
+                    sidestepTarget = sideTarget
+                    sidestepUntil = os.clock() + 0.4
+                    h:MoveTo(Vector3.new(sideTarget.X, hrp.Position.Y, sideTarget.Z))
+                else
+                    -- đường trống: đi thẳng
+                    h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+                end
+            end
+
+            -- rot void → respawn
+            if hrp.Position.Y < target.Y - 120 then
+                pcall(function() h.Health = 0 end)
+                break
+            end
+
+            -- stuck detect (không di chuyển > 0.5s)
+            if os.clock() - prevTime >= 0.6 then
+                local moved = prevPos and (hrp.Position - prevPos).Magnitude or 99
+                if moved < 0.5 then
+                    stuckTime = stuckTime + 0.6
+                else
+                    stuckTime = 0
+                end
+                prevPos = hrp.Position
+                prevTime = os.clock()
+
+                if stuckTime >= 1.2 then
+                    -- kẹt nặng: back up rồi thử hướng khác
+                    sideDir = -sideDir
+                    local backDir = Vector3.new(-flat.X, 0, -flat.Z).Unit
+                    h:MoveTo(hrp.Position + backDir * 6)
+                    task.wait(0.3)
+                    stuckTime = 0
+                end
+            end
+
+            task.wait(0.1)
+        end
+    end)
+
+    of_phasing = false
+    local h = of_humanoid()
+    local hrp = of_root()
+    if h and hrp then
+        h:MoveTo(hrp.Position)
+        of_endSprint(h)
+    end
+end
     local function of_forceSit(h)
         for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
             if seat.Occupant == nil then
