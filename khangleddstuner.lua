@@ -2732,6 +2732,7 @@ end
         return true
     end
    local function of_findNearestSeat(pos, radius)
+   local function of_findNearestSeat(pos, radius)
     radius = radius or 150
     local candidates = {}
     local ok, parts = pcall(function()
@@ -2740,18 +2741,23 @@ end
     if not ok or not parts then return nil end
 
     for _, p in ipairs(parts) do
-    if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
-        local parentName = p.Parent and p.Parent.Name or ""
-        local isWorkChair = (parentName == "Setup")
-            or parentName:lower():find("chair")
-            or parentName:lower():find("seat")
+        if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
+            local parentName = p.Parent and p.Parent.Name or ""
+            local isWorkChair = (parentName == "Setup")
+                or parentName:lower():find("chair")
+                or parentName:lower():find("seat")
 
-        if isWorkChair then
-            local d = (p.Position - pos).Magnitude
-            table.insert(candidates, { seat = p, dist = d })
+            if isWorkChair then
+                local d = (p.Position - pos).Magnitude
+                table.insert(candidates, { seat = p, dist = d })
+            end
         end
     end
-end                        
+
+    if #candidates == 0 then return nil end
+    table.sort(candidates, function(a, b) return a.dist < b.dist end)
+    return candidates[1].seat
+end
 
 local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
