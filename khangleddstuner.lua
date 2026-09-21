@@ -2345,7 +2345,7 @@ end
 -- ============================================================
 -- KHOI 5: OFFICE FARM v20 (logic officefarm v51 giu nguyen)
 -- ============================================================
-do
+
     local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
     local TeamChangeRequest = JobEvents:WaitForChild("TeamChangeRequest", 5)
     local GenerateQuestion = JobEvents:WaitForChild("GenerateQuestion")
