@@ -2353,8 +2353,7 @@ end
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
     local Computers = workspace:FindFirstChild("Computers")
-    local PathfindingService = game:GetService("PathfindingService")
-local PATTERN = { "CHOICE", "QID" }
+
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
     local OF_FLY_ONLY_DIST = 150
@@ -2373,10 +2372,7 @@ local PATTERN = { "CHOICE", "QID" }
     local of_awaitingAck = false
     local of_lastFireAt = 0
     local of_refired = false
-local OF_PATH_CHAIR_TO_PRINTER = nil
-local OF_PATH_PRINTER_TO_CHAIR = nil
-local OF_LAST_CHAIR_POS = nil
-    
+
     local function of_killBV()
         if of_activeBV then
             pcall(function() of_activeBV.Velocity = Vector3.zero end)
@@ -2421,7 +2417,7 @@ local function of_ensureSprint(h)
 end
 
 local function of_endSprint(h)
-    -- không làm gì: sprint giữ nguyên bật suốt session
+    -- không làm gì, sprint giữ nguyên
 end
     local function of_enableSit(char)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -2574,6 +2570,7 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     stopDist = stopDist or 3
     timeout = timeout or 20
     local deadline = os.clock() + timeout
+    local reached = false
 
     pcall(function()
         while os.clock() < deadline and farmOffice do
@@ -2588,7 +2585,10 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
 
             local delta = target - hrp.Position
             local flat = Vector3.new(delta.X, 0, delta.Z)
-            if flat.Magnitude <= stopDist then break end
+            if flat.Magnitude <= stopDist then
+                reached = true
+                break
+            end
 
             h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
             task.wait(0.15)
@@ -2600,23 +2600,7 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     if h and hrp then
         h:MoveTo(hrp.Position)
     end
-end
-local function of_computePath(from, to)
-    local path = PathfindingService:CreatePath({
-        AgentRadius = 3,
-        AgentHeight = 5,
-        AgentCanJump = false,
-        AgentCanClimb = false,
-        WaypointSpacing = 4,
-    })
-    local ok = pcall(function() path:ComputeAsync(from, to) end)
-    if not ok or path.Status ~= Enum.PathStatus.Success then return nil end
-
-    local wps = {}
-    for _, wp in ipairs(path:GetWaypoints()) do
-        table.insert(wps, wp.Position)
-    end
-    return wps
+    return reached
 end
 
 
@@ -2771,43 +2755,25 @@ local function of_sitAtNearestChair(fromPos)
     end
 
     setStatus("đi bộ về ghế")
-local hrp = of_root()
-if hrp then
-    if not OF_PATH_PRINTER_TO_CHAIR then
-        OF_PATH_PRINTER_TO_CHAIR = of_computePath(hrp.Position, CHAIR_POS)
-    end
+loca    setStatus("đi bộ về ghế")
+    of_walkTo(CHAIR_POS, 4, 30, true, false)
+    task.wait(0.3)
 
-    if OF_PATH_PRINTER_TO_CHAIR then
-        for _, wp in ipairs(OF_PATH_PRINTER_TO_CHAIR) do
-            if not farmOffice then return false end
-            of_walkTo(wp, 2, 15, false, false)
-        end
-    else
-        of_walkTo(CHAIR_POS, 4, 20, true, false)
-    end
-end
-h = of_humanoid()
-if h and h.Sit then return true end
-
--- gần ghế → ép sit
-local hrp2 = of_root()
-if seat and h and not h.Sit then
-    if hrp2 and (seat.Position - hrp2.Position).Magnitude < 6 then
-        pcall(function() seat:Sit(h) end)
-        task.wait(0.5)
-    else
-        of_walkTo(seat.Position, 4, 15, true, false)
-        task.wait(0.3)
-        h = of_humanoid()
+    -- tìm ghế gần, ép sit
+    local hrp = of_root()
+    local pos = hrp and hrp.Position or CHAIR_POS
+    local seat = of_findNearestSeat(pos, 30)
+        or of_findNearestSeat(CHAIR_POS, 30)
+    if seat and hrp and (seat.Position - hrp.Position).Magnitude < 8 then
+        local h = of_humanoid()
         if h and not h.Sit then
             pcall(function() seat:Sit(h) end)
-            task.wait(0.4)
+            task.wait(0.5)
         end
     end
-end
 
-h = of_humanoid()
-return (h and h.Sit) or false
+    local h = of_humanoid()
+    return (h and h.Sit) or false
 end
 
 local function of_doPrint(name)
@@ -2822,25 +2788,8 @@ local function of_doPrint(name)
         if not part then return end
         of_standUp()
         setStatus("đi bộ tới máy in")
-local hrp = of_root()
-if hrp then
-    -- compute path 1 lần nếu chưa có
-    if not OF_PATH_CHAIR_TO_PRINTER then
-        setStatus("tính đường lần đầu")
-        OF_PATH_CHAIR_TO_PRINTER = of_computePath(hrp.Position, part.Position)
-    end
+of_walkTo(part.Position, 4, 30, false, false)
 
-    if OF_PATH_CHAIR_TO_PRINTER then
-        -- đi qua waypoints đã cache
-        for _, wp in ipairs(OF_PATH_CHAIR_TO_PRINTER) do
-            if not farmOffice then return end
-            of_walkTo(wp, 2, 15, false, false)
-        end
-    else
-        -- path fail → đi thẳng
-        of_walkTo(part.Position, 4, 20, false, false)
-    end
-end
         setStatus("chuẩn bị in")
         task.wait(0.5)
         setStatus("đang in")
