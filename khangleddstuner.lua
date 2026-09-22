@@ -2634,10 +2634,7 @@ local function of_sitAtChair()
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- đi bộ vào ghế (auto-sit khi overlap)
-    setStatus("đi bộ tới ghế")
-    of_walkTo(CHAIR_POS, 1.5, 30, true, false)
-    task.wait(1.5)
+    
 
     h = of_humanoid()
     if h and h.Sit then return true end
