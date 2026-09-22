@@ -2353,7 +2353,8 @@ end
     local AssignPrintJob  = JobEvents:WaitForChild("AssignPrintJob")
     local ClearPrintJob   = JobEvents:WaitForChild("ClearPrintJob")
     local Computers = workspace:FindFirstChild("Computers")
-    local PathfindingService = game:GetService("PathfindingService")l PATTERN = { "CHOICE", "QID" }
+    local PathfindingService = game:GetService("PathfindingService")
+local PATTERN = { "CHOICE", "QID" }
     local OF_FLY_SPEED = 55
     local OF_FLY_TIMEOUT = 240
     local OF_FLY_ONLY_DIST = 150
