@@ -2754,14 +2754,7 @@ local function of_sitAtNearestChair(fromPos)
         return of_sitAtChair()
     end
 
-    -- gần ghế (< 8 studs) → ép sit luôn
-    if hrp and (seat.Position - hrp.Position).Magnitude < 8 then
-        setStatus("gần ghế — sit")
-        pcall(function() seat:Sit(h) end)
-        task.wait(0.6)
-        h = of_humanoid()
-        return (h and h.Sit) or false
-    end
+
 
     -- xa → đi bộ thẳng tới ghế, không dùng CHAIR_POS
     setStatus("đi bộ tới ghế gần")
