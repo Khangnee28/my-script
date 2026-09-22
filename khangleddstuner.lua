@@ -2755,7 +2755,6 @@ local function of_sitAtNearestChair(fromPos)
     end
 
     setStatus("đi bộ về ghế")
-local   setStatus("đi bộ về ghế")
     of_walkTo(CHAIR_POS, 4, 30, true, false)
     task.wait(0.3)
 
