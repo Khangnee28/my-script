@@ -2640,49 +2640,7 @@ local function of_teleNear(target, offsetDist)
     return true
 end
 
-local function of_sitAtNearestChair(fromPos)
-    local h = of_humanoid()
-    if not h then return false end
-    if h.Sit then return true end
 
-    local hrp = of_root()
-    local pos = hrp and hrp.Position or fromPos or CHAIR_POS
-
-    local seat = of_findNearestSeat(pos, 120)
-    if not seat then
-        setStatus("không có ghế → về CHAIR_POS")
-        return of_sitAtChair()
-    end
-
-    hrp = of_root()
-    if not hrp then return false end
-    local dist = (seat.Position - hrp.Position).Magnitude
-
-    if dist > 60 then
-        setStatus("tele ghế (" .. math.floor(dist) .. ")")
-        hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-    else
-        setStatus("đi bộ tới ghế (" .. math.floor(dist) .. ")")
-        local ok = of_walkTo(seat.Position, 1.5, 5, true, false)
-        if not ok then
-            setStatus("walk fail → tele")
-            hrp = of_root()
-            if hrp then
-                hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-                task.wait(1.5)
-            end
-        else
-            task.wait(1.5)
-        end
-    end
-
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    setStatus("không ngồi → về CHAIR_POS")
-    return of_sitAtChair()
-end
 
     local function of_forceSit(h)
         for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
@@ -2834,7 +2792,49 @@ end)
 end
 
 
-    
+local function of_sitAtNearestChair(fromPos)
+    local h = of_humanoid()
+    if not h then return false end
+    if h.Sit then return true end
+
+    local hrp = of_root()
+    local pos = hrp and hrp.Position or fromPos or CHAIR_POS
+
+    local seat = of_findNearestSeat(pos, 120)
+    if not seat then
+        setStatus("không có ghế → về CHAIR_POS")
+        return of_sitAtChair()
+    end
+
+    hrp = of_root()
+    if not hrp then return false end
+    local dist = (seat.Position - hrp.Position).Magnitude
+
+    if dist > 60 then
+        setStatus("tele ghế (" .. math.floor(dist) .. ")")
+        hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
+        task.wait(1.5)
+    else
+        setStatus("đi bộ tới ghế (" .. math.floor(dist) .. ")")
+        local ok = of_walkTo(seat.Position, 1.5, 5, true, false)
+        if not ok then
+            setStatus("walk fail → tele")
+            hrp = of_root()
+            if hrp then
+                hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
+                task.wait(1.5)
+            end
+        else
+            task.wait(1.5)
+        end
+    end
+
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    setStatus("không ngồi → về CHAIR_POS")
+    return of_sitAtChair()
+end    
      
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
