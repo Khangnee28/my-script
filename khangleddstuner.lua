@@ -2570,7 +2570,8 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
     stopDist = stopDist or 3
     timeout = timeout or 20
     local deadline = os.clock() + timeout
-    local reached = false
+    local h0 = of_humanoid()
+    if h0 then of_ensureSprint(h0) end
 
     pcall(function()
         while os.clock() < deadline and farmOffice do
@@ -2742,17 +2743,41 @@ local function of_sitAtNearestChair(fromPos)
     if not h then return false end
     if h.Sit then return true end
 
-    local pos = fromPos or (of_root() and of_root().Position) or CHAIR_POS
-
-    -- thử bán kính tăng dần: 40 → 80 → 150
-    local seat = of_findNearestSeat(pos, 90)
-
-    
+    -- tìm ghế trống gần vị trí hiện tại (không về CHAIR_POS)
+    local hrp = of_root()
+    local pos = hrp and hrp.Position or fromPos or CHAIR_POS
+    local seat = of_findNearestSeat(pos, 30)
+        or of_findNearestSeat(pos, 80)
 
     if not seat then
-        -- cuối cùng không có → ghế cố định
+        setStatus("không có ghế gần")
         return of_sitAtChair()
     end
+
+    -- gần ghế (< 8 studs) → ép sit luôn
+    if hrp and (seat.Position - hrp.Position).Magnitude < 8 then
+        setStatus("gần ghế — sit")
+        pcall(function() seat:Sit(h) end)
+        task.wait(0.6)
+        h = of_humanoid()
+        return (h and h.Sit) or false
+    end
+
+    -- xa → đi bộ thẳng tới ghế, không dùng CHAIR_POS
+    setStatus("đi bộ tới ghế gần")
+    of_walkTo(seat.Position, 4, 20, true, false)
+    task.wait(0.3)
+
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    if seat and h and not h.Sit then
+        pcall(function() seat:Sit(h) end)
+        task.wait(0.6)
+    end
+    h = of_humanoid()
+    return (h and h.Sit) or false
+end
 
     setStatus("đi bộ về ghế")
     of_walkTo(CHAIR_POS, 4, 30, true, false)
