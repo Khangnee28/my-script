@@ -2663,10 +2663,19 @@ task.wait(0.7)
 h = of_humanoid()
 if h and h.Sit then return true end
 
--- ép Humanoid.Sit = true ngay tại tâm ghế
-setStatus("ép Sit")
-pcall(function() h.Sit = true end)
-task.wait(1.2)
+-- check HRP có thật sự chạm ghế không (trong 2.5 studs)
+hrp = of_root()
+if not hrp then return false end
+local distToSeat = (hrp.Position - seat.Position).Magnitude
+
+if distToSeat < 2.5 then
+    setStatus("ép Sit")
+    pcall(function() h.Sit = true end)
+    task.wait(1.2)
+else
+    setStatus("xa ghế " .. math.floor(distToSeat) .. " → skip")
+    return of_sitAtChair()
+end
 
     h = of_humanoid()
     if h and h.Sit then return true end
