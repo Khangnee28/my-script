@@ -2596,7 +2596,34 @@ local function of_teleNear(target, offsetDist)
     task.wait(0.6)
     return true
 end
+-- không ngồi → walk ngang 6 studs (trái/phải random) rồi vào lại
+setStatus("né ngang rồi vào lại")
+local hrp2 = of_root()
+if hrp2 then
+    local forward = (seat.Position - hrp2.Position)
+    forward = Vector3.new(forward.X, 0, forward.Z)
+    if forward.Magnitude < 0.1 then forward = Vector3.new(1, 0, 0) end
+    forward = forward.Unit
 
+    local perp = Vector3.new(-forward.Z, 0, forward.X)
+    local sideDir = (math.random(1, 2) == 1) and 1 or -1
+    local sidePos = hrp2.Position + perp * sideDir * 6
+
+    of_walkTo(sidePos, 1.5, 6, false, false)
+    task.wait(0.3)
+end
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    of_walkTo(seat.Position, 1.5, 10, true, false)
+    task.wait(1.5)
+
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    setStatus("fail → về CHAIR_POS")
+    return of_sitAtChair()
+end
 
     local function of_forceSit(h)
         for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
@@ -2643,16 +2670,7 @@ local function of_sitAtChair()
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- không ngồi → lùi 6 studs, walk vào lại
-    setStatus("lùi rồi vào lại")
-    local hrp2 = of_root()
-    if hrp2 then
-        local back = (hrp2.Position - CHAIR_POS)
-        if back.Magnitude < 0.1 then back = Vector3.new(1, 0, 0) end
-        back = Vector3.new(back.X, 0, back.Z).Unit * 6
-        of_walkTo(hrp2.Position + back, 1.5, 5, false, false)
-        task.wait(0.3)
-    end
+
 
     h = of_humanoid()
     if h and h.Sit then return true end
@@ -2752,45 +2770,51 @@ end
     local hrp = of_root()
     local pos = hrp and hrp.Position or fromPos or CHAIR_POS
 
-    -- tìm ghế gần nhất (bán kính 120)
     local seat = of_findNearestSeat(pos, 120)
-
     if not seat then
         setStatus("không có ghế → về CHAIR_POS")
         return of_sitAtChair()
     end
 
-    -- tele thẳng vào tâm ghế
-    setStatus("tele vào ghế")
+    setStatus("tele vào ghế gần")
     hrp = of_root()
-    if hrp then
-        hrp.CFrame = CFrame.new(seat.Position)
-        task.wait(1.5)
-    end
+    if not hrp then return false end
+    hrp.CFrame = CFrame.new(seat.Position)
+    task.wait(1.5)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- không auto-sit → walk lùi 6 studs, walk vào lại
-    setStatus("lùi rồi vào lại")
+    -- không ngồi → walk ngang 6 studs (random trái/phải) rồi vào lại
+    setStatus("né ngang rồi vào lại")
     local hrp2 = of_root()
     if hrp2 then
-        local back = (hrp2.Position - seat.Position)
-        if back.Magnitude < 0.1 then back = Vector3.new(1, 0, 0) end
-        back = Vector3.new(back.X, 0, back.Z).Unit * 6
-        of_walkTo(hrp2.Position + back, 1.5, 5, false, false)
+        local forward = (seat.Position - hrp2.Position)
+        forward = Vector3.new(forward.X, 0, forward.Z)
+        if forward.Magnitude < 0.1 then forward = Vector3.new(1, 0, 0) end
+        forward = forward.Unit
+
+        -- vector vuông góc (trái hoặc phải)
+        local perp = Vector3.new(-forward.Z, 0, forward.X)
+        local sideDir = (math.random(1, 2) == 1) and 1 or -1
+        local sidePos = hrp2.Position + perp * sideDir * 6
+
+        of_walkTo(sidePos, 1.5, 6, false, false)
         task.wait(0.3)
     end
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- walk vào lại (không tele lần 2)
-    of_walkTo(seat.Position, 1.5, 15, true, false)
+    -- walk vào ghế lại
+    of_walkTo(seat.Position, 1.5, 10, true, false)
     task.wait(1.5)
 
     h = of_humanoid()
-    return (h and h.Sit) or false
+    if h and h.Sit then return true end
+
+    setStatus("fail → về CHAIR_POS")
+    return of_sitAtChair()
 end
 
      
