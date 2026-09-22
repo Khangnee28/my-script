@@ -2608,8 +2608,10 @@ end
     end
     
     
-    local of_initialTeleDone = false
+    
 
+
+local of_initialTeleDone = false
 
 local function of_sitAtChair()
     local h = of_humanoid()
@@ -2618,22 +2620,33 @@ local function of_sitAtChair()
     local hrp = of_root()
     if not hrp then return false end
 
-    -- tìm ghế gần CHAIR_POS nhất
-    local seat = of_findNearestSeat(CHAIR_POS, 120)
-    local target = seat and seat.Position or CHAIR_POS
+    -- tele 1 lần duy nhất khi ở xa office (spawn)
+    if not of_initialTeleDone then
+        local dist = (hrp.Position - CHAIR_POS).Magnitude
+        if dist > 500 then
+            setStatus("tele lần đầu vào office")
+            hrp.CFrame = CFrame.new(CHAIR_POS)
+            task.wait(1.0)
+        end
+        of_initialTeleDone = true
+    end
 
-    setStatus("tele ghế cố định")
-    hrp.CFrame = CFrame.new(target)
+    h = of_humanoid()
+    if h and h.Sit then return true end
+
+    -- đi bộ vào ghế (auto-sit khi overlap)
+    setStatus("đi bộ tới ghế")
+    of_walkTo(CHAIR_POS, 1.5, 30, true, false)
     task.wait(1.5)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- không auto-sit → walk lùi + walk vào lại
+    -- không ngồi → lùi 6 studs, walk vào lại
     setStatus("lùi rồi vào lại")
     local hrp2 = of_root()
     if hrp2 then
-        local back = (hrp2.Position - target)
+        local back = (hrp2.Position - CHAIR_POS)
         if back.Magnitude < 0.1 then back = Vector3.new(1, 0, 0) end
         back = Vector3.new(back.X, 0, back.Z).Unit * 6
         of_walkTo(hrp2.Position + back, 1.5, 5, false, false)
@@ -2643,7 +2656,7 @@ local function of_sitAtChair()
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    of_walkTo(target, 1.5, 15, true, false)
+    of_walkTo(CHAIR_POS, 1.5, 15, true, false)
     task.wait(1.5)
 
     h = of_humanoid()
