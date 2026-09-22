@@ -2559,8 +2559,6 @@ end
     end
 end
     
-
-local function of_teleTo(target)
 local OF_TELE_MIN = 40   -- dưới 40 studs → đi bộ
 
 local function of_teleTo(target)
