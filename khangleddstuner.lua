@@ -2932,8 +2932,16 @@ if not Computers then return end
     local function stopOffice()
     farmOffice = false
     of_killBV()
-    of_jobFired = false        -- THÊM
-    of_resetUntil = 0          -- THÊM
+    of_jobFired = false
+    of_resetUntil = 0
+
+    -- đứng lên khỏi ghế
+    local h = of_humanoid()
+    if h and h.Sit then
+        pcall(function() h.Sit = false end)
+        task.wait(0.3)
+    end
+
     if activeMode == "office" then
         activeMode = nil
         statPanel.Visible = false
@@ -2942,25 +2950,39 @@ if not Computers then return end
     setStatus("tạm nghỉ")
 end
     farmSwitch.track.MouseButton1Click:Connect(function()
-        if not farmOK then return end
-        local want = not farmOffice
-        if farmOffice then
-            stopOffice()
-            return
-        end
-        farmOffice = true
-        activeMode = "office"
-        farmStart = os.clock()
-        TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
-of_jobFired = true
-of_resetUntil = os.clock() + 5
-        local char = player.Character
-        of_enableSit(char)
-        farmSwitch.set(true)
-        statPanel.Visible = true
-        refreshStatPanel()
-        setStatus("khởi động office")
-    end)
+    if not farmOK then return end
+    if farmOffice then
+        stopOffice()
+        return
+    end
+
+    -- RESET toàn bộ state trước khi bật
+    of_initialTeleDone = false
+    of_printAssigned = nil
+    of_pendingQuestion = nil
+    of_awaitingAck = false
+    of_lastKnownQuestion = nil
+    of_questionArrivedAt = 0
+    of_nextDelay = 2.4
+    of_refired = false
+    of_lastFireAt = 0
+    of_phasing = false
+
+    farmOffice = true
+    activeMode = "office"
+    farmStart = os.clock()
+
+    TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
+    of_jobFired = true
+    of_resetUntil = os.clock() + 5
+
+    local char = player.Character
+    of_enableSit(char)
+    farmSwitch.set(true)
+    statPanel.Visible = true
+    refreshStatPanel()
+    setStatus("khởi động office")
+end)
 
 -- ============ HET KHOI 5 ============
 
