@@ -2622,23 +2622,19 @@ local function of_teleNear(target, offsetDist)
 
     local dist = (target - hrp.Position).Magnitude
     if dist < OF_TELE_MIN then
-        -- gần → thử walk 5s
-        local ok = of_walkTo(target, offsetDist or 4, 5, false, false)
-        if ok then return true end
-        setStatus("walk fail → tele")
-        -- fallthrough sang tele bên dưới
+        -- gần → đi bộ, fail thì return false
+        setStatus("đi bộ (" .. math.floor(dist) .. ")")
+        return of_walkTo(target, offsetDist or 4, 8, false, false)
     end
 
-    -- xa HOẶC walk fail → tele
-    hrp = of_root()
-    if not hrp then return false end
+    -- xa → tele
     local dir = (target - hrp.Position)
     dir = Vector3.new(dir.X, 0, dir.Z)
     if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
     dir = dir.Unit
     local landPos = target - dir * (offsetDist or 4)
     landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
-    setStatus("tele xa (" .. math.floor((target - hrp.Position).Magnitude) .. ")")
+    setStatus("tele xa (" .. math.floor(dist) .. ")")
     hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, target.Z))
     task.wait(0.6)
     return true
@@ -2699,17 +2695,13 @@ local function of_sitAtChair()
         task.wait(1.5)
     else
         setStatus("đi bộ tới ghế cố định")
-        local ok = of_walkTo(target, 1.5, 5, true, false)
-        if not ok then
-            setStatus("walk fail → tele")
-            hrp = of_root()
-            if hrp then
-                hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-                task.wait(1.5)
-            end
-        else
-            task.wait(1.5)
-        end
+        local ok = of_walkTo(target, 1.5, 8, true, false)
+if not ok then
+    setStatus("walk fail → skip")
+    return false
+end
+task.wait(1.0)
+        
     end
 
     h = of_humanoid()
@@ -2820,19 +2812,14 @@ local function of_sitAtNearestChair(fromPos)
         task.wait(1.5)
     else
         setStatus("đi bộ tới ghế (" .. math.floor(dist) .. ")")
-        local ok = of_walkTo(seat.Position, 1.5, 5, true, false)
+        local ok = of_walkTo(seat.Position, 1.5, 8, true, false)
 h = of_humanoid()
 if h and h.Sit then return true end
 if not ok then
-    setStatus("walk fail → tele")
-            hrp = of_root()
-            if hrp then
-                hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-                task.wait(1.5)
-            end
-        else
-            task.wait(1.5)
-        end
+    setStatus("walk fail → về CHAIR_POS")
+    return of_sitAtChair()
+end
+task.wait(1.0)
     end
 
     h = of_humanoid()
