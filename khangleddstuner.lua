@@ -2918,15 +2918,17 @@ if not Computers then return end
     end)
     -- DIEU KHIEN (noi vao farmSwitch cua script chinh)
     local function stopOffice()
-        farmOffice = false
-        of_killBV()
-        if activeMode == "office" then
-            activeMode = nil
-            statPanel.Visible = false
-        end
-        farmSwitch.set(false)
-        setStatus("tạm nghỉ")
+    farmOffice = false
+    of_killBV()
+    of_jobFired = false        -- THÊM
+    of_resetUntil = 0          -- THÊM
+    if activeMode == "office" then
+        activeMode = nil
+        statPanel.Visible = false
     end
+    farmSwitch.set(false)
+    setStatus("tạm nghỉ")
+end
     farmSwitch.track.MouseButton1Click:Connect(function()
         if not farmOK then return end
         local want = not farmOffice
@@ -2937,11 +2939,9 @@ if not Computers then return end
         farmOffice = true
         activeMode = "office"
         farmStart = os.clock()
-        if not of_jobFired then
-            TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
-            of_jobFired = true
-            of_resetUntil = os.clock() + 5
-        end
+        TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
+of_jobFired = true
+of_resetUntil = os.clock() + 5
         local char = player.Character
         of_enableSit(char)
         farmSwitch.set(true)
