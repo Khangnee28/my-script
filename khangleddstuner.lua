@@ -2541,53 +2541,59 @@ end
     return ok or false
 end
     local function of_standUp()
-        local h = of_humanoid()
-        local hrp = of_root()
-        if not h or not hrp then return end
-        if not h.Sit and h:GetState() ~= Enum.HumanoidStateType.Seated then return end
-        local tries = 0
-        while tries < 3 and h.Sit do
-            tries += 1
-            pcall(function() h.Sit = false end)
-            pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end)
-            pcall(function() h:ChangeState(Enum.HumanoidStateType.Jumping) end)
-            pcall(function()
-                local bv = Instance.new("BodyVelocity")
-                bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-                bv.Velocity = Vector3.new(0, 22, 0)
-                bv.Parent = hrp
-                task.wait(0.22)
-                bv.Velocity = Vector3.zero
-                bv:Destroy()
-            end)
-            task.wait(0.4)
-        end
-        task.wait(0.4)
+    local h = of_humanoid()
+    if not h then return end
+    if not h.Sit and h:GetState() ~= Enum.HumanoidStateType.Seated then return end
+
+    pcall(function() h.Sit = false end)
+    task.wait(0.25)
+
+    if h.Sit then
+        pcall(function() h.Jump = true end)
+        task.wait(0.3)
+    end
+
+    if h.Sit then
+        pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+        task.wait(0.3)
+    end
 end
     
 
 local function of_teleTo(target)
+local OF_TELE_MIN = 40   -- dưới 40 studs → đi bộ
+
+local function of_teleTo(target)
     local hrp = of_root()
     if not hrp then return false end
-    setStatus("tele")
+
+    local dist = (target - hrp.Position).Magnitude
+    if dist < OF_TELE_MIN then
+        return of_walkTo(target, 3, 15, false, false)
+    end
+
+    setStatus("tele xa (" .. math.floor(dist) .. ")")
     hrp.CFrame = CFrame.new(target)
     task.wait(0.6)
     return true
 end
 
 local function of_teleNear(target, offsetDist)
-    -- tele tới vị trí cách target offsetDist, quay mặt vào target
     local hrp = of_root()
     if not hrp then return false end
+
+    local dist = (target - hrp.Position).Magnitude
+    if dist < OF_TELE_MIN then
+        return of_walkTo(target, offsetDist or 4, 15, false, false)
+    end
 
     local dir = (target - hrp.Position)
     dir = Vector3.new(dir.X, 0, dir.Z)
     if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
     dir = dir.Unit
-
     local landPos = target - dir * (offsetDist or 4)
     landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
-    setStatus("tele gần")
+    setStatus("tele xa (" .. math.floor(dist) .. ")")
     hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, target.Z))
     task.wait(0.6)
     return true
