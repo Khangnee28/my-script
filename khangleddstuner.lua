@@ -2793,28 +2793,22 @@ end
         return of_sitAtChair()
     end
 
-        -- tele cạnh ghế 3 studs
-    setStatus("tele cạnh ghế")
-    hrp = of_root()
-    if not hrp then return false end
+-- tele vào TÂM ghế, cao hơn 2 studs để rơi xuống overlap
+setStatus("tele tâm ghế")
+hrp = of_root()
+if not hrp then return false end
 
-    local toSeat = (seat.Position - hrp.Position)
-    toSeat = Vector3.new(toSeat.X, 0, toSeat.Z)
-    if toSeat.Magnitude < 0.5 then toSeat = Vector3.new(1, 0, 0) end
-    toSeat = toSeat.Unit
+local landPos = seat.Position + Vector3.new(0, 2, 0)
+hrp.CFrame = CFrame.new(landPos)
+task.wait(0.7)
 
-    local standPos = seat.Position - toSeat * 3
-    standPos = Vector3.new(standPos.X, seat.Position.Y, standPos.Z)
-    hrp.CFrame = CFrame.new(standPos, Vector3.new(seat.Position.X, standPos.Y, seat.Position.Z))
-    task.wait(0.8)
+h = of_humanoid()
+if h and h.Sit then return true end
 
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    -- ép Humanoid.Sit = true
-    setStatus("ép Sit")
-    pcall(function() h.Sit = true end)
-    task.wait(1.2)
+-- ép Humanoid.Sit = true ngay tại tâm ghế
+setStatus("ép Sit")
+pcall(function() h.Sit = true end)
+task.wait(1.2)
 
     h = of_humanoid()
     if h and h.Sit then return true end
