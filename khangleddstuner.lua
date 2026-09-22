@@ -2596,7 +2596,7 @@ local function of_teleNear(target, offsetDist)
     task.wait(0.6)
     return true
 end
-local function of_sitAtNearestChair(fromPos)
+
 local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
     if not h then return false end
