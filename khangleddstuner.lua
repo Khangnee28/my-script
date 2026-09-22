@@ -2808,6 +2808,7 @@ end
 
 h = of_humanoid()
 return (h and h.Sit) or false
+end
 
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
