@@ -2597,6 +2597,7 @@ local function of_teleNear(target, offsetDist)
     return true
 end
 local function of_sitAtNearestChair(fromPos)
+local function of_sitAtNearestChair(fromPos)
     local h = of_humanoid()
     if not h then return false end
     if h.Sit then return true end
@@ -2610,36 +2611,35 @@ local function of_sitAtNearestChair(fromPos)
         return of_sitAtChair()
     end
 
-    setStatus("tele vào ghế gần")
+    -- tele cạnh ghế 3 studs
+    setStatus("tele cạnh ghế")
     hrp = of_root()
     if not hrp then return false end
-    hrp.CFrame = CFrame.new(seat.Position)
-    task.wait(1.5)
+
+    local toSeat = (seat.Position - hrp.Position)
+    toSeat = Vector3.new(toSeat.X, 0, toSeat.Z)
+    if toSeat.Magnitude < 0.5 then toSeat = Vector3.new(1, 0, 0) end
+    toSeat = toSeat.Unit
+
+    local standPos = seat.Position - toSeat * 3
+    standPos = Vector3.new(standPos.X, seat.Position.Y, standPos.Z)
+    hrp.CFrame = CFrame.new(standPos, Vector3.new(seat.Position.X, standPos.Y, seat.Position.Z))
+    task.wait(0.8)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
--- không ngồi → walk ngang 6 studs (trái/phải random) rồi vào lại
-setStatus("né ngang rồi vào lại")
-local hrp2 = of_root()
-if hrp2 then
-    local forward = (seat.Position - hrp2.Position)
-    forward = Vector3.new(forward.X, 0, forward.Z)
-    if forward.Magnitude < 0.1 then forward = Vector3.new(1, 0, 0) end
-    forward = forward.Unit
+    -- ép Humanoid.Sit = true — local API, game tự gán vào seat gần nhất
+    setStatus("ép Sit")
+    pcall(function() h.Sit = true end)
+    task.wait(1.2)
 
-    local perp = Vector3.new(-forward.Z, 0, forward.X)
-    local sideDir = (math.random(1, 2) == 1) and 1 or -1
-    local sidePos = hrp2.Position + perp * sideDir * 6
-
-    of_walkTo(sidePos, 1.5, 6, false, false)
-    task.wait(0.3)
-end
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    of_walkTo(seat.Position, 1.5, 10, true, false)
-    task.wait(1.5)
+    -- thử lần 2 với ChangeState
+    pcall(function() h:ChangeState(Enum.HumanoidStateType.Seated) end)
+    task.wait(1.0)
 
     h = of_humanoid()
     if h and h.Sit then return true end
@@ -2799,39 +2799,35 @@ end
         return of_sitAtChair()
     end
 
-    setStatus("tele vào ghế gần")
+        -- tele cạnh ghế 3 studs
+    setStatus("tele cạnh ghế")
     hrp = of_root()
     if not hrp then return false end
-    hrp.CFrame = CFrame.new(seat.Position)
-    task.wait(1.5)
+
+    local toSeat = (seat.Position - hrp.Position)
+    toSeat = Vector3.new(toSeat.X, 0, toSeat.Z)
+    if toSeat.Magnitude < 0.5 then toSeat = Vector3.new(1, 0, 0) end
+    toSeat = toSeat.Unit
+
+    local standPos = seat.Position - toSeat * 3
+    standPos = Vector3.new(standPos.X, seat.Position.Y, standPos.Z)
+    hrp.CFrame = CFrame.new(standPos, Vector3.new(seat.Position.X, standPos.Y, seat.Position.Z))
+    task.wait(0.8)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- không ngồi → walk ngang 6 studs (random trái/phải) rồi vào lại
-    setStatus("né ngang rồi vào lại")
-    local hrp2 = of_root()
-    if hrp2 then
-        local forward = (seat.Position - hrp2.Position)
-        forward = Vector3.new(forward.X, 0, forward.Z)
-        if forward.Magnitude < 0.1 then forward = Vector3.new(1, 0, 0) end
-        forward = forward.Unit
-
-        -- vector vuông góc (trái hoặc phải)
-        local perp = Vector3.new(-forward.Z, 0, forward.X)
-        local sideDir = (math.random(1, 2) == 1) and 1 or -1
-        local sidePos = hrp2.Position + perp * sideDir * 6
-
-        of_walkTo(sidePos, 1.5, 6, false, false)
-        task.wait(0.3)
-    end
+    -- ép Humanoid.Sit = true
+    setStatus("ép Sit")
+    pcall(function() h.Sit = true end)
+    task.wait(1.2)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- walk vào ghế lại
-    of_walkTo(seat.Position, 1.5, 10, true, false)
-    task.wait(1.5)
+    -- fallback ChangeState
+    pcall(function() h:ChangeState(Enum.HumanoidStateType.Seated) end)
+    task.wait(1.0)
 
     h = of_humanoid()
     if h and h.Sit then return true end
@@ -2839,7 +2835,6 @@ end
     setStatus("fail → về CHAIR_POS")
     return of_sitAtChair()
 end
-
      
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
