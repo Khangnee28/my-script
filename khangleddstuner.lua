@@ -2747,8 +2747,8 @@ local function of_sitAtNearestChair(fromPos)
 
     local hrp = of_root()
     local pos = hrp and hrp.Position or fromPos or CHAIR_POS
-    local seat = of_findNearestSeat(pos, 30)
-        or of_findNearestSeat(pos, 80)
+    local seat = of_findNearestSeat(pos, 85)
+        
 
     if not seat then
         setStatus("không có ghế gần")
