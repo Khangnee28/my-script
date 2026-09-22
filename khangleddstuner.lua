@@ -2825,9 +2825,10 @@ task.wait(1.0)
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    setStatus("không ngồi → về CHAIR_POS")
-    return of_sitAtChair()
-end    
+        setStatus("không ngồi — bỏ")
+    task.wait(2)
+    return false
+end
      
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
