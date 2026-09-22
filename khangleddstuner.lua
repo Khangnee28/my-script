@@ -2561,6 +2561,42 @@ end
     
 local OF_TELE_MIN = 40   -- dưới 40 studs → đi bộ
 
+local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
+    stopDist = stopDist or 3
+    timeout = timeout or 20
+    local deadline = os.clock() + timeout
+    local reached = false
+
+    pcall(function()
+        while os.clock() < deadline and farmOffice do
+            local h = of_humanoid()
+            local hrp = of_root()
+            if not h or not hrp then break end
+
+            if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
+                if allowSit then break
+                else of_standUp() end
+            end
+
+            local delta = target - hrp.Position
+            local flat = Vector3.new(delta.X, 0, delta.Z)
+            if flat.Magnitude <= stopDist then
+                reached = true
+                break
+            end
+
+            h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+            task.wait(0.15)
+        end
+    end)
+
+    local h = of_humanoid()
+    local hrp = of_root()
+    if h and hrp then
+        h:MoveTo(hrp.Position)
+    end
+    return reached
+end
 local function of_teleTo(target)
     local hrp = of_root()
     if not hrp then return false end
@@ -2582,7 +2618,11 @@ local function of_teleNear(target, offsetDist)
 
     local dist = (target - hrp.Position).Magnitude
     if dist < OF_TELE_MIN then
-        return of_walkTo(target, offsetDist or 4, 15, false, false)
+        -- thử walk
+        local ok = of_walkTo(target, offsetDist or 4, 5, false, false)
+        if ok then return true end
+        -- walk fail → tele
+        setStatus("walk fail → tele")
     end
 
     local dir = (target - hrp.Position)
