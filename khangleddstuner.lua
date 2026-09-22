@@ -2779,26 +2779,7 @@ local function of_sitAtNearestChair(fromPos)
     return (h and h.Sit) or false
 end
 
-    setStatus("đi bộ về ghế")
-    of_walkTo(CHAIR_POS, 4, 30, true, false)
-    task.wait(0.3)
-
-    -- tìm ghế gần, ép sit
-    local hrp = of_root()
-    local pos = hrp and hrp.Position or CHAIR_POS
-    local seat = of_findNearestSeat(pos, 30)
-        or of_findNearestSeat(CHAIR_POS, 30)
-    if seat and hrp and (seat.Position - hrp.Position).Magnitude < 8 then
-        local h = of_humanoid()
-        if h and not h.Sit then
-            pcall(function() seat:Sit(h) end)
-            task.wait(0.5)
-        end
-    end
-
-    local h = of_humanoid()
-    return (h and h.Sit) or false
-end
+     
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
         if not Computers then return end
