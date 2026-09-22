@@ -2625,22 +2625,10 @@ local function of_sitAtChair()
     local h = of_humanoid()
     if h and h.Sit then return true end
 
-    local seat = of_findNearestSeat(CHAIR_POS, 20)
-    local target = seat and seat.Position or CHAIR_POS
+    local hrp = of_root()
+    if not hrp then return false end
 
-    setStatus("đi vào ghế")
-    of_walkTo(target, 1.5, 25, true, false)
-    task.wait(1.0)
-
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    task.wait(1.0)
-    h = of_humanoid()
-    return (h and h.Sit) or false
-end
-
-    -- 1 lần duy nhất: ở spawn xa thì tele, sau đó đi bộ hết
+    -- tele lần đầu nếu ở xa
     if not of_initialTeleDone then
         local dist = (hrp.Position - CHAIR_POS).Magnitude
         if dist > 500 then
@@ -2654,18 +2642,20 @@ end
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    setStatus("đi bộ tới ghế")
-    of_walkTo(CHAIR_POS, 3, 90, true, false)
-    task.wait(0.3)
+    -- tìm ghế thật gần CHAIR_POS
+    local seat = of_findNearestSeat(CHAIR_POS, 20)
+    local target = seat and seat.Position or CHAIR_POS
+
+    -- đi sát vào tâm ghế, stopDist 1.5 để overlap
+    setStatus("đi vào ghế")
+    of_walkTo(target, 1.5, 25, true, false)
+    task.wait(1.2)   -- chờ game auto-sit
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    local seat = of_findNearestSeat(CHAIR_POS, 20)
-    if seat and h then
-        pcall(function() seat:Sit(h) end)
-        task.wait(0.5)
-    end
+    -- không auto-sit → chờ thêm 1s
+    task.wait(1.0)
     h = of_humanoid()
     return (h and h.Sit) or false
 end
