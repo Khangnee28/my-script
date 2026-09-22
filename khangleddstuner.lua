@@ -2697,10 +2697,16 @@ local function of_sitAtChair()
         setStatus("đi bộ tới ghế cố định")
         local ok = of_walkTo(target, 1.5, 8, true, false)
 if not ok then
-    setStatus("walk fail → skip")
-    return false
+    -- walk fail → tele thẳng về CHAIR_POS
+    setStatus("walk fail → tele CHAIR_POS")
+    hrp = of_root()
+    if hrp then
+        hrp.CFrame = CFrame.new(CHAIR_POS)
+        task.wait(1.5)
+    end
+else
+    task.wait(1.0)
 end
-task.wait(1.0)
         
     end
 
@@ -2825,9 +2831,8 @@ task.wait(1.0)
     h = of_humanoid()
     if h and h.Sit then return true end
 
-        setStatus("không ngồi — bỏ")
-    task.wait(2)
-    return false
+            setStatus("fail → về CHAIR_POS")
+    return of_sitAtChair()
 end
      
 local function of_doPrint(name)
