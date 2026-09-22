@@ -2762,7 +2762,7 @@ local function of_sitAtNearestChair(fromPos)
 
     -- thử bán kính tăng dần: 40 → 80 → 150
     local seat = of_findNearestSeat(pos, 90)
-        
+
     
 
     if not seat then
@@ -2786,6 +2786,28 @@ if hrp then
         of_walkTo(CHAIR_POS, 4, 20, true, false)
     end
 end
+h = of_humanoid()
+if h and h.Sit then return true end
+
+-- gần ghế → ép sit
+local hrp2 = of_root()
+if seat and h and not h.Sit then
+    if hrp2 and (seat.Position - hrp2.Position).Magnitude < 6 then
+        pcall(function() seat:Sit(h) end)
+        task.wait(0.5)
+    else
+        of_walkTo(seat.Position, 4, 15, true, false)
+        task.wait(0.3)
+        h = of_humanoid()
+        if h and not h.Sit then
+            pcall(function() seat:Sit(h) end)
+            task.wait(0.4)
+        end
+    end
+end
+
+h = of_humanoid()
+return (h and h.Sit) or false
 
 local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
