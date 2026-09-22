@@ -2651,42 +2651,31 @@ local function of_sitAtNearestChair(fromPos)
         return of_sitAtChair()
     end
 
-    -- tele vào TÂM ghế, cao hơn 2 studs để rơi xuống overlap
-setStatus("tele tâm ghế")
-hrp = of_root()
-if not hrp then return false end
-
-local landPos = seat.Position + Vector3.new(0, 2, 0)
-hrp.CFrame = CFrame.new(landPos)
-task.wait(0.7)
-
-h = of_humanoid()
-if h and h.Sit then return true end
-
--- check HRP có thật sự chạm ghế không (trong 2.5 studs)
-hrp = of_root()
-if not hrp then return false end
-local distToSeat = (hrp.Position - seat.Position).Magnitude
-
-if distToSeat < 2.5 then
-    setStatus("ép Sit")
-    pcall(function() h.Sit = true end)
-    task.wait(1.2)
-else
-    setStatus("xa ghế " .. math.floor(distToSeat) .. " → skip")
-    return of_sitAtChair()
-end
+    -- tele tới tâm ghế, Y+2 để rơi overlap
+    setStatus("tele tâm ghế")
+    hrp = of_root()
+    if not hrp then return false end
+    hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
+    task.wait(1.5)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- thử lần 2 với ChangeState
-    pcall(function() h:ChangeState(Enum.HumanoidStateType.Seated) end)
-    task.wait(1.0)
+    -- không auto-sit → check HRP có ở gần tâm ghế không
+    hrp = of_root()
+    if not hrp then return false end
+    local distToSeat = (hrp.Position - seat.Position).Magnitude
 
-    h = of_humanoid()
-    if h and h.Sit then return true end
+    if distToSeat < 2.5 then
+        -- đứng đúng tâm → ép Sit lần cuối
+        setStatus("đúng tâm — ép Sit")
+        pcall(function() h.Sit = true end)
+        task.wait(1.2)
+        h = of_humanoid()
+        if h and h.Sit then return true end
+    end
 
+    -- fail → về ghế cố định
     setStatus("fail → về CHAIR_POS")
     return of_sitAtChair()
 end
