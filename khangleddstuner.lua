@@ -2802,37 +2802,38 @@ local function of_sitAtNearestChair(fromPos)
     local hrp = of_root()
     local pos = hrp and hrp.Position or fromPos or CHAIR_POS
 
-    local seat = of_findNearestSeat(pos, 120)
+    local seat = of_findNearestSeat(pos, 250)
     if not seat then
-        setStatus("không có ghế → về CHAIR_POS")
-        return of_sitAtChair()
+        setStatus("không có ghế")
+        return false
     end
 
+    -- tele tâm ghế + Y 3
+    setStatus("tele ghế")
     hrp = of_root()
     if not hrp then return false end
-    local dist = (seat.Position - hrp.Position).Magnitude
-
-    if dist > 60 then
-        setStatus("tele ghế (" .. math.floor(dist) .. ")")
-        hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-    else
-        setStatus("đi bộ tới ghế (" .. math.floor(dist) .. ")")
-        local ok = of_walkTo(seat.Position, 1.5, 8, true, false)
-h = of_humanoid()
-if h and h.Sit then return true end
-if not ok then
-    setStatus("walk fail → về CHAIR_POS")
-    return of_sitAtChair()
-end
-task.wait(1.0)
-    end
+    hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 3, 0))
+    task.wait(2.5)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-            setStatus("fail → về CHAIR_POS")
-    return of_sitAtChair()
+    -- check đứng trong 4 studs tâm ghế
+    hrp = of_root()
+    if hrp then
+        local d = (hrp.Position - seat.Position).Magnitude
+        if d < 4 then
+            setStatus("đúng tâm — ép Sit")
+            pcall(function() h.Sit = true end)
+            task.wait(1.5)
+            h = of_humanoid()
+            if h and h.Sit then return true end
+        else
+            setStatus("xa ghế " .. math.floor(d))
+        end
+    end
+
+    return false
 end
      
 local function of_doPrint(name)
