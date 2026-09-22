@@ -2574,9 +2574,13 @@ local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
             if not h or not hrp then break end
 
             if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-                if allowSit then break
-                else of_standUp() end
-            end
+    if allowSit then
+        reached = true
+        break
+    else
+        of_standUp()
+    end
+end
 
             local delta = target - hrp.Position
             local flat = Vector3.new(delta.X, 0, delta.Z)
@@ -2817,8 +2821,10 @@ local function of_sitAtNearestChair(fromPos)
     else
         setStatus("đi bộ tới ghế (" .. math.floor(dist) .. ")")
         local ok = of_walkTo(seat.Position, 1.5, 5, true, false)
-        if not ok then
-            setStatus("walk fail → tele")
+h = of_humanoid()
+if h and h.Sit then return true end
+if not ok then
+    setStatus("walk fail → tele")
             hrp = of_root()
             if hrp then
                 hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
