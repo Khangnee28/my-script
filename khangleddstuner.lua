@@ -2766,14 +2766,15 @@ local function of_findNearestUntriedSeat(pos, radius, tried)
     for _, p in ipairs(parts) do
         if (p:IsA("Seat") or p:IsA("VehicleSeat"))
            and p.Occupant == nil
-           and not tried[p] then
+           and not tried[p]
+and p ~= OF_SKIP_SEAT then
             local d = (p.Position - pos).Magnitude
-if d >= 30 and d < bestD then best, bestD = p, d end        end
+if d < bestD then best, bestD = p, d end        end
     end
     return best
 end
 local of_initialTeleDone = false
-
+local OF_SKIP_SEAT = nil
 
 local function of_sitAtChair(searchFrom)
     local h = of_humanoid()
@@ -2794,7 +2795,10 @@ local function of_sitAtChair(searchFrom)
     end
 
     h = of_humanoid()
-    if h and h.Sit then return true end
+if h and h.Sit then
+    OF_SKIP_SEAT = nil
+    return true
+end
 
     -- loop vô hạn: thử mọi ghế trống cho tới khi ngồi được
     local tried = {}
@@ -2909,11 +2913,17 @@ end
     return
 end
         setStatus("ngồi ghế, chờ câu hỏi")
-        local idleStart = os.clock()
-        while farmOffice do
-            if of_printAssigned then break end
-            if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
-                local q = of_pendingQuestion
+local idleStart = os.clock()
+local noQuestionStart = os.clock()
+while farmOffice do
+    if of_printAssigned then break end
+
+    -- có câu hỏi → reset timer
+    if of_pendingQuestion then
+        noQuestionStart = os.clock()
+    end
+
+    if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then                local q = of_pendingQuestion
                 of_pendingQuestion = nil
                 of_fireAnswer(q)
                 setStatus("đã giải")
@@ -2929,9 +2939,23 @@ end
                 end
                 idleStart = os.clock()
             end
-            if os.clock() - idleStart > 60 then break end
-            task.wait(0.2)
+                -- 5s không câu hỏi mới → đứng lên, đổi ghế
+    if os.clock() - noQuestionStart > 5
+       and not of_pendingQuestion
+       and not of_awaitingAck then
+        setStatus("5s không câu hỏi — đổi ghế")
+        local hh = of_humanoid()
+        if hh and hh.Sit then
+            OF_SKIP_SEAT = hh.SeatPart
+            pcall(function() hh.Sit = false end)
+            task.wait(0.5)
         end
+        break
+    end
+
+    if os.clock() - idleStart > 60 then break end
+    task.wait(0.2)
+end
         if farmOffice and of_printAssigned then
 if not Computers then return end
             of_doPrint(of_printAssigned)
