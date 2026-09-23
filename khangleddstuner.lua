@@ -2676,6 +2676,8 @@ local function of_findSeatAtDist(pos, minDist, maxDist)
     table.sort(out, function(a, b) return a.dist < b.dist end)
     return out[1].seat
 end
+local of_initialTeleDone = false
+local OF_SKIPPED_SEATS = {}
 local function of_findNearestUntriedSeat(pos, radius, tried)
     local ok, parts = pcall(function()
         return workspace:GetPartBoundsInRadius(pos, radius or 350)
@@ -2693,8 +2695,7 @@ if d < bestD then best, bestD = p, d end        end
     end
     return best
 end
-local of_initialTeleDone = false
-local OF_SKIPPED_SEATS = {}
+
 
 local function of_sitAtChair(searchFrom)
     local h = of_humanoid()
@@ -3040,7 +3041,7 @@ if readfile and isfile and isfile("farmState.txt") then
         
             pcall(function()
     firesignal(farmSwitch.track.MouseButton1Click)
-end)
+
         end)
     end
 end
