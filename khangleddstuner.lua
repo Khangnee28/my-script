@@ -1384,7 +1384,7 @@ local function sunSet(on, intensity)
     rejoinNote.TextWrapped = true
 
             -- AUTO EXECUTE: chỉ tự load script khi vào game mới
-    makeToggle(rejoinSection, 2, false, "🔄 AUTO EXECUTE: BẬT", "🔄 AUTO EXECUTE: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+    makeToggle(rejoinSection, 2, readflag"🔄 AUTO EXECUTE: BẬT", "🔄 AUTO EXECUTE: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoExecute.txt", v and "1" or "0") end
         if v and queue_on_teleport then
             pcall(queue_on_teleport, [[
@@ -1394,7 +1394,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
     end)
 
     -- AUTO REJOIN: chỉ tự vào lại game khi bị kick
-    makeToggle(rejoinSection, 3, false, "🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
+    makeToggle(rejoinSection, 3, readflag"🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
@@ -3059,44 +3059,55 @@ if readfile and isfile then
     end
 end
 
+-- Auto Rejoin: cooldown 2 phút + check popup chính xác
 if _autoRejoin then
     task.spawn(function()
+        -- đọc timestamp lần rejoin trước
+        local lastAttempt = 0
+        if readfile and isfile and isfile("lastRejoin.txt") then
+            local ok, v = pcall(readfile, "lastRejoin.txt")
+            if ok then lastAttempt = tonumber(v) or 0 end
+        end
+
         while true do
-            task.wait(2)
-            local lp = game.Players.LocalPlayer
-            local c = lp and lp.Character
+            task.wait(3)
 
-            local shouldRejoin = false
+            -- cooldown 120s
+            if os.time() - lastAttempt < 120 then
+                -- trong cooldown, bỏ qua
+            else
+                local shouldRejoin = false
 
-            -- 1) char mất
-            if not c then shouldRejoin = true end
+                -- char mất
+                local c = game.Players.LocalPlayer.Character
+                if not c then shouldRejoin = true end
 
-            -- 2) LocalPlayer bị remove
-            if lp and not lp.Parent then shouldRejoin = true end
-
-            -- 3) quét popup "Mất kết nối" / "Disconnected" trong CoreGui
-            if not shouldRejoin then
-                pcall(function()
-                    local cg = game:GetService("CoreGui")
-                    for _, d in ipairs(cg:GetDescendants()) do
-                        if d:IsA("TextLabel") and d.Text ~= "" then
-                            local t = d.Text
-                            if t:find("Mất kết nối") or t:find("Disconnected")
-                               or t:find("kết nối") or t:find("Connection") then
-                                shouldRejoin = true
-                                return
+                -- check popup "Mất kết nối" chính xác
+                if not shouldRejoin then
+                    pcall(function()
+                        local cg = game:GetService("CoreGui")
+                        for _, d in ipairs(cg:GetDescendants()) do
+                            if d:IsA("TextLabel") then
+                                local t = d.Text
+                                if t == "Mất kết nối" or t:find("Disconnected")
+                                   or t == "Kết nối bị mất" then
+                                    shouldRejoin = true
+                                    return
+                                end
                             end
                         end
-                    end
-                end)
-            end
+                    end)
+                end
 
-            if shouldRejoin then
-                task.wait(1)
-                pcall(function()
-                    game:GetService("TeleportService"):Teleport(game.PlaceId)
-                end)
-                task.wait(5)
+                if shouldRejoin then
+                    lastAttempt = os.time()
+                    if writefile then
+                        pcall(writefile, "lastRejoin.txt", tostring(lastAttempt))
+                    end
+                    pcall(function()
+                        game:GetService("TeleportService"):Teleport(game.PlaceId)
+                    end)
+                end
             end
         end
     end)
