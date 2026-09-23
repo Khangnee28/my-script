@@ -996,8 +996,7 @@ end)
     fcOpenBtn.ZIndex = 13
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
-
-        -- SETTINGS (v15) — collapsible sections
+            -- SETTINGS (v15) — collapsible sections
     local settingsScroll = Instance.new("ScrollingFrame")
     settingsScroll.Size = UDim2.new(1, 0, 1, 0)
     settingsScroll.BackgroundTransparency = 1
@@ -1016,6 +1015,60 @@ end)
     settingsPad.PaddingLeft = UDim.new(0, 4)
     settingsPad.PaddingRight = UDim.new(0, 4)
     settingsPad.PaddingBottom = UDim.new(0, 8)
+    local function parseHex(str)
+    local input = (str or ""):gsub("^#", "")
+    if #input ~= 6 then return nil end
+    local r = tonumber(input:sub(1,2), 16)
+    local g = tonumber(input:sub(3,4), 16)
+    local b = tonumber(input:sub(5,6), 16)
+    if not (r and g and b) then return nil end
+    return Color3.fromRGB(r, g, b), input:upper()
+end
+local QUAL = {
+    Enum.SavedQualitySetting.QualityLevel1,
+    Enum.SavedQualitySetting.QualityLevel2,
+    Enum.SavedQualitySetting.QualityLevel3,
+    Enum.SavedQualitySetting.QualityLevel4,
+    Enum.SavedQualitySetting.QualityLevel5,
+    Enum.SavedQualitySetting.QualityLevel6,
+    Enum.SavedQualitySetting.QualityLevel7,
+    Enum.SavedQualitySetting.QualityLevel8,
+    Enum.SavedQualitySetting.QualityLevel9,
+    Enum.SavedQualitySetting.QualityLevel10,
+}
+local function setQualityLevel(idx)
+    pcall(function()
+        if idx == nil then
+            UserSettings().GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.Automatic
+        else
+            UserSettings().GameSettings.SavedQualityLevel = QUAL[idx]
+        end
+    end)
+end
+local function bloomSet(on, intensity, threshold)
+    pcall(function()
+        local b = Lighting:FindFirstChild("KhangLeBloom")
+        if not b then
+            b = Instance.new("BloomEffect", Lighting)
+            b.Name = "KhangLeBloom"
+        end
+        b.Enabled = on
+        if intensity then b.Intensity = intensity end
+        if threshold then b.Threshold = threshold end
+    end)
+end
+local function sunSet(on, intensity)
+    pcall(function()
+        local s = Lighting:FindFirstChild("KhangLeSun")
+        if not s then
+            s = Instance.new("SunRaysEffect", Lighting)
+            s.Name = "KhangLeSun"
+        end
+        s.Enabled = on
+        if intensity then s.Intensity = intensity end
+    end)
+    end
+
 
     local function makeSection(order, title, defaultOpen)
         local section = Instance.new("Frame", settingsScroll)
@@ -1322,7 +1375,8 @@ end)
     rejoinNote.Size = UDim2.new(1, 0, 0, 28)
     rejoinNote.LayoutOrder = 1
     rejoinNote.BackgroundTransparency = 1
-    rejoinNote.Text = "Auto Execute: tự load script khi vào game mới\nAuto Rejoin: tự vào lại khi bị kick\n2 chức năng độc lập" rejoinNote.TextColor3 = Color3.fromRGB(160, 170, 190)
+    rejoinNote.Text = "Auto Execute: tự load script khi vào game mới\nAuto Rejoin: tự vào lại khi bị kick\n2 chức năng độc lập" 
+    rejoinNote.TextColor3 = Color3.fromRGB(160, 170, 190)
     rejoinNote.TextSize = 9
     rejoinNote.Font = Enum.Font.GothamMedium
     rejoinNote.TextXAlignment = Enum.TextXAlignment.Left
@@ -2223,6 +2277,7 @@ end
     local OF_FLY_TIMEOUT = 240
     local OF_FLY_ONLY_DIST = 150
     local CHAIR_POS = Vector3.new(-5902.42, 2.71, -228.54)
+    local PATTERN = { "CHOICE", "QID" }
     local UUID_PAT = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
     local of_phasing = false
     local of_activeBV = nil
@@ -2982,8 +3037,10 @@ if readfile and isfile and isfile("farmState.txt") then
     local ok, v = pcall(readfile, "farmState.txt")
     if ok and v == "1" then
         task.wait(6)   -- chờ UI + JobEvents load
-        pcall(function()
-            farmSwitch.track.MouseButton1Click:Fire()
+        
+            pcall(function()
+    firesignal(farmSwitch.track.MouseButton1Click)
+end)
         end)
     end
 end
