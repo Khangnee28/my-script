@@ -3119,20 +3119,34 @@ if _autoRejoin then
         end
     end)
 end
--- sau rejoin < 60s → fire menuToggleRequest (tránh lỗi spawn)
-if readfile and isfile and isfile("lastRejoin.txt") then
-    local ok, v = pcall(readfile, "lastRejoin.txt")
-    if ok then
-        local t = tonumber(v) or 0
-        if os.time() - t < 60 then
-            task.spawn(function()
-                task.wait(3)
-                pcall(function()
-                    game:GetService("ReplicatedStorage")
-                        :WaitForChild("menuToggleRequest", 5)
-                        :FireServer()
-                end)
+-- Bước 1: fire menuToggleRequest để vào game
+task.spawn(function()
+    task.wait(3)   -- chờ script + UI load
+    pcall(function()
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("menuToggleRequest", 5)
+            :FireServer()
+    end)
+
+    -- Bước 2: chờ vào game (char spawn) tối đa 30s
+    local deadline = os.clock() + 30
+    while os.clock() < deadline do
+        local c = game.Players.LocalPlayer.Character
+        if c and c:FindFirstChild("HumanoidRootPart") then
+            break
+        end
+        task.wait(0.5)
+    end
+
+    task.wait(3)   -- chờ UI game load xong
+
+    -- Bước 3: bật farm nếu flag = "1"
+    if readfile and isfile and isfile("farmState.txt") then
+        local ok, v = pcall(readfile, "farmState.txt")
+        if ok and v == "1" then
+            pcall(function()
+                firesignal(farmSwitch.track.MouseButton1Click)
             end)
         end
     end
-end
+end)
