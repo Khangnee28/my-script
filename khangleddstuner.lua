@@ -1015,6 +1015,13 @@ end)
     settingsPad.PaddingLeft = UDim.new(0, 4)
     settingsPad.PaddingRight = UDim.new(0, 4)
     settingsPad.PaddingBottom = UDim.new(0, 8)
+    local function readFlag(fname)
+    if readfile and isfile and isfile(fname) then
+        local ok, v = pcall(readfile, fname)
+        if ok and v == "1" then return true end
+    end
+    return false
+    end
     local function parseHex(str)
     local input = (str or ""):gsub("^#", "")
     if #input ~= 6 then return nil end
@@ -1384,7 +1391,7 @@ local function sunSet(on, intensity)
     rejoinNote.TextWrapped = true
 
             -- AUTO EXECUTE: chỉ tự load script khi vào game mới
-    makeToggle(rejoinSection, 2, readflag"🔄 AUTO EXECUTE: BẬT", "🔄 AUTO EXECUTE: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+    makeToggle(rejoinSection, 2, readFlag"🔄 AUTO EXECUTE: BẬT", "🔄 AUTO EXECUTE: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoExecute.txt", v and "1" or "0") end
         if v and queue_on_teleport then
             pcall(queue_on_teleport, [[
@@ -1394,7 +1401,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
     end)
 
     -- AUTO REJOIN: chỉ tự vào lại game khi bị kick
-    makeToggle(rejoinSection, 3, readflag"🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
+    makeToggle(rejoinSection, 3, readFlag"🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
