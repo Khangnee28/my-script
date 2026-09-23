@@ -2657,95 +2657,7 @@ end
     
     
     
-local function of_findSeatAtDist(pos, minDist, maxDist)
-    local out = {}
-    local ok, parts = pcall(function()
-        return workspace:GetPartBoundsInRadius(pos, maxDist or 250)
-    end)
-    if not ok or not parts then return nil end
 
-    for _, p in ipairs(parts) do
-        if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
-            local d = (p.Position - pos).Magnitude
-            if d >= (minDist or 60) then
-                table.insert(out, { seat = p, dist = d })
-            end
-        end
-    end
-    if #out == 0 then return nil end
-    table.sort(out, function(a, b) return a.dist < b.dist end)
-    return out[1].seat
-end
-
-local of_initialTeleDone = false
-
-
-local function of_sitAtChair()
-    local h = of_humanoid()
-    if h and h.Sit then return true end
-
-    local hrp = of_root()
-    if not hrp then return false end
-
-    -- tele lần đầu khi ở xa
-    if not of_initialTeleDone then
-        local dist = (hrp.Position - CHAIR_POS).Magnitude
-        if dist > 500 then
-            setStatus("tele lần đầu")
-            hrp.CFrame = CFrame.new(CHAIR_POS)
-            task.wait(1.0)
-        end
-        of_initialTeleDone = true
-    end
-
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    hrp = of_root()
-    if not hrp then return false end
-
-    local seat = of_findNearestSeat(CHAIR_POS, 250)
-    local target = seat and seat.Position or CHAIR_POS
-    local dist = (target - hrp.Position).Magnitude
-
-    if dist > 60 then
-        setStatus("tele ghế (" .. math.floor(dist) .. ")")
-        hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-    else
-        setStatus("walk ghế (" .. math.floor(dist) .. ")")
-        local ok = of_walkTo(target, 1.5, 5, true, false)
-        if not ok then
-            setStatus("walk fail → tele")
-            hrp = of_root()
-            if hrp then
-                hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-                task.wait(1.5)
-            end
-        else
-            task.wait(1.0)
-        end
-    end
-
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    -- không auto-sit → tìm ghế khác >60 studs
-    setStatus("không sit → tìm ghế xa")
-    hrp = of_root()
-    if not hrp then return false end
-
-    local farSeat = of_findSeatAtDist(hrp.Position, 60, 250)
-    if farSeat then
-        setStatus("tele ghế xa")
-        hrp.CFrame = CFrame.new(farSeat.Position + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-        h = of_humanoid()
-        if h and h.Sit then return true end
-    end
-
-    return false
-end
         
     local function of_solve(q)
         if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then
@@ -2844,17 +2756,34 @@ local function of_findSeatAtDist(pos, minDist, maxDist)
     table.sort(out, function(a, b) return a.dist < b.dist end)
     return out[1].seat
 end
+local function of_findNearestUntriedSeat(pos, radius, tried)
+    local ok, parts = pcall(function()
+        return workspace:GetPartBoundsInRadius(pos, radius or 250)
+    end)
+    if not ok or not parts then return nil end
+
+    local best, bestD = nil, math.huge
+    for _, p in ipairs(parts) do
+        if (p:IsA("Seat") or p:IsA("VehicleSeat"))
+           and p.Occupant == nil
+           and not tried[p] then
+            local d = (p.Position - pos).Magnitude
+            if d < bestD then best, bestD = p, d end
+        end
+    end
+    return best
+end
 local of_initialTeleDone = false
 
 
-local function of_sitAtChair()
+local function of_sitAtChair(searchFrom)
     local h = of_humanoid()
     if h and h.Sit then return true end
 
     local hrp = of_root()
     if not hrp then return false end
 
-    -- tele lần đầu khi ở xa
+    -- tele lần đầu khi ở xa (spawn)
     if not of_initialTeleDone then
         local dist = (hrp.Position - CHAIR_POS).Magnitude
         if dist > 500 then
@@ -2868,45 +2797,32 @@ local function of_sitAtChair()
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    hrp = of_root()
-    if not hrp then return false end
+    -- loop vô hạn: thử mọi ghế trống cho tới khi ngồi được
+    local tried = {}
 
-    local seat = of_findNearestSeat(CHAIR_POS, 250)
-    local target = seat and seat.Position or CHAIR_POS
-    local dist = (target - hrp.Position).Magnitude
+    while farmOffice do
+        hrp = of_root()
+        if not hrp then return false end
 
-    if dist > 60 then
-        setStatus("tele ghế (" .. math.floor(dist) .. ")")
-        hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-    else
-        setStatus("walk ghế (" .. math.floor(dist) .. ")")
-        local ok = of_walkTo(target, 1.5, 5, true, false)
-        if not ok then
-            setStatus("walk fail → tele")
-            hrp = of_root()
-            if hrp then
-                hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-                task.wait(1.5)
+        local seat = of_findNearestUntriedSeat(hrp.Position, 250, tried)
+        if not seat then
+            -- hết ghế chưa thử → reset danh sách, thử lại từ đầu
+            setStatus("hết ghế — reset")
+            tried = {}
+            task.wait(2)
+            seat = of_findNearestUntriedSeat(hrp.Position, 250, tried)
+            if not seat then
+                setStatus("không có ghế trống")
+                task.wait(3)
+                return false
             end
-        else
-            task.wait(1.0)
         end
-    end
 
-    h = of_humanoid()
-    if h and h.Sit then return true end
-
-    -- không auto-sit → tìm ghế khác >60 studs
-    setStatus("không sit → tìm ghế xa")
-    hrp = of_root()
-    if not hrp then return false end
-
-    local farSeat = of_findSeatAtDist(hrp.Position, 60, 250)
-    if farSeat then
-        setStatus("tele ghế xa")
-        hrp.CFrame = CFrame.new(farSeat.Position + Vector3.new(0, 2, 0))
+        tried[seat] = true
+        setStatus("tìm ghế — tele")
+        hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
         task.wait(1.5)
+
         h = of_humanoid()
         if h and h.Sit then return true end
     end
@@ -2988,12 +2904,11 @@ end
         end
         if not farmOffice then return end
         if not of_sitAtChair() then
-            if farmOffice then
-                
-                task.wait(2)
-            end
-            return
-        end
+    if farmOffice then
+        task.wait(3)
+    end
+    return
+end
         setStatus("ngồi ghế, chờ câu hỏi")
         local idleStart = os.clock()
         while farmOffice do
@@ -3076,7 +2991,9 @@ end
     of_refired = false
     of_lastFireAt = 0
     of_phasing = false
-
+ofAnswers = 0
+ofPrints = 0
+refreshStatPanel()
     farmOffice = true
     activeMode = "office"
     farmStart = os.clock()
