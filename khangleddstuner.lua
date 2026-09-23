@@ -2668,22 +2668,32 @@ local function of_sitAtChair()
     local hrp = of_root()
     if not hrp then return false end
 
-    -- LUÔN tele thẳng về CHAIR_POS
-    setStatus("tele về CHAIR_POS")
-    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 2, 0))
-    task.wait(1.5)
+    -- tele lần đầu khi ở xa
+    if not of_initialTeleDone then
+        local dist = (hrp.Position - CHAIR_POS).Magnitude
+        if dist > 500 then
+            setStatus("tele lần đầu")
+            hrp.CFrame = CFrame.new(CHAIR_POS)
+            task.wait(1.0)
+        end
+        of_initialTeleDone = true
+    end
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- tìm ghế gần CHAIR_POS (30 studs)
-    local seat = of_findNearestSeat(CHAIR_POS, 30)
-    if seat then
-        hrp = of_root()
-        if hrp then
-            hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-            task.wait(2.0)
-        end
+    hrp = of_root()
+    if not hrp then return false end
+    local distToChair = (hrp.Position - CHAIR_POS).Magnitude
+
+    if distToChair > 80 then
+        setStatus("tele về CHAIR_POS (" .. math.floor(distToChair) .. ")")
+        hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 2, 0))
+        task.wait(2.0)
+    else
+        setStatus("đi bộ về CHAIR_POS")
+        of_walkTo(CHAIR_POS, 1.5, 8, true, false)
+        task.wait(1.5)
     end
 
     h = of_humanoid()
@@ -2780,34 +2790,32 @@ local function of_sitAtNearestChair(fromPos)
 
     local seat = of_findNearestSeat(pos, 250)
     if not seat then
-        setStatus("không có ghế → về CHAIR_POS")
+        setStatus("không có ghế")
         return of_sitAtChair()
     end
 
-    -- lần 1: tele tâm ghế + chờ auto-sit
-    setStatus("tele ghế")
-    hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
-    task.wait(2.5)
+    hrp = of_root()
+    if not hrp then return false end
+    local dist = (seat.Position - hrp.Position).Magnitude
+
+    if dist > 80 then
+        setStatus("tele ghế (" .. math.floor(dist) .. ")")
+        hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
+        task.wait(2.5)
+    else
+        setStatus("đi bộ ghế (" .. math.floor(dist) .. ")")
+        local ok = of_walkTo(seat.Position, 1.5, 8, true, false)
+        if not ok then
+            setStatus("walk fail → về CHAIR_POS")
+            return of_sitAtChair()
+        end
+        task.wait(1.5)
+    end
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- lần 2: tìm ghế khác trong 60 studs quanh vị trí hiện tại
-    hrp = of_root()
-    if not hrp then return false end
-    local nearby = of_findNearestSeat(hrp.Position, 60)
-
-    if nearby and nearby ~= seat then
-        setStatus("thử ghế khác")
-        hrp.CFrame = CFrame.new(nearby.Position + Vector3.new(0, 2, 0))
-        task.wait(2.5)
-
-        h = of_humanoid()
-        if h and h.Sit then return true end
-    end
-
-    -- fail → về CHAIR_POS
-    setStatus("fail → về CHAIR_POS")
+    setStatus("không ngồi → về CHAIR_POS")
     return of_sitAtChair()
 end
      
