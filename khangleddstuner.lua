@@ -2668,46 +2668,22 @@ local function of_sitAtChair()
     local hrp = of_root()
     if not hrp then return false end
 
-    -- tele 1 lần duy nhất khi ở xa office (spawn)
-    if not of_initialTeleDone then
-        local dist = (hrp.Position - CHAIR_POS).Magnitude
-        if dist > 500 then
-            setStatus("tele lần đầu vào office")
-            hrp.CFrame = CFrame.new(CHAIR_POS)
-            task.wait(1.0)
-        end
-        of_initialTeleDone = true
-    end
+    -- LUÔN tele thẳng về CHAIR_POS
+    setStatus("tele về CHAIR_POS")
+    hrp.CFrame = CFrame.new(CHAIR_POS + Vector3.new(0, 2, 0))
+    task.wait(1.5)
 
-        h = of_humanoid()
+    h = of_humanoid()
     if h and h.Sit then return true end
 
-    hrp = of_root()
-    if not hrp then return false end
-
-    local seat = of_findNearestSeat(CHAIR_POS, 120)
-    local target = seat and seat.Position or CHAIR_POS
-    local distToTarget = (target - hrp.Position).Magnitude
-
-    if distToTarget > 60 then
-        setStatus("tele ghế cố định")
-        hrp.CFrame = CFrame.new(target + Vector3.new(0, 2, 0))
-        task.wait(1.5)
-    else
-        setStatus("đi bộ tới ghế cố định")
-        local ok = of_walkTo(target, 1.5, 8, true, false)
-if not ok then
-    -- walk fail → tele thẳng về CHAIR_POS
-    setStatus("walk fail → tele CHAIR_POS")
-    hrp = of_root()
-    if hrp then
-        hrp.CFrame = CFrame.new(CHAIR_POS)
-        task.wait(1.5)
-    end
-else
-    task.wait(1.0)
-end
-        
+    -- tìm ghế gần CHAIR_POS (30 studs)
+    local seat = of_findNearestSeat(CHAIR_POS, 30)
+    if seat then
+        hrp = of_root()
+        if hrp then
+            hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
+            task.wait(2.0)
+        end
     end
 
     h = of_humanoid()
@@ -2804,36 +2780,35 @@ local function of_sitAtNearestChair(fromPos)
 
     local seat = of_findNearestSeat(pos, 250)
     if not seat then
-        setStatus("không có ghế")
-        return false
+        setStatus("không có ghế → về CHAIR_POS")
+        return of_sitAtChair()
     end
 
-    -- tele tâm ghế + Y 3
+    -- lần 1: tele tâm ghế + chờ auto-sit
     setStatus("tele ghế")
-    hrp = of_root()
-    if not hrp then return false end
-    hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 3, 0))
+    hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0))
     task.wait(2.5)
 
     h = of_humanoid()
     if h and h.Sit then return true end
 
-    -- check đứng trong 4 studs tâm ghế
+    -- lần 2: tìm ghế khác trong 60 studs quanh vị trí hiện tại
     hrp = of_root()
-    if hrp then
-        local d = (hrp.Position - seat.Position).Magnitude
-        if d < 4 then
-            setStatus("đúng tâm — ép Sit")
-            pcall(function() h.Sit = true end)
-            task.wait(1.5)
-            h = of_humanoid()
-            if h and h.Sit then return true end
-        else
-            setStatus("xa ghế " .. math.floor(d))
-        end
+    if not hrp then return false end
+    local nearby = of_findNearestSeat(hrp.Position, 60)
+
+    if nearby and nearby ~= seat then
+        setStatus("thử ghế khác")
+        hrp.CFrame = CFrame.new(nearby.Position + Vector3.new(0, 2, 0))
+        task.wait(2.5)
+
+        h = of_humanoid()
+        if h and h.Sit then return true end
     end
 
-    return false
+    -- fail → về CHAIR_POS
+    setStatus("fail → về CHAIR_POS")
+    return of_sitAtChair()
 end
      
 local function of_doPrint(name)
@@ -2852,22 +2827,43 @@ of_teleNear(part.Position, 4)
         setStatus("chuẩn bị in")
         task.wait(0.5)
         setStatus("đang in")
-        if of_printAssigned and farmOffice then
-            local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
-            if prompt then
-                pcall(function() prompt:InputHoldBegin() end)
-                local t1 = os.clock()
-                while of_printAssigned and farmOffice and os.clock() - t1 < 4 do
-                    task.wait(0.2)
-                end
-                pcall(function() prompt:InputHoldEnd() end)
-            end
+        local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+
+-- thử in tối đa 3 lần
+local attempt = 0
+while of_printAssigned and farmOffice and attempt < 3 do
+    attempt = attempt + 1
+    setStatus("in lần " .. attempt)
+
+    if prompt then
+        pcall(function()
+            prompt:InputHoldBegin()
+        end)
+        local t1 = os.clock()
+        while of_printAssigned and farmOffice and os.clock() - t1 < 3 do
+            task.wait(0.2)
         end
-            local t2 = os.clock()
-    while of_printAssigned and farmOffice and os.clock() - t2 < 6 do
+        pcall(function()
+            prompt:InputHoldEnd()
+        end)
+    end
+
+    -- chờ phản hồi
+    local t2 = os.clock()
+    while of_printAssigned and farmOffice and os.clock() - t2 < 3 do
         task.wait(0.2)
     end
+
+    if not of_printAssigned then break end
+end
+
+-- nếu vẫn chưa in xong sau 3 lần → force clear để cycle tiếp
+if of_printAssigned then
+    setStatus("in fail — bỏ qua")
+    of_printAssigned = nil
+else
     setStatus("đã in")
+end
 
     task.wait(0.3)
     of_sitAtNearestChair(part.Position)
