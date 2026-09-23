@@ -1322,26 +1322,26 @@ end)
     rejoinNote.Size = UDim2.new(1, 0, 0, 28)
     rejoinNote.LayoutOrder = 1
     rejoinNote.BackgroundTransparency = 1
-    rejoinNote.Text = "Bật farm office → tự bật auto rejoin\nTắt farm → tự tắt"
-    rejoinNote.TextColor3 = Color3.fromRGB(160, 170, 190)
+    rejoinNote.Text = "Auto Execute: tự load script khi vào game mới\nAuto Rejoin: tự vào lại khi bị kick\n2 chức năng độc lập" rejoinNote.TextColor3 = Color3.fromRGB(160, 170, 190)
     rejoinNote.TextSize = 9
     rejoinNote.Font = Enum.Font.GothamMedium
     rejoinNote.TextXAlignment = Enum.TextXAlignment.Left
     rejoinNote.TextYAlignment = Enum.TextYAlignment.Top
     rejoinNote.TextWrapped = true
 
-    makeToggle(rejoinSection, 2, false, "🤖 AUTO REJOIN: BẬT", "🤖 AUTO REJOIN: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
-        autoRejoinEnabled = v
-        if v then
-            if writefile then pcall(writefile, "autoFarm_flag.txt", "1") end
-            if queue_on_teleport then
-                pcall(queue_on_teleport, [[
+            -- AUTO EXECUTE: chỉ tự load script khi vào game mới
+    makeToggle(rejoinSection, 2, false, "🔄 AUTO EXECUTE: BẬT", "🔄 AUTO EXECUTE: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+        if writefile then pcall(writefile, "autoExecute.txt", v and "1" or "0") end
+        if v and queue_on_teleport then
+            pcall(queue_on_teleport, [[
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()
 ]])
-            end
-        else
-            if writefile then pcall(writefile, "autoFarm_flag.txt", "0") end
         end
+    end)
+
+    -- AUTO REJOIN: chỉ tự vào lại game khi bị kick
+    makeToggle(rejoinSection, 3, false, "🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
+        if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
     -- ============ SECTION: ANTI-AFK ============
@@ -2623,7 +2623,7 @@ local function of_findSeatAtDist(pos, minDist, maxDist)
 end
 local function of_findNearestUntriedSeat(pos, radius, tried)
     local ok, parts = pcall(function()
-        return workspace:GetPartBoundsInRadius(pos, radius or 250)
+        return workspace:GetPartBoundsInRadius(pos, radius or 350)
     end)
     if not ok or not parts then return nil end
 
@@ -2632,14 +2632,14 @@ local function of_findNearestUntriedSeat(pos, radius, tried)
         if (p:IsA("Seat") or p:IsA("VehicleSeat"))
            and p.Occupant == nil
            and not tried[p]
-and p ~= OF_SKIP_SEAT then
+and not OF_SKIPPED_SEATS[p] then
             local d = (p.Position - pos).Magnitude
 if d < bestD then best, bestD = p, d end        end
     end
     return best
 end
 local of_initialTeleDone = false
-local OF_SKIP_SEAT = nil
+local OF_SKIPPED_SEATS = {}
 
 local function of_sitAtChair(searchFrom)
     local h = of_humanoid()
@@ -2661,7 +2661,6 @@ local function of_sitAtChair(searchFrom)
 
     h = of_humanoid()
 if h and h.Sit then
-    OF_SKIP_SEAT = nil
     return true
 end
 
@@ -2672,13 +2671,13 @@ end
         hrp = of_root()
         if not hrp then return false end
 
-        local seat = of_findNearestUntriedSeat(hrp.Position, 250, tried)
+        local seat = of_findNearestUntriedSeat(hrp.Position, 350, tried)
         if not seat then
             -- hết ghế chưa thử → reset danh sách, thử lại từ đầu
             setStatus("hết ghế — reset")
             tried = {}
             task.wait(2)
-            seat = of_findNearestUntriedSeat(hrp.Position, 250, tried)
+            seat = of_findNearestUntriedSeat(hrp.Position, 350, tried)
             if not seat then
                 setStatus("không có ghế trống")
                 task.wait(3)
@@ -2811,7 +2810,7 @@ while farmOffice do
         setStatus("5s không câu hỏi — đổi ghế")
         local hh = of_humanoid()
         if hh and hh.Sit then
-            OF_SKIP_SEAT = hh.SeatPart
+            OF_SKIPPED_SEATS[hh.SeatPart] = true
             pcall(function() hh.Sit = false end)
             task.wait(0.5)
         end
@@ -2846,7 +2845,8 @@ if not Computers then return end
     of_killBV()
     of_jobFired = false
     of_resetUntil = 0
-if writefile then pcall(writefile, "autoFarm_flag.txt", "0") end
+    if writefile then pcall(writefile, "farmState.txt", "0") end
+
 
     -- đứng lên khỏi ghế
     local h = of_humanoid()
@@ -2881,6 +2881,7 @@ end
     of_lastFireAt = 0
     of_phasing = false
 ofAnswers = 0
+        OF_SKIPPED_SEATS = {}
 ofPrints = 0
 refreshStatPanel()
     farmOffice = true
@@ -2889,10 +2890,11 @@ refreshStatPanel()
 
     TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
     of_jobFired = true
+    
     of_resetUntil = os.clock() + 5
+   if writefile then pcall(writefile, "farmState.txt", "1") end     
     -- auto bật rejoin
-    if writefile then pcall(writefile, "autoFarm_flag.txt", "1") end
-    if queue_on_teleport then
+      if queue_on_teleport then
         pcall(queue_on_teleport, [[
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()
 ]])
@@ -2975,14 +2977,48 @@ task.spawn(function()
 
     end
 end)
-  -- auto rejoin: nếu flag set → tự bật farm
-if readfile and isfile and isfile("autoFarm_flag.txt") then
-    local ok, v = pcall(readfile, "autoFarm_flag.txt")
+  -- tự bật farm nếu lần trước đang bật
+if readfile and isfile and isfile("farmState.txt") then
+    local ok, v = pcall(readfile, "farmState.txt")
     if ok and v == "1" then
-        task.wait(5)
-        -- trigger farm bật
-        local ok2 = pcall(function()
+        task.wait(6)   -- chờ UI + JobEvents load
+        pcall(function()
             farmSwitch.track.MouseButton1Click:Fire()
         end)
     end
-end                   
+end
+-- đọc state auto execute + auto rejoin
+local _autoExecute = false
+local _autoRejoin = false
+if readfile and isfile then
+    if isfile("autoExecute.txt") then
+        local ok, v = pcall(readfile, "autoExecute.txt")
+        if ok and v == "1" then _autoExecute = true end
+    end
+    if isfile("autoRejoin.txt") then
+        local ok, v = pcall(readfile, "autoRejoin.txt")
+        if ok and v == "1" then _autoRejoin = true end
+    end
+end
+
+-- Auto Rejoin: detect mất kết nối
+if _autoRejoin then
+    task.spawn(function()
+          local lostAt = nil
+        while true do
+            task.wait(2)
+            local c = game.Players.LocalPlayer.Character
+            if not c then
+                if not lostAt then lostAt = os.clock() end
+                if os.clock() - lostAt > 10 then
+                    pcall(function()
+                        game:GetService("TeleportService"):Teleport(game.PlaceId)
+                    end)
+                    lostAt = nil
+                end
+            else
+                lostAt = nil
+            end
+        end
+    end)
+end
