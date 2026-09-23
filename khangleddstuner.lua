@@ -2835,7 +2835,7 @@ of_teleNear(part.Position, 4)
         setStatus("chuẩn bị in")
         task.wait(0.5)
         setStatus("đang in")
-        local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+    
 local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
 
 -- loop vô hạn cho tới khi in được hoặc tắt farm
