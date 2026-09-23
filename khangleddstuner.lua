@@ -2883,6 +2883,7 @@ end
 
 if not farmOffice then return end
 setStatus("đã in")
+end
     local function of_runCycle()
         while farmOffice and os.clock() < of_resetUntil do
             setStatus("chờ reset nhân vật")
