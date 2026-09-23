@@ -2768,8 +2768,7 @@ local function of_findNearestUntriedSeat(pos, radius, tried)
            and p.Occupant == nil
            and not tried[p] then
             local d = (p.Position - pos).Magnitude
-            if d < bestD then best, bestD = p, d end
-        end
+if d >= 50 and d < bestD then best, bestD = p, d end        end
     end
     return best
 end
@@ -2894,7 +2893,7 @@ end
 
 if not farmOffice then return end
     setStatus("đã in")
-    task.wait(0.3)
+    task.wait(2)
     of_sitAtChair()
 end
     local function of_runCycle()
