@@ -3059,23 +3059,44 @@ if readfile and isfile then
     end
 end
 
--- Auto Rejoin: detect mất kết nối
 if _autoRejoin then
     task.spawn(function()
-          local lostAt = nil
         while true do
             task.wait(2)
-            local c = game.Players.LocalPlayer.Character
-            if not c then
-                if not lostAt then lostAt = os.clock() end
-                if os.clock() - lostAt > 10 then
-                    pcall(function()
-                        game:GetService("TeleportService"):Teleport(game.PlaceId)
-                    end)
-                    lostAt = nil
-                end
-            else
-                lostAt = nil
+            local lp = game.Players.LocalPlayer
+            local c = lp and lp.Character
+
+            local shouldRejoin = false
+
+            -- 1) char mất
+            if not c then shouldRejoin = true end
+
+            -- 2) LocalPlayer bị remove
+            if lp and not lp.Parent then shouldRejoin = true end
+
+            -- 3) quét popup "Mất kết nối" / "Disconnected" trong CoreGui
+            if not shouldRejoin then
+                pcall(function()
+                    local cg = game:GetService("CoreGui")
+                    for _, d in ipairs(cg:GetDescendants()) do
+                        if d:IsA("TextLabel") and d.Text ~= "" then
+                            local t = d.Text
+                            if t:find("Mất kết nối") or t:find("Disconnected")
+                               or t:find("kết nối") or t:find("Connection") then
+                                shouldRejoin = true
+                                return
+                            end
+                        end
+                    end
+                end)
+            end
+
+            if shouldRejoin then
+                task.wait(1)
+                pcall(function()
+                    game:GetService("TeleportService"):Teleport(game.PlaceId)
+                end)
+                task.wait(5)
             end
         end
     end)
