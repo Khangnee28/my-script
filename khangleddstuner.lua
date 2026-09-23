@@ -2768,7 +2768,7 @@ local function of_findNearestUntriedSeat(pos, radius, tried)
            and p.Occupant == nil
            and not tried[p] then
             local d = (p.Position - pos).Magnitude
-if d >= 50 and d < bestD then best, bestD = p, d end        end
+if d >= 40 and d < bestD then best, bestD = p, d end        end
     end
     return best
 end
