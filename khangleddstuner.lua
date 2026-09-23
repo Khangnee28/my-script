@@ -2828,46 +2828,53 @@ of_teleNear(part.Position, 4)
         task.wait(0.5)
         setStatus("đang in")
         local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
 
--- thử in tối đa 3 lần
-local attempt = 0
-while of_printAssigned and farmOffice and attempt < 3 do
-    attempt = attempt + 1
-    setStatus("in lần " .. attempt)
+-- loop vô hạn cho tới khi in được hoặc tắt farm
+while of_printAssigned and farmOffice do
+    local attempt = 0
 
-    if prompt then
-        pcall(function()
-            prompt:InputHoldBegin()
-        end)
-        local t1 = os.clock()
-        while of_printAssigned and farmOffice and os.clock() - t1 < 3 do
+    -- thử tối đa 3 lần trong batch
+    while of_printAssigned and farmOffice and attempt < 3 do
+        attempt = attempt + 1
+
+        if attempt == 1 then
+            setStatus("đang in")
+        else
+            setStatus("thử in lại")
+        end
+
+        if prompt then
+            pcall(function() prompt:InputHoldBegin() end)
+            local t1 = os.clock()
+            while of_printAssigned and farmOffice and os.clock() - t1 < 3 do
+                task.wait(0.2)
+            end
+            pcall(function() prompt:InputHoldEnd() end)
+        end
+
+        -- chờ ClearPrintJob event
+        local t2 = os.clock()
+        while of_printAssigned and farmOffice and os.clock() - t2 < 3 do
             task.wait(0.2)
         end
-        pcall(function()
-            prompt:InputHoldEnd()
-        end)
+
+        if not of_printAssigned then break end
     end
 
-    -- chờ phản hồi
-    local t2 = os.clock()
-    while of_printAssigned and farmOffice and os.clock() - t2 < 3 do
+    -- in xong → thoát loop
+    if not of_printAssigned then break end
+
+    -- 3 lần fail → chờ 5s rồi thử batch mới
+    setStatus("chờ 5s thử lại")
+    local t3 = os.clock()
+    while of_printAssigned and farmOffice and os.clock() - t3 < 5 do
         task.wait(0.2)
     end
-
-    if not of_printAssigned then break end
 end
 
--- nếu vẫn chưa in xong sau 3 lần → force clear để cycle tiếp
-if of_printAssigned then
-    setStatus("in fail — bỏ qua")
-    of_printAssigned = nil
-else
-    setStatus("đã in")
-end
-
-    task.wait(0.3)
-    of_sitAtNearestChair(part.Position)
-end
+if not farmOffice then return end
+setStatus("đã in")
     local function of_runCycle()
         while farmOffice and os.clock() < of_resetUntil do
             setStatus("chờ reset nhân vật")
