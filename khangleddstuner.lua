@@ -199,7 +199,7 @@ task.spawn(function()
 end)
 
 -- ============ TAY NAM KHAI BAO TRUOC ============
-local ControlPanel, freecamMenuFrame, hideFloatBtn, GuideFrame
+local ControlPanel, freecamMenuFrame, hideFloatBtn
 local HubFrame, hubClose, hubHeader, hubStroke, statPanel
 local farmSwitch
 local farmNote
@@ -213,6 +213,7 @@ local ofPrints = 0
 local activeMode = nil
 local farmStart = 0
 local antiAfk = true
+local autoRejoinEnabled = false
 local optFPS = false
 
 -- ============ NUT NOI (VUONG + LED RGB) ============
@@ -632,11 +633,11 @@ do
     addNav("TUNER", "🎛️")
     addNav("CHUNG", "🧰")
     addNav("SETTINGS", "⚙️")
-    addNav("GUIDE", "📜")
+    
     local tunerPage = pages["TUNER"]
     local chungPage = pages["CHUNG"]
     local settingsPage = pages["SETTINGS"]
-    local guidePage = pages["GUIDE"]
+    
 
     -- TUNER
     local function createInput(name, defaultVal, posY, pg)
@@ -1025,227 +1026,92 @@ end)
     fcOpenBtn.Parent = cardFc
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
 
-    -- SETTINGS (ScrollingFrame)
+        -- SETTINGS (v15) — collapsible sections
     local settingsScroll = Instance.new("ScrollingFrame")
     settingsScroll.Size = UDim2.new(1, 0, 1, 0)
     settingsScroll.BackgroundTransparency = 1
     settingsScroll.BorderSizePixel = 0
-    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 460)
+    settingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    settingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     settingsScroll.ScrollBarThickness = 4
     settingsScroll.ZIndex = 12
     settingsScroll.Parent = settingsPage
 
-    local function sectionTitle(y, text, color)
-        local t = Instance.new("TextLabel")
-        t.Size = UDim2.new(1, -20, 0, 18)
-        t.Position = UDim2.new(0, 10, 0, y)
-        t.BackgroundTransparency = 1
-        t.Text = text
-        t.TextColor3 = color or themeColor
-        t.TextSize = 11
-        t.Font = Enum.Font.GothamBold
-        t.TextXAlignment = Enum.TextXAlignment.Left
-        t.ZIndex = 13
-        t.Parent = settingsScroll
-        return t
-    end
-    local function parseHex(str)
-        local input = (str or ""):gsub("^#", "")
-        if #input ~= 6 then return nil end
-        local r = tonumber(input:sub(1,2), 16)
-        local g = tonumber(input:sub(3,4), 16)
-        local b = tonumber(input:sub(5,6), 16)
-        if not (r and g and b) then return nil end
-        return Color3.fromRGB(r, g, b), input:upper()
-    end
-    local function makeSwatch(x, y, color, gradient, onClick)
-        local sw = Instance.new("TextButton")
-        sw.Size = UDim2.new(0, 34, 0, 26)
-        sw.Position = UDim2.new(0, x, 0, y)
-        sw.BackgroundColor3 = color or Color3.fromRGB(60, 60, 80)
-        sw.Text = ""
-        sw.ZIndex = 14
-        sw.Parent = settingsScroll
-        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        if gradient then
-            local g = Instance.new("UIGradient", sw)
-            g.Color = gradient
-        end
-        local st = Instance.new("UIStroke", sw)
-        st.Color = Color3.fromRGB(255, 255, 255)
-        st.Transparency = 0.75
-        st.Thickness = 1
-        sw.MouseButton1Click:Connect(onClick)
-        return sw
-    end
+    local settingsList = Instance.new("UIListLayout", settingsScroll)
+    settingsList.Padding = UDim.new(0, 6)
+    settingsList.SortOrder = Enum.SortOrder.LayoutOrder
+    local settingsPad = Instance.new("UIPadding", settingsScroll)
+    settingsPad.PaddingTop = UDim.new(0, 8)
+    settingsPad.PaddingLeft = UDim.new(0, 4)
+    settingsPad.PaddingRight = UDim.new(0, 4)
+    settingsPad.PaddingBottom = UDim.new(0, 8)
 
-    sectionTitle(4, "🎨 MÀU MENU CHÍNH", themeColor)
-    local themePresets = {
-        Color3.fromRGB(0, 229, 160),
-        Color3.fromRGB(56, 189, 248),
-        Color3.fromRGB(167, 139, 250),
-        Color3.fromRGB(255, 100, 100),
-        Color3.fromRGB(255, 170, 60),
-        Color3.fromRGB(255, 110, 190),
-    }
-    for i, c in ipairs(themePresets) do
-        makeSwatch(10 + (i - 1) * 40, 26, c, nil, function() applyTheme(c) end)
-    end
-    local menuHexLbl = Instance.new("TextLabel")
-    menuHexLbl.Size = UDim2.new(0, 88, 0, 24)
-    menuHexLbl.Position = UDim2.new(0, 10, 0, 60)
-    menuHexLbl.BackgroundTransparency = 1
-    menuHexLbl.Text = "MÃ MENU:"
-    menuHexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-    menuHexLbl.TextSize = 10
-    menuHexLbl.Font = Enum.Font.GothamBold
-    menuHexLbl.TextXAlignment = Enum.TextXAlignment.Left
-    menuHexLbl.ZIndex = 13
-    menuHexLbl.Parent = settingsScroll
-    local menuHexBox = Instance.new("TextBox")
-    menuHexBox.Size = UDim2.new(0, 110, 0, 24)
-    menuHexBox.Position = UDim2.new(0, 102, 0, 60)
-    menuHexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-    menuHexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    menuHexBox.PlaceholderText = "#00E5A0"
-    menuHexBox.Text = ""
-    menuHexBox.TextSize = 10
-    menuHexBox.Font = Enum.Font.GothamBold
-    menuHexBox.BorderSizePixel = 0
-    menuHexBox.ZIndex = 13
-    menuHexBox.Parent = settingsScroll
-    Instance.new("UICorner", menuHexBox).CornerRadius = UDim.new(0, 6)
-    local menuHexApply = Instance.new("TextButton")
-    menuHexApply.Size = UDim2.new(0, 70, 0, 24)
-    menuHexApply.Position = UDim2.new(0, 220, 0, 60)
-    menuHexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
-    menuHexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
-    menuHexApply.Text = "ÁP DỤNG"
-    menuHexApply.TextSize = 10
-    menuHexApply.Font = Enum.Font.GothamBold
-    menuHexApply.ZIndex = 13
-    menuHexApply.Parent = settingsScroll
-    Instance.new("UICorner", menuHexApply).CornerRadius = UDim.new(0, 6)
-    local menuHexStatus = Instance.new("TextLabel")
-    menuHexStatus.Size = UDim2.new(1, -20, 0, 14)
-    menuHexStatus.Position = UDim2.new(0, 10, 0, 88)
-    menuHexStatus.BackgroundTransparency = 1
-    menuHexStatus.Text = ""
-    menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
-    menuHexStatus.TextSize = 9
-    menuHexStatus.Font = Enum.Font.GothamBold
-    menuHexStatus.TextXAlignment = Enum.TextXAlignment.Left
-    menuHexStatus.ZIndex = 13
-    menuHexStatus.Parent = settingsScroll
-    menuHexApply.MouseButton1Click:Connect(function()
-        local col, up = parseHex(menuHexBox.Text)
-        if not col then
-            menuHexStatus.Text = "❌ mã màu sai (VD: #00E5A0)"
-            menuHexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        applyTheme(col)
-        menuHexStatus.Text = "✔ màu menu = #" .. up
-        menuHexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
-    end)
+    local function makeSection(order, title, defaultOpen)
+        local section = Instance.new("Frame", settingsScroll)
+        section.Size = UDim2.new(1, -8, 0, 0)
+        section.AutomaticSize = Enum.AutomaticSize.Y
+        section.BackgroundTransparency = 1
+        section.LayoutOrder = order
 
-    sectionTitle(110, "🌈 MÀU LED RGB", ACCENT2)
-    local ledPresets = {
-        { name = "rainbow", c = nil },
-        { name = "blue", c = Color3.fromRGB(0, 150, 255) },
-        { name = "red", c = Color3.fromRGB(255, 40, 60) },
-        { name = "yellow", c = Color3.fromRGB(255, 210, 40) },
-        { name = "purple", c = Color3.fromRGB(180, 80, 255) },
-        { name = "white", c = Color3.fromRGB(240, 240, 255) },
-    }
-    local rainbowGrad = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 60)),
-        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(90, 230, 90)),
-        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(70, 160, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(225, 80, 220)),
-    }
-    for i, p in ipairs(ledPresets) do
-        makeSwatch(10 + (i - 1) * 40, 132, p.c, (p.c == nil and rainbowGrad or nil), function()
-            if p.c == nil then
-                ledMode = "rainbow"
-            else
-                ledMode = "fixed"
-                ledFixedColor = p.c
-            end
+        local sl = Instance.new("UIListLayout", section)
+        sl.Padding = UDim.new(0, 0)
+        sl.SortOrder = Enum.SortOrder.LayoutOrder
+
+        local header = Instance.new("TextButton", section)
+        header.Size = UDim2.new(1, 0, 0, 28)
+        header.LayoutOrder = 1
+        header.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
+        header.TextColor3 = themeColor
+        header.TextSize = 11
+        header.Font = Enum.Font.GothamBold
+        header.TextXAlignment = Enum.TextXAlignment.Left
+        header.ZIndex = 14
+        Instance.new("UICorner", header).CornerRadius = UDim.new(0, 6)
+        local hp = Instance.new("UIPadding", header)
+        hp.PaddingLeft = UDim.new(0, 8)
+
+        local content = Instance.new("Frame", section)
+        content.Size = UDim2.new(1, 0, 0, 0)
+        content.AutomaticSize = Enum.AutomaticSize.Y
+        content.LayoutOrder = 2
+        content.BackgroundColor3 = Color3.fromRGB(18, 24, 36)
+        content.BorderSizePixel = 0
+        content.Visible = defaultOpen or false
+        content.ZIndex = 13
+        Instance.new("UICorner", content).CornerRadius = UDim.new(0, 6)
+
+        local cl = Instance.new("UIListLayout", content)
+        cl.Padding = UDim.new(0, 4)
+        cl.SortOrder = Enum.SortOrder.LayoutOrder
+        local cp = Instance.new("UIPadding", content)
+        cp.PaddingTop = UDim.new(0, 8)
+        cp.PaddingBottom = UDim.new(0, 8)
+        cp.PaddingLeft = UDim.new(0, 8)
+        cp.PaddingRight = UDim.new(0, 8)
+
+        local isOpen = defaultOpen or false
+        header.Text = (isOpen and "▼ " or "▶ ") .. title
+        header.MouseButton1Click:Connect(function()
+            isOpen = not isOpen
+            content.Visible = isOpen
+            header.Text = (isOpen and "▼ " or "▶ ") .. title
         end)
+        return content
     end
-    local hexLbl = Instance.new("TextLabel")
-    hexLbl.Size = UDim2.new(0, 88, 0, 24)
-    hexLbl.Position = UDim2.new(0, 10, 0, 166)
-    hexLbl.BackgroundTransparency = 1
-    hexLbl.Text = "HEX LED:"
-    hexLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-    hexLbl.TextSize = 10
-    hexLbl.Font = Enum.Font.GothamBold
-    hexLbl.TextXAlignment = Enum.TextXAlignment.Left
-    hexLbl.ZIndex = 13
-    hexLbl.Parent = settingsScroll
-    local hexBox = Instance.new("TextBox")
-    hexBox.Size = UDim2.new(0, 110, 0, 24)
-    hexBox.Position = UDim2.new(0, 102, 0, 166)
-    hexBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-    hexBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    hexBox.PlaceholderText = "#FF00AA"
-    hexBox.Text = ""
-    hexBox.TextSize = 10
-    hexBox.Font = Enum.Font.GothamBold
-    hexBox.BorderSizePixel = 0
-    hexBox.ZIndex = 13
-    hexBox.Parent = settingsScroll
-    Instance.new("UICorner", hexBox).CornerRadius = UDim.new(0, 6)
-    local hexApply = Instance.new("TextButton")
-    hexApply.Size = UDim2.new(0, 70, 0, 24)
-    hexApply.Position = UDim2.new(0, 220, 0, 166)
-    hexApply.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
-    hexApply.TextColor3 = Color3.fromRGB(255, 255, 255)
-    hexApply.Text = "ÁP DỤNG"
-    hexApply.TextSize = 10
-    hexApply.Font = Enum.Font.GothamBold
-    hexApply.ZIndex = 13
-    hexApply.Parent = settingsScroll
-    Instance.new("UICorner", hexApply).CornerRadius = UDim.new(0, 6)
-    local hexStatus = Instance.new("TextLabel")
-    hexStatus.Size = UDim2.new(1, -20, 0, 14)
-    hexStatus.Position = UDim2.new(0, 10, 0, 194)
-    hexStatus.BackgroundTransparency = 1
-    hexStatus.Text = ""
-    hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
-    hexStatus.TextSize = 9
-    hexStatus.Font = Enum.Font.GothamBold
-    hexStatus.TextXAlignment = Enum.TextXAlignment.Left
-    hexStatus.ZIndex = 13
-    hexStatus.Parent = settingsScroll
-    hexApply.MouseButton1Click:Connect(function()
-        local col, up = parseHex(hexBox.Text)
-        if not col then
-            hexStatus.Text = "❌ hex phải đủ 6 ký tự (VD: FF00AA)"
-            hexStatus.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        ledMode = "fixed"
-        ledFixedColor = col
-        hexStatus.Text = "✔ đã đổi LED sang #" .. up
-        hexStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
-    end)
 
-    local function toggleBtn(y, defaultOn, labelOn, labelOff, colorOn, colorOff, cb)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(1, -20, 0, 28)
-        b.Position = UDim2.new(0, 10, 0, y)
+    -- helper tạo nút toggle trong section
+    local function makeToggle(parent, order, defaultOn, labelOn, labelOff, colorOn, colorOff, cb)
+        local b = Instance.new("TextButton", parent)
+        b.Size = UDim2.new(1, 0, 0, 28)
+        b.LayoutOrder = order
         b.TextColor3 = Color3.fromRGB(255, 255, 255)
         b.TextSize = 10
         b.Font = Enum.Font.GothamBold
         b.ZIndex = 14
-        b.Parent = settingsScroll
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
         local on = defaultOn
         local function paint()
-            b.Text = (on and labelOn or labelOff)
+            b.Text = on and labelOn or labelOff
             b.BackgroundColor3 = on and colorOn or colorOff
         end
         paint()
@@ -1256,71 +1122,122 @@ end)
         end)
         return b
     end
-    toggleBtn(216, true, "🛡️ ANTI-AFK: ĐANG BẬT", "🛡️ ANTI-AFK: ĐANG TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
-        antiAfk = v
+
+    -- helper tạo hàng input (label + textbox + nút)
+    local function makeInput(parent, order, label, placeholder, btnText, color, onClick)
+        local row = Instance.new("Frame", parent)
+        row.Size = UDim2.new(1, 0, 0, 26)
+        row.LayoutOrder = order
+        row.BackgroundTransparency = 1
+
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Size = UDim2.new(0, 80, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.TextColor3 = Color3.fromRGB(200, 210, 220)
+        lbl.TextSize = 10
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        local box = Instance.new("TextBox", row)
+        box.Size = UDim2.new(1, -160, 1, 0)
+        box.Position = UDim2.new(0, 82, 0, 0)
+        box.BackgroundColor3 = Color3.fromRGB(22, 26, 34)
+        box.TextColor3 = Color3.fromRGB(255, 255, 255)
+        box.PlaceholderText = placeholder
+        box.Text = ""
+        box.TextSize = 10
+        box.Font = Enum.Font.GothamBold
+        box.BorderSizePixel = 0
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+        local btn = Instance.new("TextButton", row)
+        btn.Size = UDim2.new(0, 72, 1, 0)
+        btn.Position = UDim2.new(1, -72, 0, 0)
+        btn.BackgroundColor3 = color or Color3.fromRGB(0, 150, 120)
+        btn.Text = btnText
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.TextSize = 10
+        btn.Font = Enum.Font.GothamBold
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+        local status = Instance.new("TextLabel", parent)
+        status.Size = UDim2.new(1, 0, 0, 14)
+        status.LayoutOrder = order + 0.5
+        status.BackgroundTransparency = 1
+        status.Text = ""
+        status.TextColor3 = Color3.fromRGB(140, 255, 140)
+        status.TextSize = 9
+        status.Font = Enum.Font.GothamBold
+        status.TextXAlignment = Enum.TextXAlignment.Left
+
+        btn.MouseButton1Click:Connect(function()
+            onClick(box.Text, function(msg, ok)
+                status.Text = msg
+                status.TextColor3 = ok and Color3.fromRGB(140, 255, 140) or Color3.fromRGB(255, 120, 120)
+            end)
+        end)
+        return box
+    end
+
+    -- ============ SECTION: MÀU MENU + LED ============
+    local colorSection = makeSection(1, "🎨 Màu menu + LED", false)
+    local colorRow = Instance.new("Frame", colorSection)
+    colorRow.Size = UDim2.new(1, 0, 0, 30)
+    colorRow.LayoutOrder = 1
+    colorRow.BackgroundTransparency = 1
+    local colorList = Instance.new("UIListLayout", colorRow)
+    colorList.FillDirection = Enum.FillDirection.Horizontal
+    colorList.Padding = UDim.new(0, 4)
+    local themePresets = {
+        Color3.fromRGB(0, 229, 160),
+        Color3.fromRGB(56, 189, 248),
+        Color3.fromRGB(167, 139, 250),
+        Color3.fromRGB(255, 100, 100),
+        Color3.fromRGB(255, 170, 60),
+        Color3.fromRGB(255, 110, 190),
+    }
+    for i, c in ipairs(themePresets) do
+        local sw = Instance.new("TextButton", colorRow)
+        sw.Size = UDim2.new(0, 30, 1, 0)
+        sw.BackgroundColor3 = c
+        sw.Text = ""
+        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
+        sw.MouseButton1Click:Connect(function() applyTheme(c) end)
+    end
+    makeInput(colorSection, 2, "Mã menu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
+        local col, up = parseHex(txt)
+        if not col then cb("❌ mã màu sai (VD: #00E5A0)", false) return end
+        applyTheme(col)
+        cb("✔ màu menu = #" .. up, true)
     end)
-    toggleBtn(250, false, "📊 HIỆN FPS / PING: ĐANG BẬT", "📊 HIỆN FPS / PING: ĐANG TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
-        perfOn = v
-        perfFrame.Visible = v
+    makeInput(colorSection, 4, "Mã LED", "#FF00AA", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
+        local col, up = parseHex(txt)
+        if not col then cb("❌ hex sai", false) return end
+        ledMode = "fixed"
+        ledFixedColor = col
+        cb("✔ LED = #" .. up, true)
     end)
-    toggleBtn(284, false, "🔒 KHÓA VỊ TRÍ FPS/PING: ĐANG KHÓA", "🔒 KHÓA VỊ TRÍ FPS/PING: ĐANG MỞ", Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70), function(v)
-        perfLocked = v
-        perfFrame.Draggable = not v
+    makeToggle(colorSection, 6, ledMode == "rainbow", "🌈 LED: RAINBOW", "🌈 LED: ĐƠN SẮC", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
+        if v then ledMode = "rainbow" else ledMode = "fixed" end
     end)
 
-    -- TOI UU FPS
-    local QUAL = {
-        Enum.SavedQualitySetting.QualityLevel1,
-        Enum.SavedQualitySetting.QualityLevel2,
-        Enum.SavedQualitySetting.QualityLevel3,
-        Enum.SavedQualitySetting.QualityLevel4,
-        Enum.SavedQualitySetting.QualityLevel5,
-        Enum.SavedQualitySetting.QualityLevel6,
-        Enum.SavedQualitySetting.QualityLevel7,
-        Enum.SavedQualitySetting.QualityLevel8,
-        Enum.SavedQualitySetting.QualityLevel9,
-        Enum.SavedQualitySetting.QualityLevel10,
-    }
-    local function setQualityLevel(idx)
-        pcall(function()
-            if idx == nil then
-                UserSettings().GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.Automatic
-            else
-                UserSettings().GameSettings.SavedQualityLevel = QUAL[idx]
-            end
-        end)
-        pcall(function()
-            if idx == nil then
-                settings().Rendering.QualityLevel = 0
-            else
-                settings().Rendering.QualityLevel = math.floor(idx * 2.1)
-            end
-        end)
-    end
-    local function bloomSet(on, intensity, threshold)
-        pcall(function()
-            local b = Lighting:FindFirstChild("KhangLeBloom")
-            if not b then
-                b = Instance.new("BloomEffect", Lighting)
-                b.Name = "KhangLeBloom"
-            end
-            b.Enabled = on
-            if intensity then b.Intensity = intensity end
-            if threshold then b.Threshold = threshold end
-        end)
-    end
-    local function sunSet(on, intensity)
-        pcall(function()
-            local s = Lighting:FindFirstChild("KhangLeSun")
-            if not s then
-                s = Instance.new("SunRaysEffect", Lighting)
-                s.Name = "KhangLeSun"
-            end
-            s.Enabled = on
-            if intensity then s.Intensity = intensity end
-        end)
-    end
-    toggleBtn(318, false, "⚡ TỐI ƯU FPS: ĐANG BẬT", "⚡ TỐI ƯU FPS: ĐANG TẮT", Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
+    -- ============ SECTION: TÊN HIỂN THỊ ============
+    local nameSection = makeSection(2, "👤 Tên hiển thị", false)
+    makeToggle(nameSection, 1, false, "👤 ẨN TÊN: BẬT", "👤 ẨN TÊN: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+        hideNameOn = v
+        if v then hideNameTags() else showNameTags() end
+    end)
+    makeInput(nameSection, 2, "Tên mới", "Nhập tên", "ĐỔI TÊN", Color3.fromRGB(120, 80, 200), function(txt, cb)
+        if txt == "" then cb("❌ nhập tên trước", false) return end
+        customName = txt
+        applyCustomName()
+        cb("✔ đã đổi tên", true)
+    end)
+
+    -- ============ SECTION: HIỆU NĂNG ============
+    local perfSection = makeSection(3, "⚡ Hiệu năng", false)
+    makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT", Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
         optFPS = v
         if v then
             pcall(function() Lighting.GlobalShadows = false end)
@@ -1332,12 +1249,144 @@ end)
             pcall(function() Lighting.GlobalShadows = true end)
             pcall(function() Lighting.Brightness = 2 end)
             bloomSet(true, 0.4, 0.8)
+            setQualityLevel(nil)
+        end
+    end)
+    makeToggle(perfSection, 2, false, "🎨 CHẤT LƯỢNG CAO: BẬT", "🎨 CHẤT LƯỢNG CAO: TẮT", Color3.fromRGB(160, 100, 200), Color3.fromRGB(60, 60, 70), function(v)
+        if v then
+            pcall(function() Lighting.GlobalShadows = true end)
+            pcall(function() Lighting.Brightness = 3 end)
+            bloomSet(true, 0.6, 0.7)
+            sunSet(true, 0.3)
+            setQualityLevel(10)
+        else
+            bloomSet(true, 0.4, 0.8)
             sunSet(false)
             setQualityLevel(nil)
         end
     end)
+    makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
+        perfOn = v
+        perfFrame.Visible = v
+    end)
+    makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT", Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70), function(v)
+        perfLocked = v
+        perfFrame.Draggable = not v
+    end)
 
-    -- AN TEN / DOI TEN
+    -- ============ SECTION: SERVER ============
+    local serverSection = makeSection(4, "🔄 Server", false)
+    local TeleportService = game:GetService("TeleportService")
+    local HttpService = game:GetService("HttpService")
+
+    local function fetchServers()
+        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local ok, res = pcall(function() return game:HttpGet(url) end)
+        if not ok then return nil end
+        local ok2, data = pcall(function() return HttpService:JSONDecode(res) end)
+        if not ok2 or not data or not data.data then return nil end
+        return data.data
+    end
+
+    local btnHop = Instance.new("TextButton", serverSection)
+    btnHop.Size = UDim2.new(1, 0, 0, 28)
+    btnHop.LayoutOrder = 1
+    btnHop.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
+    btnHop.Text = "🎲 SERVER HOP"
+    btnHop.TextColor3 = Color3.new(1,1,1)
+    btnHop.TextSize = 10
+    btnHop.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btnHop).CornerRadius = UDim.new(0, 7)
+
+    local btnSmall = Instance.new("TextButton", serverSection)
+    btnSmall.Size = UDim2.new(1, 0, 0, 28)
+    btnSmall.LayoutOrder = 2
+    btnSmall.BackgroundColor3 = Color3.fromRGB(40, 120, 90)
+    btnSmall.Text = "🐜 SMALL SERVER"
+    btnSmall.TextColor3 = Color3.new(1,1,1)
+    btnSmall.TextSize = 10
+    btnSmall.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btnSmall).CornerRadius = UDim.new(0, 7)
+
+    local btnRejoin = Instance.new("TextButton", serverSection)
+    btnRejoin.Size = UDim2.new(1, 0, 0, 28)
+    btnRejoin.LayoutOrder = 3
+    btnRejoin.BackgroundColor3 = Color3.fromRGB(140, 80, 40)
+    btnRejoin.Text = "🔁 REJOIN"
+    btnRejoin.TextColor3 = Color3.new(1,1,1)
+    btnRejoin.TextSize = 10
+    btnRejoin.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btnRejoin).CornerRadius = UDim.new(0, 7)
+
+    btnHop.MouseButton1Click:Connect(function()
+        local servers = fetchServers()
+        if not servers then return end
+        for _, s in ipairs(servers) do
+            if s.id ~= game.JobId and s.playing < s.maxPlayers - 1 then
+                pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, player) end)
+                return
+            end
+        end
+    end)
+    btnSmall.MouseButton1Click:Connect(function()
+        local servers = fetchServers()
+        if not servers then return end
+        local best = nil
+        for _, s in ipairs(servers) do
+            if s.id ~= game.JobId and s.playing < s.maxPlayers - 1 then
+                if not best or s.playing < best.playing then best = s end
+            end
+        end
+        if best then
+            pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, best.id, player) end)
+        end
+    end)
+    btnRejoin.MouseButton1Click:Connect(function()
+        pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
+    end)
+
+    -- ============ SECTION: AUTO REJOIN ============
+    local rejoinSection = makeSection(5, "🤖 Auto Rejoin", false)
+    local rejoinNote = Instance.new("TextLabel", rejoinSection)
+    rejoinNote.Size = UDim2.new(1, 0, 0, 28)
+    rejoinNote.LayoutOrder = 1
+    rejoinNote.BackgroundTransparency = 1
+    rejoinNote.Text = "Bật farm office → tự bật auto rejoin\nTắt farm → tự tắt"
+    rejoinNote.TextColor3 = Color3.fromRGB(160, 170, 190)
+    rejoinNote.TextSize = 9
+    rejoinNote.Font = Enum.Font.GothamMedium
+    rejoinNote.TextXAlignment = Enum.TextXAlignment.Left
+    rejoinNote.TextYAlignment = Enum.TextYAlignment.Top
+    rejoinNote.TextWrapped = true
+
+    makeToggle(rejoinSection, 2, false, "🤖 AUTO REJOIN: BẬT", "🤖 AUTO REJOIN: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
+        autoRejoinEnabled = v
+        if v then
+            if writefile then pcall(writefile, "autoFarm_flag.txt", "1") end
+            if queue_on_teleport then
+                pcall(queue_on_teleport, [[
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()
+]])
+            end
+        else
+            if writefile then pcall(writefile, "autoFarm_flag.txt", "0") end
+        end
+    end)
+
+    -- ============ SECTION: ANTI-AFK ============
+    local afkSection = makeSection(6, "🛡️ Anti-AFK", false)
+    makeToggle(afkSection, 1, true, "🛡️ ANTI-AFK: BẬT", "🛡️ ANTI-AFK: TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
+        antiAfk = v
+    end)
+    
+    
+
+    
+
+    
+
+
+    ---AN TEN / DOI TEN
     toggleBtn(352, false, "👤 ẨN TÊN TRÊN ĐẦU: ĐANG BẬT", "👤 ẨN TÊN TRÊN ĐẦU: ĐANG TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
         hideNameOn = v
         if v then hideNameTags() else showNameTags() end
@@ -1345,44 +1394,7 @@ end)
     local nameLbl = Instance.new("TextLabel")
     nameLbl.Size = UDim2.new(0, 88, 0, 24)
     nameLbl.Position = UDim2.new(0, 10, 0, 386)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Text = "TÊN TÙY CHỈNH:"
-    nameLbl.TextColor3 = Color3.fromRGB(220, 220, 220)
-    nameLbl.TextSize = 10
-    nameLbl.Font = Enum.Font.GothamBold
-    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-    nameLbl.ZIndex = 13
-    nameLbl.Parent = settingsScroll
-    local nameBox = Instance.new("TextBox")
-    nameBox.Size = UDim2.new(0, 110, 0, 24)
-    nameBox.Position = UDim2.new(0, 102, 0, 386)
-    nameBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
-    nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameBox.PlaceholderText = "Nhập tên mới"
-    nameBox.Text = ""
-    nameBox.TextSize = 10
-    nameBox.Font = Enum.Font.GothamBold
-    nameBox.BorderSizePixel = 0
-    nameBox.ZIndex = 13
-    nameBox.Parent = settingsScroll
-    Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
-    local nameApply = Instance.new("TextButton")
-    nameApply.Size = UDim2.new(0, 70, 0, 24)
-    nameApply.Position = UDim2.new(0, 220, 0, 386)
-    nameApply.BackgroundColor3 = Color3.fromRGB(120, 80, 200)
-    nameApply.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameApply.Text = "ĐỔI TÊN"
-    nameApply.TextSize = 10
-    nameApply.Font = Enum.Font.GothamBold
-    nameApply.ZIndex = 13
-    nameApply.Parent = settingsScroll
-    Instance.new("UICorner", nameApply).CornerRadius = UDim.new(0, 6)
-    local nameStatus = Instance.new("TextLabel")
-    nameStatus.Size = UDim2.new(1, -20, 0, 14)
-    nameStatus.Position = UDim2.new(0, 10, 0, 414)
-    nameStatus.BackgroundTransparency = 1
-    nameStatus.Text = ""
-    nameStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
+    nam140, 255, 140)
     nameStatus.TextSize = 9
     nameStatus.Font = Enum.Font.GothamBold
     nameStatus.TextXAlignment = Enum.TextXAlignment.Left
@@ -1401,39 +1413,7 @@ end)
         nameStatus.TextColor3 = Color3.fromRGB(140, 255, 140)
     end)
 
-    -- GUIDE (nhung thang, 1500)
-    local guideHint = Instance.new("TextLabel")
-    guideHint.Size = UDim2.new(0.9, 0, 0, 20)
-    guideHint.Position = UDim2.new(0.05, 0, 0, 6)
-    guideHint.BackgroundTransparency = 1
-    guideHint.Text = "Vui lòng đọc kĩ bảng hướng dẫn để tùy chỉnh thông số tránh lỗi !"
-    guideHint.TextColor3 = Color3.fromRGB(255, 215, 0)
-    guideHint.TextSize = 10
-    guideHint.Font = Enum.Font.GothamBold
-    guideHint.TextXAlignment = Enum.TextXAlignment.Left
-    guideHint.ZIndex = 12
-    guideHint.Parent = guidePage
-    local guideScroll = Instance.new("ScrollingFrame")
-    guideScroll.Size = UDim2.new(1, -8, 1, -34)
-    guideScroll.Position = UDim2.new(0, 4, 0, 30)
-    guideScroll.BackgroundTransparency = 1
-    guideScroll.BorderSizePixel = 0
-    guideScroll.CanvasSize = UDim2.new(0, 0, 0, 1500)
-    guideScroll.ScrollBarThickness = 4
-    guideScroll.ZIndex = 12
-    guideScroll.Parent = guidePage
-    local guideText = Instance.new("TextLabel")
-    guideText.Size = UDim2.new(1, -10, 0, 1500)
-    guideText.BackgroundTransparency = 1
-    guideText.Text = guideFullText
-    guideText.TextColor3 = Color3.fromRGB(220, 220, 220)
-    guideText.TextSize = 11
-    guideText.Font = Enum.Font.GothamMedium
-    guideText.TextXAlignment = Enum.TextXAlignment.Left
-    guideText.TextYAlignment = Enum.TextYAlignment.Top
-    guideText.TextWrapped = true
-    guideText.ZIndex = 13
-    guideText.Parent = guideScroll
+
 
     selectPage("TUNER")
 
@@ -1450,67 +1430,7 @@ end)
         end
     end
 
-    -- GUIDE FRAME popup (1400)
-    GuideFrame = Instance.new("Frame")
-    GuideFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-    GuideFrame.BorderSizePixel = 0
-    GuideFrame.Active = true
-    GuideFrame.Draggable = false
-    GuideFrame.Visible = false
-    GuideFrame.ClipsDescendants = true
-    GuideFrame.ZIndex = 9
-    GuideFrame.Parent = ScreenGui
-    Instance.new("UICorner", GuideFrame).CornerRadius = UDim.new(0, 14)
-    local strokeGuide = Instance.new("UIStroke", GuideFrame)
-    strokeGuide.Color = Color3.fromRGB(255, 215, 0)
-    strokeGuide.Thickness = 1.8
-    strokeGuide.Parent = GuideFrame
-    local GuideTitle = Instance.new("TextLabel")
-    GuideTitle.Size = UDim2.new(1, 0, 0, 42)
-    GuideTitle.BackgroundTransparency = 1
-    GuideTitle.Text = "📜 HƯỚNG DẪN SỬ DỤNG - VUI LÒNG ĐỌC KĨ!"
-    GuideTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-    GuideTitle.TextSize = 12
-    GuideTitle.Font = Enum.Font.GothamBold
-    GuideTitle.Parent = GuideFrame
-    makeHeaderDraggable(GuideTitle, GuideFrame)
-    local ScrollGuide = Instance.new("ScrollingFrame")
-    ScrollGuide.BackgroundTransparency = 1
-    ScrollGuide.BorderSizePixel = 0
-    ScrollGuide.ScrollBarThickness = 4
-    ScrollGuide.ZIndex = 10
-    ScrollGuide.Parent = GuideFrame
-    local GuideContent = Instance.new("TextLabel")
-    GuideContent.BackgroundTransparency = 1
-    GuideContent.Text = guideFullText
-    GuideContent.TextColor3 = Color3.fromRGB(220, 220, 220)
-    GuideContent.TextSize = 12
-    GuideContent.Font = Enum.Font.GothamMedium
-    GuideContent.TextXAlignment = Enum.TextXAlignment.Left
-    GuideContent.TextYAlignment = Enum.TextYAlignment.Top
-    GuideContent.TextWrapped = true
-    GuideContent.ZIndex = 10
-    GuideContent.Parent = ScrollGuide
-    local CloseGuideBtn = Instance.new("TextButton")
-    CloseGuideBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-    CloseGuideBtn.TextColor3 = Color3.fromRGB(15, 15, 15)
-    CloseGuideBtn.Text = "✖ ĐÃ HIỂU - VÀO GIAO DIỆN CHÍNH"
-    CloseGuideBtn.TextSize = 12
-    CloseGuideBtn.Font = Enum.Font.GothamBold
-    CloseGuideBtn.ZIndex = 10
-    CloseGuideBtn.Parent = GuideFrame
-    Instance.new("UICorner", CloseGuideBtn).CornerRadius = UDim.new(0, 8)
-    GuideFrame.Size = UDim2.new(0, 540, 0, 350)
-    GuideFrame.Position = UDim2.new(0.5, -270, 0.5, -175)
-    ScrollGuide.Size = UDim2.new(0.94, 0, 0, 240)
-    ScrollGuide.Position = UDim2.new(0.03, 0, 0, 45)
-    ScrollGuide.CanvasSize = UDim2.new(0, 0, 0, 1370)
-    GuideContent.Size = UDim2.new(1, -10, 0, 1370)
-    CloseGuideBtn.Size = UDim2.new(0.94, 0, 0, 38)
-    CloseGuideBtn.Position = UDim2.new(0.03, 0, 0, 298)
-    GuideFrame.Visible = true
-    CloseGuideBtn.MouseButton1Click:Connect(function()
-        GuideFrame.Visible = false
+    
         HubFrame.Visible = true
     end)
 end
@@ -2981,6 +2901,7 @@ if not Computers then return end
     of_killBV()
     of_jobFired = false
     of_resetUntil = 0
+if writefile then pcall(writefile, "autoFarm_flag.txt", "0") end
 
     -- đứng lên khỏi ghế
     local h = of_humanoid()
@@ -3024,6 +2945,13 @@ refreshStatPanel()
     TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
     of_jobFired = true
     of_resetUntil = os.clock() + 5
+    -- auto bật rejoin
+    if writefile then pcall(writefile, "autoFarm_flag.txt", "1") end
+    if queue_on_teleport then
+        pcall(queue_on_teleport, [[
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()
+]])
+end
 
     local char = player.Character
     of_enableSit(char)
@@ -3099,6 +3027,17 @@ task.spawn(function()
         local f = pos - (idx - 1)
         statStroke.Color = RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
         task.wait(0.03)
+
     end
 end)
-                     
+  -- auto rejoin: nếu flag set → tự bật farm
+if readfile and isfile and isfile("autoFarm_flag.txt") then
+    local ok, v = pcall(readfile, "autoFarm_flag.txt")
+    if ok and v == "1" then
+        task.wait(5)
+        -- trigger farm bật
+        local ok2 = pcall(function()
+            farmSwitch.track.MouseButton1Click:Fire()
+        end)
+    end
+end                   
