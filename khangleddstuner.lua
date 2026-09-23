@@ -1378,7 +1378,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
 
     
         HubFrame.Visible = true
-    end)
 end
 
 -- ============================================================
