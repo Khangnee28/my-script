@@ -3111,7 +3111,23 @@ if _autoRejoin then
 end
 
 task.spawn(function()
+    -- chỉ chạy auto-PLAY khi vừa rejoin (< 120s)
+    local wasRejoin = false
+    if readfile and isfile and isfile("lastRejoin.txt") then
+        local ok, v = pcall(readfile, "lastRejoin.txt")
+        if ok then
+            local t = tonumber(v) or 0
+            if t > 0 and os.time() - t < 60 then wasRejoin = true end
+        end
+    end
+
+    -- nếu KHÔNG phải rejoin → skip block này, không click PLAY
+    if not wasRejoin then
+        return
+    end
+
     task.wait(15)
+    -- ... phần còn lại giữ nguyên
 
     local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if not pg then return end
@@ -3195,7 +3211,10 @@ task.spawn(function()
     end
     if lbl2 then clickAt(lbl2) end
 
-    task.wait(10)
+-- xóa marker để lần load script sau không click PLAY nữa
+if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+
+task.wait(10)
 
     -- bật farm nếu flag = "1"
     if readfile and isfile and isfile("farmState.txt") then
