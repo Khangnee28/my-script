@@ -1,3 +1,4 @@
+
 -- ============================================================
 -- KHANGLE DDS HUB
 -- ============================================================
@@ -3109,72 +3110,90 @@ if _autoRejoin then
     end)
 end
 task.spawn(function()
+task.spawn(function()
     task.wait(15)
-local function findPlayBtn()
+
     local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    local cg = game:GetService("CoreGui")
-    local function scan(root)
-        if not root then return nil end
-        for _, d in ipairs(root:GetDescendants()) do
-            if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible and d.AbsoluteSize.X > 0 then
-                local txt = ""
-                if d:IsA("TextButton") then
-                    txt = d.Text
-                end
-                if txt == "CHƠI" or txt == "Chơi" or txt == "PLAY" or txt == "Play" then
-                    return d
-                end
+    if not pg then return end
+
+    -- click tại tọa độ textLabel PLAY
+    local function clickAt(label)
+        if not label then return false end
+        local x = label.AbsolutePosition.X + label.AbsoluteSize.X / 2
+        local y = label.AbsolutePosition.Y + label.AbsoluteSize.Y / 2
+
+        if pcall(function()
+            touchpress(x, y)
+            task.wait(0.1)
+            touchrelease(x, y)
+        end) then return true end
+
+        -- fallback firesignal nếu parent là button
+        local p = label.Parent
+        if p and p:IsA("TextButton") then
+            if pcall(function() firesignal(p.MouseButton1Click) end) then return true end
+        end
+        return false
+    end
+
+    -- tìm textLabel PLAY, chỉ lấy nút trong homeFrame
+    local function findHomePlay()
+        local menu = pg:FindFirstChild("mainMenuSystem")
+        if not menu then return nil end
+        local base = menu:FindFirstChild("baseFrame")
+        if not base then return nil end
+        local home = base:FindFirstChild("homeFrame")
+        if not home then return nil end
+        for _, d in ipairs(home:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
+                return d
             end
-            if d:IsA("TextLabel") and d.Visible then
-                local txt = d.Text
-                if txt == "CHƠI" or txt == "Chơi" or txt == "PLAY" or txt == "Play" then
-                    local p = d.Parent
-                    if p and (p:IsA("TextButton") or p:IsA("ImageButton")) and p.Visible then
-                        return p
-                    end
+        end
+        return nil
+    end
+
+    -- tìm textLabel PLAY, chỉ lấy nút trong playFrame (không nằm trong homeFrame)
+    local function findTeamPlay()
+        local menu = pg:FindFirstChild("mainMenuSystem")
+        if not menu then return nil end
+        local base = menu:FindFirstChild("baseFrame")
+        if not base then return nil end
+        local play = base:FindFirstChild("playFrame")
+        if not play then return nil end
+        for _, d in ipairs(play:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
+                -- loại nút trong homeFrame (dùng IsDescendantOf)
+                local home = base:FindFirstChild("homeFrame")
+                if home and d:IsDescendantOf(home) then
+                    -- skip
+                else
+                    return d
                 end
             end
         end
         return nil
     end
-    return scan(pg) or scan(cg)
-end
-    local function clickBtn(btn)
-    if not btn then return false end
-    if pcall(function() firesignal(btn.MouseButton1Click) end) then return true end
-    if pcall(function() firesignal(btn.Activated) end) then return true end
-    local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
-    local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-    if pcall(function()
-        touchpress(x, y)
-        task.wait(0.08)
-        touchrelease(x, y)
-    end) then return true end
-    return false
-end
-    -- lần 1: menu chính
-    local clicked1 = false
+
+    -- LẦN 1: click PLAY trong homeFrame
+    local lbl1 = nil
     for i = 1, 8 do
-        local btn = findPlayBtn()
-        if btn then
-            if clickBtn(btn) then clicked1 = true break end
-        end
-        task.wait(1.5)
+        lbl1 = findHomePlay()
+        if lbl1 then break end
+        task.wait(1)
     end
-    if not clicked1 then return end
+    if lbl1 then clickAt(lbl1) end
 
     -- chờ menu đội hiện
     task.wait(3)
 
-    -- lần 2: menu đội
-    local clicked2 = false
+    -- LẦN 2: click PLAY trong playFrame
+    local lbl2 = nil
     for i = 1, 8 do
-        local btn = findPlayBtn()
-        if btn then
-            if clickBtn(btn) then clicked2 = true break end
-        end
-        task.wait(1.5)
+        lbl2 = findTeamPlay()
+        if lbl2 then break end
+        task.wait(1)
     end
+    if lbl2 then clickAt(lbl2) end
 
     task.wait(10)
 
