@@ -3108,18 +3108,85 @@ if _autoRejoin then
         end
     end)
 end
--- sau rejoin: đợi 15s → fire toggle request → đợi 10s → bật farm
+-- sau rejoin: đợi 15s → click CHƠI lần 1 → fire remote → đợi 10s → bật farm
 task.spawn(function()
-    task.wait(15)   -- chờ game load ổn định sau rejoin
+    task.wait(15)
 
+    -- hàm tìm nút CHƠI
+    local function findPlayBtn()
+        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        local cg = game:GetService("CoreGui")
+        local function scan(root)
+            if not root then return nil end
+            for _, d in ipairs(root:GetDescendants()) do
+                if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible and d.AbsoluteSize.X > 0 then
+                    local txt = ""
+                    if d:IsA("TextButton") then
+                        txt = d.Text
+                    end
+                    if txt == "CHƠI" or txt == "Chơi" or txt == "PLAY" or txt == "Play" then
+                        return d
+                    end
+                end
+                if d:IsA("TextLabel") and d.Visible then
+                    local txt = d.Text
+                    if txt == "CHƠI" or txt == "Chơi" or txt == "PLAY" or txt == "Play" then
+                        local p = d.Parent
+                        if p and (p:IsA("TextButton") or p:IsA("ImageButton")) and p.Visible then
+                            return p
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+        return scan(pg) or scan(cg)
+    end
+
+    -- hàm click bằng nhiều cách
+    local function clickBtn(btn)
+        if not btn then return false end
+        if pcall(function() firesignal(btn.MouseButton1Click) end) then return true end
+        if pcall(function() firesignal(btn.Activated) end) then return true end
+        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+        if pcall(function()
+            touchpress(x, y)
+            task.wait(0.08)
+            touchrelease(x, y)
+        end) then return true end
+        return false
+    end
+
+    -- BƯỚC 1: click CHƠI lần 1 (menu chính) → mở menu đội
+    local clicked1 = false
+    for i = 1, 8 do
+        local btn = findPlayBtn()
+        if btn then
+            if clickBtn(btn) then clicked1 = true break end
+        end
+        task.wait(1.5)
+    end
+
+    if not clicked1 then
+        -- không tìm được nút → thoát, không bật farm
+        return
+    end
+
+    -- BƯỚC 2: chờ menu đội hiện
+    task.wait(3)
+
+    -- BƯỚC 3: fire menuToggleRequest (= nút CHƠI lần 2)
     pcall(function()
         game:GetService("ReplicatedStorage")
             :WaitForChild("menuToggleRequest", 5)
             :FireServer()
     end)
 
-    task.wait(10)   -- chờ UI game load xong sau toggle
+    -- BƯỚC 4: chờ UI load
+    task.wait(10)
 
+    -- BƯỚC 5: bật farm nếu flag = "1"
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
         if ok and v == "1" then
