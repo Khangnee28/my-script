@@ -3040,18 +3040,7 @@ task.spawn(function()
 
     end
 end)
-  -- tự bật farm nếu lần trước đang bật
-if readfile and isfile and isfile("farmState.txt") then
-    local ok, v = pcall(readfile, "farmState.txt")
-    if ok and v == "1" then
-        task.wait(6)   -- chờ UI + JobEvents load
-        
-            pcall(function()
-    firesignal(farmSwitch.track.MouseButton1Click)
 
-        end)
-    end
-end
 -- đọc state auto execute + auto rejoin
 local _autoExecute = false
 local _autoRejoin = false
