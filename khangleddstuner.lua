@@ -1,5 +1,5 @@
 -- ============================================================
--- KHANGLE DDS HUB — 4080 REMIX v14
+-- KHANGLE DDS HUB
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -3119,28 +3119,18 @@ if _autoRejoin then
         end
     end)
 end
--- Bước 1: fire menuToggleRequest để vào game
+-- sau rejoin: đợi 15s → fire toggle request → đợi 10s → bật farm
 task.spawn(function()
-    task.wait(3)   -- chờ script + UI load
+    task.wait(15)   -- chờ game load ổn định sau rejoin
+
     pcall(function()
         game:GetService("ReplicatedStorage")
             :WaitForChild("menuToggleRequest", 5)
             :FireServer()
     end)
 
-    -- Bước 2: chờ vào game (char spawn) tối đa 30s
-    local deadline = os.clock() + 30
-    while os.clock() < deadline do
-        local c = game.Players.LocalPlayer.Character
-        if c and c:FindFirstChild("HumanoidRootPart") then
-            break
-        end
-        task.wait(0.5)
-    end
+    task.wait(10)   -- chờ UI game load xong sau toggle
 
-    task.wait(3)   -- chờ UI game load xong
-
-    -- Bước 3: bật farm nếu flag = "1"
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
         if ok and v == "1" then
