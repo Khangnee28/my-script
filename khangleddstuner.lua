@@ -3109,7 +3109,7 @@ if _autoRejoin then
         end
     end)
 end
-task.spawn(function()
+
 task.spawn(function()
     task.wait(15)
 
