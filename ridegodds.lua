@@ -239,8 +239,6 @@ local function flyTo(target, timeout)
     local hrp = root()
     if not h or not hrp then return false end
 
-    
-
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
     bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
@@ -261,30 +259,36 @@ local function flyTo(target, timeout)
 
             local delta = target - hrp.Position
             local dist = delta.Magnitude
-            if dist < ARRIVE_DIST then reached = true break end
+            if dist < ARRIVE_DIST then
+                reached = true
+                break
+            end
 
             bv.Velocity = delta.Unit * FLY_SPEED
 
-            
-            -- void scan phía trước mỗi 0.4s
-if os.clock() - lastCheck > 0.4 then
-    local forward = delta.Unit
-    local aheadPos = hrp.Position + forward * 30
-    local floorY = rayFloorY(aheadPos)
-    local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
+            if os.clock() - lastCheck > 0.4 then
+                local forward = delta.Unit
+                local aheadPos = hrp.Position + forward * 30
+                local floorY = rayFloorY(aheadPos)
+                local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
 
-    if isVoid then
-        bv.Velocity = Vector3.zero
-        local carModel = nil
-        if h.SeatPart then carModel = h.SeatPart:FindFirstAncestorOfClass("Model") end
-        if carModel then pcall(function() carModel:PivotTo(CFrame.new(target)) end) end
-        pcall(function() hrp.CFrame = CFrame.new(target) end)
-        task.wait(0.5)
-    end
-    lastCheck = os.clock()
-end
-
+                if isVoid then
+                    bv.Velocity = Vector3.zero
+                    local carModel = nil
+                    if h.SeatPart then
+                        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+                    end
+                    if carModel then
+                        pcall(function() carModel:PivotTo(CFrame.new(target)) end)
+                    end
+                    pcall(function() hrp.CFrame = CFrame.new(target) end)
+                    task.wait(0.5)
+                end
+                lastCheck = os.clock()
             end
+
+            task.wait(0.05)
+        end
     end)
 
     if bv and bv.Parent then bv:Destroy() end
