@@ -156,7 +156,7 @@ local function setNoclip(on)
             end
         end
     end
-    local car = myCar or findCarByName(selectedCar)
+    local car = myCar or findMyCar()
     if car then
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then
@@ -181,7 +181,7 @@ task.spawn(function()
                     end
                 end
             end
-            local car = myCar or findCarByName(selectedCar)
+            local car = myCar or findMyCar()
             if car then
                 for _, p in ipairs(car:GetDescendants()) do
                     if p:IsA("BasePart") and p.CanCollide then
@@ -200,7 +200,7 @@ local function rayFloorY(fromPos)
     local ignore = {}
     local c = char()
     if c then table.insert(ignore, c) end
-    local car = myCar or findCarByName(selectedCar)
+    local car = myCar or findMyCar()
     if car then table.insert(ignore, car) end
     params.FilterDescendantsInstances = ignore
     params.IgnoreWater = false
@@ -307,12 +307,12 @@ local function seatCar(timeout)
         local h = hum()
         local hrp = root()
         if h and h.Sit then
-            myCar = findCarByName(selectedCar) or findMyCar()
+            myCar = findMyCar()
             return true
         end
 
         if h and hrp then
-            local car = findCarByName(selectedCar) or findMyCar()
+            local car = findMyCar()
             if car then
                 -- tìm VehicleSeat
                 local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
@@ -348,7 +348,7 @@ local function spawnAndSeat()
     end
 
     -- BƯỚC 1: check xe đã có sẵn chưa
-    local car = findCarByName(selectedCar)
+    local car = findMyCar()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
         -- xe có → chỉ cần seat
         setState("ngồi xe có sẵn")
@@ -366,7 +366,7 @@ local function spawnAndSeat()
     -- BƯỚC 3: chờ xe hiện (async, tối đa 20s)
     local deadline = os.clock() + 20
     while os.clock() < deadline and enabled do
-        car = findCarByName(selectedCar)
+        car = findMyCar()
         if car and car:FindFirstChildWhichIsA("BasePart", true) then
             -- check part đã anchor chưa (xe rơi xong)
             local root = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
@@ -417,7 +417,7 @@ local function doInit()
         return false
     end
 
-    myCar = findCarByName(selectedCar) or findMyCar()
+    myCar = findMyCar()
     setNoclip(true)
     setState("sẵn sàng")
     return true
@@ -432,7 +432,7 @@ if not h or not h.Sit then
         return
     end
 end
-    myCar = findCarByName(selectedCar) or findMyCar()
+    myCar = findMyCar()
 
     setNoclip(true)
 
