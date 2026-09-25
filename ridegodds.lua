@@ -7,7 +7,7 @@ local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST     = 25      -- studs moi buoc
+local STEP_DIST     = 55      -- studs moi buoc
 local STEP_DELAY    = 0.06    -- giay giua cac buoc
 local ARRIVE_DIST   = 8
 local FLY_TIMEOUT   = 60
@@ -260,12 +260,24 @@ local function flyTo(target, timeout)
     local car = myCar or findMyCar()
     if not h or not car then return false end
 
-    anchorCar(true)
+    anchorCar(false)   -- KHÔNG anchor
     task.wait(0.1)
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
+    -- BV gắn vào DriveSeat (hoặc HRP nếu không có)
+    local vs = getDriveSeat(car)
+    local attach = vs or root()
+    if not attach then return false end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFly"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 5000  -- độ bám cao, không lag
+    bv.Velocity = Vector3.zero
+    bv.Parent = attach
+
     local reached = false
-    local GROUND_OFFSET = 8   -- bay cao 8 studs tren mat dat
+    local FLY_Y = 15   -- cao cách đất 15 studs
 
     while os.clock() < deadline and enabled do
         car = myCar or findMyCar()
@@ -274,82 +286,62 @@ local function flyTo(target, timeout)
         local hrp = root()
         if not hrp then break end
 
-        local vs = getDriveSeat(car)
+        vs = getDriveSeat(car)
         local curPos = (h.Sit and vs) and vs.Position or hrp.Position
 
-        -- chi check khoang cach ngang (X,Z)
+        -- khoảng cách ngang
         local delta = target - curPos
         local flat = Vector3.new(delta.X, 0, delta.Z)
         local dist = flat.Magnitude
+
         if dist < ARRIVE_DIST then
             reached = true
             break
         end
 
-        local dir = flat.Unit
-
-        -- raycast phia truoc 40 studs: check void
-        local aheadPos = curPos + dir * 40
-local aheadFloorY = rayFloorY(aheadPos)
-local curFloorY = rayFloorY(curPos)
-local isVoidAhead = (aheadFloorY == nil)
-    or (curFloorY and (curFloorY - aheadFloorY > 30))
-    or (aheadFloorY < -50)
-
-        if isVoidAhead then
-            -- tim bo ben kia void
-            for testDist = 80, 500, 20 do
-    local testPos = curPos + dir * testDist
-    local fY = rayFloorY(testPos)
-    -- bờ bên kia: sàn cao ngang sàn hiện tại (không phải đáy vực)
-    if fY and curFloorY and (curFloorY - fY < 30) then
-        jumpDist = testDist
-        jumpFloorY = fY
-        break
-    end
-end
-            if jumpFloorY then
-                local dest = Vector3.new(
-                    curPos.X + dir.X * jumpDist,
-                    jumpFloorY + GROUND_OFFSET,
-                    curPos.Z + dir.Z * jumpDist
-                )
-                pcall(function() car:PivotTo(CFrame.new(dest)) end)
-                if not h.Sit then forceSeat() end
-                task.wait(0.15)
-            else
-                -- khong tim duoc bo -> dung lai
-                break
-            end
+        -- target Y: giữ cao trên mặt đất hoặc trên sàn đích
+        local targetFloorY = rayFloorY(target)
+        local targetY
+        if targetFloorY then
+            targetY = targetFloorY + FLY_Y
         else
-            -- buoc binh thuong: 25 studs
-            local step = math.min(STEP_DIST, dist)
-            local flatNext = curPos + dir * step
-
-            -- raycast xuong tai vi tri moi -> lay Y cua mat dat
-            local nextFloorY = rayFloorY(flatNext)
-            local nextY
-            if nextFloorY then
-                nextY = nextFloorY + GROUND_OFFSET
-            else
-                nextY = curPos.Y
-            end
-
-            local nextPos = Vector3.new(flatNext.X, nextY, flatNext.Z)
-            pcall(function() car:PivotTo(CFrame.new(nextPos)) end)
-            if not h.Sit then forceSeat() end
-            task.wait(STEP_DELAY)
+            targetY = target.Y + FLY_Y
         end
+
+        -- vector bay: ngang tới target + Y giữ cao
+        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+        local speed = STEP_DIST   -- 25 studs/s
+        -- gần tới → giảm tốc
+        if dist < 80 then
+            speed = math.max(STEP_DIST * dist / 80, 5)
+        end
+
+        local vx = dir.X * speed
+        local vz = dir.Z * speed
+        -- Y: kéo về độ cao mục tiêu
+        local vy = (targetY - curPos.Y) * 3
+        vy = math.clamp(vy, -50, 50)
+
+        bv.Velocity = Vector3.new(vx, vy, vz)
+
+        if not h.Sit then forceSeat() end
+
+        task.wait(0.1)
     end
 
-    anchorCar(false)
+    -- gần tới: tắt BV → xe rơi tự do
+    if bv and bv.Parent then bv:Destroy() end
 
-    local h2 = hum()
-    if h2 and h2.SeatPart then
-        pcall(function()
-            h2.SeatPart.AssemblyLinearVelocity = Vector3.zero
-            h2.SeatPart.AssemblyAngularVelocity = Vector3.zero
-        end)
+    -- chờ xe hạ xuống đất
+    local t0 = os.clock()
+    while os.clock() - t0 < 3 and enabled do
+        task.wait(0.1)
+        local hrp2 = root()
+        if not hrp2 then break end
+        local floorY = rayFloorY(hrp2.Position)
+        if floorY and hrp2.Position.Y - floorY < 5 then
+            break
+        end
     end
 
     task.wait(0.2)
