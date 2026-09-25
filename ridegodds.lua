@@ -256,6 +256,7 @@ local function rayFloorY(fromPos)
     return nil
 end
 
+
 local function flyTo(target, timeout)
     timeout = timeout or FLY_TIMEOUT
     local deadline = os.clock() + timeout
@@ -283,18 +284,26 @@ local function flyTo(target, timeout)
 
             local delta = target - hrp.Position
             local dist = delta.Magnitude
-            if dist < ARRIVE_DIST then
+
+            -- ngưỡng dừng lớn hơn để chắc chắn tới
+            if dist < 6 then
                 reached = true
                 break
             end
 
-            local dir = delta.Unit
--- nếu đang rơi (Y âm > -20), ép trồi lên
-if hrp.Position.Y - target.Y < -20 then
-    dir = Vector3.new(dir.X, math.max(dir.Y, 0.5), dir.Z).Unit
-end
-bv.Velocity = dir * FLY_SPEED
+            -- giảm tốc khi gần tới
+            local speed = FLY_SPEED
+            if dist < 60 then
+                speed = math.max(FLY_SPEED * (dist / 60), 20)
+            end
 
+            local dir = delta.Unit
+            if hrp.Position.Y - target.Y < -20 then
+                dir = Vector3.new(dir.X, math.max(dir.Y, 0.5), dir.Z).Unit
+            end
+            bv.Velocity = dir * speed
+
+            -- void scan phía trước
             if os.clock() - lastCheck > 0.4 then
                 local forward = delta.Unit
                 local aheadPos = hrp.Position + forward * 30
@@ -302,19 +311,18 @@ bv.Velocity = dir * FLY_SPEED
                 local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
 
                 if isVoid then
-    bv.Velocity = Vector3.zero
-    local carModel = nil
-    if h.SeatPart then
-        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
-    end
-    -- tele Y cao hơn 15 studs để không kẹt đất
-    local dest = Vector3.new(target.X, target.Y + 15, target.Z)
-    if carModel then
-        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-    end
-    pcall(function() hrp.CFrame = CFrame.new(dest) end)
-    task.wait(0.5)
-end
+                    bv.Velocity = Vector3.zero
+                    local carModel = nil
+                    if h.SeatPart then
+                        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+                    end
+                    local dest = Vector3.new(target.X, target.Y + 15, target.Z)
+                    if carModel then
+                        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+                    end
+                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
+                    task.wait(0.5)
+                end
                 lastCheck = os.clock()
             end
 
@@ -322,7 +330,25 @@ end
         end
     end)
 
+    -- dừng hoàn toàn, không trôi
     if bv and bv.Parent then bv:Destroy() end
+
+    local h2 = hum()
+    if h2 and h2.SeatPart then
+        pcall(function()
+            h2.SeatPart.AssemblyLinearVelocity = Vector3.zero
+            h2.SeatPart.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    local hrp2 = root()
+    if hrp2 then
+        pcall(function()
+            hrp2.AssemblyLinearVelocity = Vector3.zero
+            hrp2.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+
+    task.wait(0.3)
     return reached
 end
 
@@ -494,9 +520,17 @@ end
     setState("đón khách")
 setAntiGravity(false)
 flyTo(pickupPos, 40)
+setAntiGravity(true)   -- chống trôi/rơi tại điểm đón
 
     setState("khách lên xe (5s)")
-setAntiGravity(true)
+-- đảm bảo đứng yên
+local hrp0 = root()
+if hrp0 then
+    pcall(function()
+        hrp0.AssemblyLinearVelocity = Vector3.zero
+        hrp0.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
 task.wait(5)
 
     if dropPos then
