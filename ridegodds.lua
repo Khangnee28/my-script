@@ -88,47 +88,30 @@ local function setState(s) curState = s end
 
 local function scanCars()
     carList = {}
+    if not InitCarData then return carList end
 
-    -- bước 1: InitializeCarData (quét data xe)
-    if InitCarData then
-        pcall(function() InitCarData:InvokeServer() end)
-        task.wait(1)
-    end
+    local ok, data = pcall(function() return InitCarData:InvokeServer() end)
+    if not ok or type(data) ~= "table" then return carList end
 
-    -- bước 2: GetInfoCarSlot (lấy slot có xe)
-    local sources = {}
-    if GetInfoCarSlot then table.insert(sources, GetInfoCarSlot) end
-    if InitCarData then table.insert(sources, InitCarData) end
-
-    for _, remote in ipairs(sources) do
-        if #carList > 0 then break end
-        local ok, data = pcall(function() return remote:InvokeServer() end)
-        if ok and type(data) == "table" then
-            -- dạng 1: {car1, car2, ...}
-            for _, v in pairs(data) do
-                if type(v) == "string" then
-                    table.insert(carList, v)
-                elseif type(v) == "table" then
-                    if type(v.Name) == "string" then
-                        table.insert(carList, v.Name)
-                    elseif type(v.Model) == "string" then
-                        table.insert(carList, v.Model)
-                    elseif type(v.CarName) == "string" then
-                        table.insert(carList, v.CarName)
-                    end
-                end
-            end
-            -- dạng 2: {slot1 = "carA", slot2 = "carB"}
-            if #carList == 0 and type(data) == "table" then
-                for k, v in pairs(data) do
-                    if type(v) == "string" then
-                        table.insert(carList, v)
-                    end
-                end
+    for _, v in pairs(data) do
+        if type(v) == "table" then
+            -- Name = tên model, dùng để spawn
+            if type(v.Name) == "string" and v.Name ~= "" then
+                table.insert(carList, v.Name)
             end
         end
     end
 
+    -- unique + sort
+    local seen, uniq = {}, {}
+    for _, n in ipairs(carList) do
+        if not seen[n] then
+            seen[n] = true
+            table.insert(uniq, n)
+        end
+    end
+    table.sort(uniq)
+    carList = uniq
     return carList
 end
 
@@ -219,30 +202,18 @@ local function seatCar(timeout)
     return false
 end
 
--- spawn xe + tự seat
 local function spawnAndSeat()
-    if #carList == 0 then scanCars() end
-
-    -- thử selectedCar trước
+    if not SpawnCarEv then return false end
+    setState("spawn " .. selectedCar:sub(1, 20))
     fire(SpawnCarEv, selectedCar)
-    task.wait(2)
-    if seatCar(6) then
+    task.wait(2.5)
+
+    if seatCar(8) then
         myCar = findMyCar()
+        setState("sẵn sàng")
         return true
     end
-
-    -- nếu fail, thử từng xe trong list
-    for _, name in ipairs(carList) do
-        if name ~= selectedCar then
-            fire(SpawnCarEv, name)
-            task.wait(2)
-            if seatCar(5) then
-                myCar = findMyCar()
-                selectedCar = name
-                return true
-            end
-        end
-    end
+    setState("spawn fail")
     return false
 end
 
@@ -397,10 +368,31 @@ toggleBtn.TextSize = 12
 toggleBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
 
--- nút scan xe
-local scanBtn = Instance.new("TextButton", rootUI)
-scanBtn.Size = UDim2.new(1, -16, 0, 26)
-scanBtn.Position = UDim2.new(0, 8, 0, 114)
+-- header bảng xe (đóng/mở)
+local carHeader = Instance.new("TextButton", rootUI)
+carHeader.Size = UDim2.new(1, -16, 0, 26)
+carHeader.Position = UDim2.new(0, 8, 0, 114)
+carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
+carHeader.Text = "▶ 🚗 CHỌN XE (0)"
+carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
+carHeader.TextSize = 11
+carHeader.Font = Enum.Font.GothamBold
+carHeader.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", carHeader).CornerRadius = UDim.new(0, 6)
+local chp = Instance.new("UIPadding", carHeader)
+chp.PaddingLeft = UDim.new(0, 8)
+
+-- body bảng xe (ẩn mặc định)
+local carBody = Instance.new("Frame", rootUI)
+carBody.Size = UDim2.new(1, -16, 0, 0)
+carBody.Position = UDim2.new(0, 8, 0, 146)
+carBody.BackgroundTransparency = 1
+carBody.Visible = false
+
+-- nút quét
+local scanBtn = Instance.new("TextButton", carBody)
+scanBtn.Size = UDim2.new(1, 0, 0, 26)
+scanBtn.Position = UDim2.new(0, 0, 0, 0)
 scanBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 90)
 scanBtn.Text = "🔍 QUÉT XE"
 scanBtn.TextColor3 = Color3.new(1,1,1)
@@ -408,10 +400,10 @@ scanBtn.TextSize = 11
 scanBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
 
--- scroll list xe
-local scroll = Instance.new("ScrollingFrame", rootUI)
-scroll.Size = UDim2.new(1, -16, 0, 160)
-scroll.Position = UDim2.new(0, 8, 0, 146)
+-- scroll list
+local scroll = Instance.new("ScrollingFrame", carBody)
+scroll.Size = UDim2.new(1, 0, 0, 150)
+scroll.Position = UDim2.new(0, 0, 0, 32)
 scroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 4
@@ -428,51 +420,19 @@ sPad.PaddingLeft = UDim.new(0, 6)
 sPad.PaddingRight = UDim.new(0, 6)
 sPad.PaddingBottom = UDim.new(0, 6)
 
-local function clearList()
-    for _, c in ipairs(scroll:GetChildren()) do
-        if c:IsA("GuiObject") then c:Destroy() end
+-- toggle
+local carOpen = false
+carHeader.MouseButton1Click:Connect(function()
+    carOpen = not carOpen
+    carBody.Visible = carOpen
+    if carOpen then
+        carBody.Size = UDim2.new(1, -16, 0, 186)
+        rootUI.Size = UDim2.new(0, 280, 0, 340)
+    else
+        carBody.Size = UDim2.new(1, -16, 0, 0)
+        rootUI.Size = UDim2.new(0, 280, 0, 148)
     end
-end
-
-local function renderCars()
-    clearList()
-    if #carList == 0 then
-        local lbl = Instance.new("TextLabel", scroll)
-        lbl.Size = UDim2.new(1, -12, 0, 40)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "chưa quét xe — tap QUÉT XE"
-        lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
-        lbl.TextSize = 10
-        lbl.Font = Enum.Font.GothamMedium
-        lbl.TextWrapped = true
-        return
-    end
-    for i, name in ipairs(carList) do
-        local btn = Instance.new("TextButton", scroll)
-        btn.Size = UDim2.new(1, -12, 0, 34)
-        btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
-        btn.Text = "  " .. name
-        btn.TextColor3 = Color3.fromRGB(220, 230, 240)
-        btn.TextSize = 10
-        btn.Font = Enum.Font.Code
-        btn.TextXAlignment = Enum.TextXAlignment.Left
-        btn.TextTruncate = Enum.TextTruncate.AtEnd
-        btn.LayoutOrder = i
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-        btn.MouseButton1Click:Connect(function()
-            selectedCar = name
-            renderCars()
-        end)
-    end
-end
-
-scanBtn.MouseButton1Click:Connect(function()
-    scanBtn.Text = "⏳ đang quét..."
-    task.spawn(function()
-        scanCars()
-        renderCars()
-        scanBtn.Text = "🔍 QUÉT XE (" .. #carList .. ")"
-    end)
+    carHeader.Text = (carOpen and "▼ " or "▶ ") .. "🚗 CHỌN XE (" .. #carList .. ")"
 end)
 
 local function paint()
@@ -524,12 +484,14 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
--- tự scan 1 lần khi load
 task.spawn(function()
     task.wait(1)
     scanCars()
+    if #carList > 0 and (not selectedCar or selectedCar == "") then
+        selectedCar = carList[1]
+    end
     renderCars()
-    scanBtn.Text = "🔍 QUÉT XE (" .. #carList .. ")"
+    carHeader.Text = "▶ 🚗 CHỌN XE (" .. #carList .. ")"
 end)
 
 print("[ridego v4] loaded")
