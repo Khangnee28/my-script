@@ -9,9 +9,9 @@ local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local FLY_SPEED     = 130
+local FLY_SPEED     = 80
 local FLY_TIMEOUT   = 40
-local ARRIVE_DIST   = 6
+local ARRIVE_DIST   = 8
 local ORDER_TIMEOUT = 30
 local PICKUP_WAIT   = 8
 local DROP_WAIT     = 8
@@ -318,9 +318,11 @@ local function flyTo(target, timeout)
             end
 
             local speed = FLY_SPEED
-            if dist < 60 then
-                speed = math.max(FLY_SPEED * (dist / 60), 20)
-            end
+            local speed = FLY_SPEED
+if dist < 80 then
+    speed = math.max(FLY_SPEED * (dist / 80), 15)
+end
+            
 
             local dir = delta.Unit
             if hrp.Position.Y - target.Y < -20 then
@@ -328,15 +330,28 @@ local function flyTo(target, timeout)
             end
             bv.Velocity = dir * speed
 
-            if os.clock() - lastCheck > 0.15 then
+-- ép seat mỗi frame, không cho té
+if not h.Sit then
+    local vs = attach:IsA("VehicleSeat") and attach or nil
+    if not vs then
+        local carM = myCar or findMyCar()
+        if carM then
+            vs = carM:FindFirstChildWhichIsA("VehicleSeat", true)
+        end
+    end
+    if vs and vs.Occupant ~= h then
+        pcall(function() vs:Sit(h) end)
+    end
+end
+
+if os.clock() - lastCheck > 0.15 then
                 local origin = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
                 local belowY = rayFloorY(origin)
                 local isVoid = (belowY == nil) or (hrp.Position.Y - belowY > 50)
 
                 if isVoid then
                     bv.Velocity = Vector3.zero
-                    bv.MaxForce = Vector3.new(0, 0, 0)
-
+                    bv.MaxForce = Vector3.new(1e7, 1e7, 1e7)
                     local forward = delta.Unit
                     local curY = hrp.Position.Y
 
@@ -378,7 +393,7 @@ local function flyTo(target, timeout)
                         end
                     end
 
-                    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+                    bv.MaxForce = Vector3.new(1e7, 1e7, 1e7)
                     task.wait(0.3)
                 end
 
