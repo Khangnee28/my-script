@@ -156,7 +156,7 @@ local function setNoclip(on)
             end
         end
     end
-    local car = myCar or findMyCar()
+    local car = findMyCar()
     if car then
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then
@@ -181,7 +181,7 @@ task.spawn(function()
                     end
                 end
             end
-            local car = myCar or findMyCar()
+            local car = findMyCar()
             if car then
                 for _, p in ipairs(car:GetDescendants()) do
                     if p:IsA("BasePart") and p.CanCollide then
@@ -200,7 +200,7 @@ local function rayFloorY(fromPos)
     local ignore = {}
     local c = char()
     if c then table.insert(ignore, c) end
-    local car = myCar or findMyCar()
+    local car = findMyCar()
     if car then table.insert(ignore, car) end
     params.FilterDescendantsInstances = ignore
     params.IgnoreWater = false
@@ -395,7 +395,6 @@ end
 
 -- ============ INIT (1 LẦN) ============
 local function doInit()
-    -- check đã ngồi xe chưa
     local h = hum()
     if h and h.Sit then
         myCar = findMyCar()
@@ -413,7 +412,7 @@ local function doInit()
 
     setState("spawn xe")
     if not spawnAndSeat() then
-        setState("spawn fail")
+        -- giữ nguyên curState lúc này (đã set bên trong spawnAndSeat)
         return false
     end
 
@@ -486,10 +485,10 @@ local function startLoop()
             initialized = ok
         end
         if not initialized then
-            setState("init fail")
-            loopBusy = false
-            return
-        end
+    -- curState đã được set bên trong doInit, giữ nguyên
+    loopBusy = false
+    return
+end
 
         while enabled do
             local ok, err = pcall(runTrip)
