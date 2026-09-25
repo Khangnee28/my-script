@@ -12,7 +12,7 @@ local lp = Players.LocalPlayer
 -- ============ CONFIG ============
 local STEP_DIST     = 180      -- studs/s
 local FLY_Y         = 5        -- cao cach mat dat
-local ARRIVE_DIST   = 10       -- khoang cach tinh la toi
+local ARRIVE_DIST   = 12       -- khoang cach tinh la toi
 local ORDER_TIMEOUT = 60
 local PICKUP_WAIT   = 8
 local DROP_WAIT     = 8
@@ -279,7 +279,7 @@ local function seatCar(timeout)
 end
 
 -- ============ FLY ============
-local function flyTo(target)
+ function flyTo(target)
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
@@ -299,6 +299,8 @@ local function flyTo(target)
     bv.Parent = attach
 
     local reached = false
+    local DECEL_DIST = 200   -- bat dau giam toc tu 200 studs
+    local ARRIVE = 8         -- dung khi cach target < 8
 
     while enabled do
         car = myCar or findMyCar()
@@ -318,7 +320,7 @@ local function flyTo(target)
         local flat = Vector3.new(delta.X, 0, delta.Z)
         local dist = flat.Magnitude
 
-        if dist < ARRIVE_DIST then
+        if dist < ARRIVE then
             reached = true
             bv.Velocity = Vector3.zero
             bv.MaxForce = Vector3.new(0, 0, 0)
@@ -369,18 +371,23 @@ local function flyTo(target)
                 targetY = curPos.Y
             end
 
-            local speed = STEP_DIST
-            if dist < 60 then
-                speed = math.max(STEP_DIST * (dist / 60) * 0.5, 5)
-            end
-            if dist < 20 then
-                speed = math.max(speed * 0.4, 3)
+            -- ==== GIAM TOC TUYEN TINH ====
+            -- dist 200 -> speed = STEP_DIST
+            -- dist 20  -> speed ~ 18
+            -- dist 8   -> speed ~ 7
+            local speed
+            if dist >= DECEL_DIST then
+                speed = STEP_DIST
+            else
+                -- ty le: dist/200 * STEP_DIST, san 4
+                speed = math.max(STEP_DIST * dist / DECEL_DIST, 4)
+                -- dist 8 -> 180*8/200 = 7.2 -> van > ARRIVE nen stop som
             end
 
             local vx = dir.X * speed
             local vz = dir.Z * speed
             local vy = (targetY - curPos.Y) * 5
-            vy = math.clamp(vy, -80, 80)
+            vy = math.clamp(vy, -60, 60)
 
             bv.Velocity = Vector3.new(vx, vy, vz)
 
@@ -389,11 +396,9 @@ local function flyTo(target)
         end
     end
 
-    -- ==== HẠ XE XUỐNG TỪ TỪ BẰNG PIVOTTO ====
+    -- ==== HA XE XUONG TU TU ====
     if bv and bv.Parent then bv:Destroy() end
-
-    -- chờ 0.2s cho xe ổn định
-    task.wait(0.2)
+    task.wait(0.15)
 
     car = myCar or findMyCar()
     if car then
@@ -401,51 +406,38 @@ local function flyTo(target)
         local curPos = (vs2 and vs2.Position) or (root() and root().Position)
 
         if curPos then
-            -- raycast xuống tìm sàn
             local floorY = rayFloorY(curPos)
-            if not floorY then
-                floorY = curPos.Y - 5   -- fallback
-            end
+            if not floorY then floorY = curPos.Y - 5 end
 
             local startY = curPos.Y
-            local targetY = floorY + 1   -- cách đất 1 stud
+            local targetY = floorY + 1
             local dropDist = startY - targetY
 
             if dropDist > 0.5 then
-                -- hạ theo bước nhỏ 3 studs/bước, 0.05s/bước
                 local step = 3
-                local delay = 0.05
                 local y = startY
                 while y > targetY and enabled do
                     y = y - step
                     if y < targetY then y = targetY end
-
                     local carM = myCar or findMyCar()
                     if carM then
                         local newPos = Vector3.new(curPos.X, y, curPos.Z)
                         pcall(function() carM:PivotTo(CFrame.new(newPos)) end)
                     end
-
-                    -- force seat trong lúc hạ
                     if not h.Sit then forceSeat() end
-
-                    task.wait(delay)
+                    task.wait(0.05)
                 end
             end
         end
     end
 
-    -- chờ xe ổn định trên mặt đất
     task.wait(0.3)
-
-    -- force seat lần cuối
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
         task.wait(0.3)
     end
 
-    -- TẮT NOCLIP SAU KHI ĐÃ HẠ XUỐNG
     setCarNoclip(false)
     task.wait(0.2)
     return reached
