@@ -237,6 +237,21 @@ local function seatCar(timeout)
 end
 
 -- ============ FLY (anchored + PivotTo) ============
+local function rayFloorY(fromPos)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ignore = {}
+    local c = char()
+    if c then table.insert(ignore, c) end
+    local car = myCar or findMyCar()
+    if car then table.insert(ignore, car) end
+    params.FilterDescendantsInstances = ignore
+    params.IgnoreWater = true
+    local hit = workspace:Raycast(fromPos + Vector3.new(0, 2, 0), Vector3.new(0, -500, 0), params)
+    if hit then return hit.Position.Y end
+    return nil
+end
+
 local function flyTo(target, timeout)
     timeout = timeout or FLY_TIMEOUT
     local deadline = os.clock() + timeout
