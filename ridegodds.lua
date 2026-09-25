@@ -120,32 +120,28 @@ local function scanCars()
 end
 
 local function findMyCar()
+    -- ưu tiên: char đang ngồi
     local c = char()
-    if not c then return nil end
-    local h = c:FindFirstChildOfClass("Humanoid")
-    if h and h.SeatPart then
-        return h.SeatPart:FindFirstAncestorOfClass("Model")
+    if c then
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if h and h.SeatPart then
+            return h.SeatPart:FindFirstAncestorOfClass("Model")
+        end
+    end
+    -- fallback: model có tên player + VehicleSeat
+    local pname = lp.Name:lower()
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("Model") then
+            local dn = d.Name:lower()
+            if dn:find(pname, 1, true) and d:FindFirstChildWhichIsA("VehicleSeat", true) then
+                return d
+            end
+        end
     end
     return nil
 end
 
-local function findCarByName(name)
-    if not name or name == "" then return nil end
-    local lower = name:lower()
-    -- ưu tiên exact
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("Model") and d.Name == name then
-            return d
-        end
-    end
-    -- fallback substring
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("Model") and d.Name:lower():find(lower, 1, true) then
-            return d
-        end
-    end
-    return nil
-end
+
 -- noclip flag
 local noclipOn = false
 local noclipKeepRunning = false
