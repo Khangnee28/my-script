@@ -130,8 +130,16 @@ local function findMyCar()
 end
 local function findCarByName(name)
     if not name or name == "" then return nil end
-    for _, d in ipairs(workspace:GetChildren()) do
+    -- match chính xác trước
+    for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("Model") and d.Name == name then
+            return d
+        end
+    end
+    -- match substring (tránh suffix hoặc prefix)
+    local lower = name:lower()
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("Model") and d.Name:lower():find(lower, 1, true) then
             return d
         end
     end
