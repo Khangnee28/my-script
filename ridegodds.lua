@@ -245,63 +245,88 @@ local function flyTo(target, timeout)
     local car = myCar or findMyCar()
     if not h or not car then return false end
 
-    -- anchor car - khong roi, khong va tuong
     anchorCar(true)
     task.wait(0.1)
-
-    -- ep seat truoc khi bay
-    if not h.Sit then
-        forceSeat()
-        task.wait(0.1)
-    end
+    if not h.Sit then forceSeat(); task.wait(0.1) end
 
     local reached = false
+    local GROUND_OFFSET = 8   -- bay cao 8 studs tren mat dat
 
     while os.clock() < deadline and enabled do
-        -- re-check car + humanoid
         car = myCar or findMyCar()
         if not car then break end
 
         local hrp = root()
         if not hrp then break end
 
-        local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        local curPos
-        if h.Sit and vs then
-            curPos = vs.Position
-        else
-            curPos = hrp.Position
-        end
+        local vs = getDriveSeat(car)
+        local curPos = (h.Sit and vs) and vs.Position or hrp.Position
 
+        -- chi check khoang cach ngang (X,Z)
         local delta = target - curPos
-        local dist = delta.Magnitude
+        local flat = Vector3.new(delta.X, 0, delta.Z)
+        local dist = flat.Magnitude
         if dist < ARRIVE_DIST then
             reached = true
             break
         end
 
-        -- buoc tiep theo
-        local step = math.min(STEP_DIST, dist)
-        local dir = delta.Unit
-        local nextPos = curPos + dir * step
+        local dir = flat.Unit
 
-        -- PivotTo ca xe - char dang ngoi se di theo
-        pcall(function()
-            car:PivotTo(CFrame.new(nextPos))
-        end)
+        -- raycast phia truoc 40 studs: check void
+        local aheadPos = curPos + dir * 40
+        local aheadFloorY = rayFloorY(aheadPos)
+        local isVoidAhead = (aheadFloorY == nil) or (aheadFloorY < -50)
 
-        -- force seat moi buoc
-        if not h.Sit then
-            forceSeat()
+        if isVoidAhead then
+            -- tim bo ben kia void
+            local jumpDist = 80
+            local jumpFloorY = nil
+            for testDist = 50, 400, 25 do
+                local testPos = curPos + dir * testDist
+                local fY = rayFloorY(testPos)
+                if fY and fY > -50 then
+                    jumpDist = testDist
+                    jumpFloorY = fY
+                    break
+                end
+            end
+            if jumpFloorY then
+                local dest = Vector3.new(
+                    curPos.X + dir.X * jumpDist,
+                    jumpFloorY + GROUND_OFFSET,
+                    curPos.Z + dir.Z * jumpDist
+                )
+                pcall(function() car:PivotTo(CFrame.new(dest)) end)
+                if not h.Sit then forceSeat() end
+                task.wait(0.15)
+            else
+                -- khong tim duoc bo -> dung lai
+                break
+            end
+        else
+            -- buoc binh thuong: 25 studs
+            local step = math.min(STEP_DIST, dist)
+            local flatNext = curPos + dir * step
+
+            -- raycast xuong tai vi tri moi -> lay Y cua mat dat
+            local nextFloorY = rayFloorY(flatNext)
+            local nextY
+            if nextFloorY then
+                nextY = nextFloorY + GROUND_OFFSET
+            else
+                nextY = curPos.Y
+            end
+
+            local nextPos = Vector3.new(flatNext.X, nextY, flatNext.Z)
+            pcall(function() car:PivotTo(CFrame.new(nextPos)) end)
+            if not h.Sit then forceSeat() end
+            task.wait(STEP_DELAY)
         end
-
-        task.wait(STEP_DELAY)
     end
 
-    -- unanchor khi toi noi
     anchorCar(false)
 
-    -- brake
     local h2 = hum()
     if h2 and h2.SeatPart then
         pcall(function()
@@ -313,7 +338,6 @@ local function flyTo(target, timeout)
     task.wait(0.2)
     return reached
 end
-
 -- ============ SPAWN ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
