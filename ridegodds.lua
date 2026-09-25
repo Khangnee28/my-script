@@ -1,20 +1,23 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — bodyvelocity low-altitude edition
--- Bay thap 5 studs tren mat dat. Gap void -> CFrame qua bo ben kia.
--- Xe noclip khi bay. Khong anchor.
+-- RideGo Farm — final
+-- Init: doi job -> spawn xe -> seat -> online -> nhan bac don
+-- Loop: cho don -> bay pickup -> khach len -> bay drop -> khach xuong -> loop
+-- Bay nhanh, khong gioi han thoi gian, chi dung khi toi noi.
+-- Noclip ca xe + char khi bay.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST     = 55
-local FLY_Y         = 5
-local ARRIVE_DIST   = 8
-local FLY_TIMEOUT   = 60
-local ORDER_TIMEOUT = 30
+local STEP_DIST     = 180      -- studs/s
+local FLY_Y         = 5        -- cao cach mat dat
+local ARRIVE_DIST   = 10       -- khoang cach tinh la toi
+local ORDER_TIMEOUT = 60
 local PICKUP_WAIT   = 8
 local DROP_WAIT     = 8
+local MAX_FLY_TIME  = 999      -- khong gioi han
+local VOID_SEARCH   = 500      -- tam tim bo ben kia void
 
 -- ============ STATE ============
 local enabled     = false
@@ -147,7 +150,7 @@ local function rayFloorY(fromPos)
     return nil
 end
 
--- ============ NOCLIP (chi part xe) ============
+-- ============ NOCLIP (xe + char) ============
 local carNoclipOn = false
 local noclipHooked = {}
 
@@ -223,7 +226,7 @@ local function forceSeat()
     if h.Sit and h.SeatPart == vs then return end
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
-        task.wait(0.2)
+        task.wait(0.15)
     end
 
     if vs.Occupant and vs.Occupant ~= h then return end
@@ -276,10 +279,7 @@ local function seatCar(timeout)
 end
 
 -- ============ FLY ============
-local function flyTo(target, timeout)
-    timeout = timeout or FLY_TIMEOUT
-    local deadline = os.clock() + timeout
-
+local function flyTo(target)
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
@@ -293,14 +293,14 @@ local function flyTo(target, timeout)
 
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 5000
+    bv.MaxForce = Vector3.new(1e8, 1e8, 1e8)
+    bv.P = 10000
     bv.Velocity = Vector3.zero
     bv.Parent = attach
 
     local reached = false
 
-    while os.clock() < deadline and enabled do
+    while enabled do
         car = myCar or findMyCar()
         if not car then break end
         local hrp = root()
@@ -325,8 +325,7 @@ local function flyTo(target, timeout)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- check void phia truoc 40 studs
-        local aheadPos = curPos + dir * 40
+        local aheadPos = curPos + dir * 50
         local aheadFloorY = rayFloorY(aheadPos)
         local curFloorY = rayFloorY(curPos)
         local isVoidAhead = (aheadFloorY == nil)
@@ -334,10 +333,9 @@ local function flyTo(target, timeout)
             or (aheadFloorY and aheadFloorY < -50)
 
         if isVoidAhead then
-            -- tim bo ben kia: Y gan bang san hien tai
             local jumpDist = 100
             local jumpFloorY = nil
-            for testDist = 60, 500, 20 do
+            for testDist = 60, VOID_SEARCH, 20 do
                 local testPos = curPos + dir * testDist
                 local fY = rayFloorY(testPos)
                 if fY and curFloorY and math.abs(curFloorY - fY) < 25 then
@@ -352,7 +350,6 @@ local function flyTo(target, timeout)
                     jumpFloorY + FLY_Y,
                     curPos.Z + dir.Z * jumpDist
                 )
-                -- tele ca xe
                 local carModel = myCar or findMyCar()
                 if carModel then
                     pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
@@ -363,7 +360,6 @@ local function flyTo(target, timeout)
                 break
             end
         else
-            -- target Y: giu 5 studs tren mat dat
             local targetY
             if curFloorY then
                 targetY = curFloorY + FLY_Y
@@ -372,32 +368,31 @@ local function flyTo(target, timeout)
             end
 
             local speed = STEP_DIST
-            if dist < 80 then
-                speed = math.max(STEP_DIST * dist / 80, 5)
+            if dist < 30 then
+                speed = math.max(STEP_DIST * dist / 30, 8)
             end
 
             local vx = dir.X * speed
             local vz = dir.Z * speed
-            local vy = (targetY - curPos.Y) * 3
-            vy = math.clamp(vy, -50, 50)
+            local vy = (targetY - curPos.Y) * 5
+            vy = math.clamp(vy, -80, 80)
 
             bv.Velocity = Vector3.new(vx, vy, vz)
 
             if not h.Sit then forceSeat() end
-            task.wait(0.1)
+            task.wait(0.03)
         end
     end
 
     if bv and bv.Parent then bv:Destroy() end
 
-    -- ha canh
     local t0 = os.clock()
     while os.clock() - t0 < 3 and enabled do
         task.wait(0.1)
         local hrp2 = root()
         if not hrp2 then break end
         local floorY = rayFloorY(hrp2.Position)
-        if floorY and hrp2.Position.Y - floorY < 5 then
+        if floorY and hrp2.Position.Y - floorY < 6 then
             break
         end
     end
@@ -457,17 +452,19 @@ end
 
 -- ============ INIT ============
 local function doInit()
-    setState("spawn xe")
-    if not spawnAndSeat() then
-        return false
-    end
-
-    myCar = findMyCar()
-
+    -- 1. doi job
     setState("doi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
+    -- 2. spawn xe + seat
+    setState("spawn xe")
+    if not spawnAndSeat() then
+        return false
+    end
+    myCar = findMyCar()
+
+    -- 3. online
     setState("online")
     fire(TaxiEvent, "GoOnline")
     task.wait(2)
@@ -509,7 +506,7 @@ local function runTrip()
     end
 
     setState("don khach")
-    flyTo(pickupPos, 50)
+    flyTo(pickupPos)
     task.wait(1)
     forceSeat()
 
@@ -518,7 +515,7 @@ local function runTrip()
 
     if dropPos then
         setState("tra khach")
-        flyTo(dropPos, 60)
+        flyTo(dropPos)
         task.wait(1)
         forceSeat()
 
