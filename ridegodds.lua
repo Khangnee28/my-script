@@ -398,7 +398,6 @@ local function doInit()
     return true
 end
 
--- ============ LOOP (chỉ đợi đơn + đón trả) ============
 local function runTrip()
     local h = hum()
     if not h or not h.Sit then
@@ -406,18 +405,21 @@ local function runTrip()
         if not spawnAndSeat() then return end
     end
     myCar = findCarByName(selectedCar) or findMyCar()
-setNoclip(true)
-setState("sẵn sàng")
-return true
+
+    setNoclip(true)
 
     setState("chờ đơn")
     orderToken = nil
     pickupPos = nil
+
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
-        if pickupPos then break end
+        if pickupPos then
+            break
+        end
         task.wait(0.4)
     end
+
     if not pickupPos then
         setState("no pickup")
         setNoclip(false)
@@ -427,7 +429,6 @@ return true
     setState("đón khách")
     flyTo(pickupPos, 40)
 
-    -- đứng im 5s cho khách lên
     setState("khách lên xe (5s)")
     task.wait(5)
 
@@ -438,7 +439,6 @@ return true
         task.wait(6)
     end
 
-    -- TẮT NOCLIP sau trip
     setNoclip(false)
 
     pickupPos = nil
