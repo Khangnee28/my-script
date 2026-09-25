@@ -386,7 +386,8 @@ if os.clock() - lastCheck > 0.15 then
     lastCheck = os.clock()
             end
         end              
-    end)                 
+        end
+end)                 
 
     if bv and bv.Parent then bv:Destroy() end
     local h2 = hum()
