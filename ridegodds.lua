@@ -316,7 +316,7 @@ local function flyTo(target, timeout)
                 reached = true
                 break
             end
-
+            end
             local speed = FLY_SPEED
             if dist < 60 then
                 speed = math.max(FLY_SPEED * (dist / 60), 20)
