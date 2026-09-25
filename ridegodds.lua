@@ -145,7 +145,26 @@ end
 -- noclip flag
 local noclipOn = false
 local noclipKeepRunning = false
+-- giữ xe không rơi tự do khi đang chuẩn bị bay
+local antiGravBV = nil
+local function setAntiGravity(on)
+    if antiGravBV then
+        pcall(function() antiGravBV:Destroy() end)
+        antiGravBV = nil
+    end
+    if not on then return end
 
+    local car = findMyCar()
+    local h = hum()
+    if not car or not h or not h.SeatPart then return end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGAntiGrav"
+    bv.MaxForce = Vector3.new(0, 1e6, 0)
+    bv.Velocity = Vector3.zero
+    bv.Parent = h.SeatPart
+    antiGravBV = bv
+end
 local function setNoclip(on)
     noclipOn = on
     local c = char()
@@ -269,7 +288,12 @@ local function flyTo(target, timeout)
                 break
             end
 
-            bv.Velocity = delta.Unit * FLY_SPEED
+            local dir = delta.Unit
+-- nếu đang rơi (Y âm > -20), ép trồi lên
+if hrp.Position.Y - target.Y < -20 then
+    dir = Vector3.new(dir.X, math.max(dir.Y, 0.5), dir.Z).Unit
+end
+bv.Velocity = dir * FLY_SPEED
 
             if os.clock() - lastCheck > 0.4 then
                 local forward = delta.Unit
@@ -278,17 +302,19 @@ local function flyTo(target, timeout)
                 local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
 
                 if isVoid then
-                    bv.Velocity = Vector3.zero
-                    local carModel = nil
-                    if h.SeatPart then
-                        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
-                    end
-                    if carModel then
-                        pcall(function() carModel:PivotTo(CFrame.new(target)) end)
-                    end
-                    pcall(function() hrp.CFrame = CFrame.new(target) end)
-                    task.wait(0.5)
-                end
+    bv.Velocity = Vector3.zero
+    local carModel = nil
+    if h.SeatPart then
+        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+    end
+    -- tele Y cao hơn 15 studs để không kẹt đất
+    local dest = Vector3.new(target.X, target.Y + 15, target.Z)
+    if carModel then
+        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+    end
+    pcall(function() hrp.CFrame = CFrame.new(dest) end)
+    task.wait(0.5)
+end
                 lastCheck = os.clock()
             end
 
@@ -306,10 +332,11 @@ local function seatCar(timeout)
     while os.clock() < deadline and enabled do
         local h = hum()
         local hrp = root()
-        if h and h.Sit then
-            myCar = findMyCar()
-            return true
-        end
+        if h.Sit then
+    myCar = car
+    setAntiGravity(true)
+    return true
+end
 
         if h and hrp then
             local car = findMyCar()
@@ -436,16 +463,27 @@ end
     setNoclip(true)
 
     setState("chờ đơn")
-    orderToken = nil
-    pickupPos = nil
+orderToken = nil
+pickupPos = nil
+-- giữ xe không rơi trong lúc chờ
+setAntiGravity(true)
 
     local deadline = os.clock() + ORDER_TIMEOUT
-    while os.clock() < deadline and enabled do
-        if pickupPos then
-            break
-        end
-        task.wait(0.4)
+while os.clock() < deadline and enabled do
+    if pickupPos then
+        break
     end
+
+    -- void check: nếu rơi quá thấp → tele về CHAIR_POS
+    local hrp = root()
+    if hrp and hrp.Position.Y < -50 then
+        setState("void — tele lên")
+        pcall(function() hrp.CFrame = CFrame.new(hrp.Position.X, 10, hrp.Position.Z) end)
+        task.wait(0.5)
+    end
+
+    task.wait(0.4)
+end
 
     if not pickupPos then
         setState("no pickup")
@@ -454,16 +492,20 @@ end
     end
 
     setState("đón khách")
-    flyTo(pickupPos, 40)
+setAntiGravity(false)
+flyTo(pickupPos, 40)
 
     setState("khách lên xe (5s)")
-    task.wait(5)
+setAntiGravity(true)
+task.wait(5)
 
     if dropPos then
         setState("trả khách")
-        flyTo(dropPos, 50)
-        setState("khách xuống xe (6s)")
-        task.wait(6)
+setAntiGravity(false)
+flyTo(dropPos, 50)
+setState("khách xuống xe (6s)")
+setAntiGravity(true)
+task.wait(6)
     end
 
     setNoclip(false)
