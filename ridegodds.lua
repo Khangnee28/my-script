@@ -24,7 +24,7 @@ local orderToken  = nil
 local pickupPos   = nil
 local dropPos     = nil
 local myCar       = nil
-local selectedCar = "Hando-CBR600RRGP(2018)(NSTRSpec)"
+local selectedCar = ""
 local carList     = {}
 local stats = { trips = 0, earn = 0 }
 local curState = "OFF"
