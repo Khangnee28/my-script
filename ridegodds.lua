@@ -137,6 +137,72 @@ local function findCarByName(name)
     end
     return nil
 end
+-- noclip flag
+local noclipOn = false
+local noclipKeepRunning = false
+
+local function setNoclip(on)
+    noclipOn = on
+    local c = char()
+    if c then
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = not on end)
+            end
+        end
+    end
+    local car = myCar or findCarByName(selectedCar)
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = not on end)
+            end
+        end
+    end
+end
+
+-- loop giữ noclip suốt — bật khi char/xe có part mới
+task.spawn(function()
+    if noclipKeepRunning then return end
+    noclipKeepRunning = true
+    while true do
+        task.wait(0.2)
+        if noclipOn then
+            local c = char()
+            if c then
+                for _, p in ipairs(c:GetDescendants()) do
+                    if p:IsA("BasePart") and p.CanCollide then
+                        pcall(function() p.CanCollide = false end)
+                    end
+                end
+            end
+            local car = myCar or findCarByName(selectedCar)
+            if car then
+                for _, p in ipairs(car:GetDescendants()) do
+                    if p:IsA("BasePart") and p.CanCollide then
+                        pcall(function() p.CanCollide = false end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- raycast tìm sàn
+local function rayFloorY(fromPos)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ignore = {}
+    local c = char()
+    if c then table.insert(ignore, c) end
+    local car = myCar or findCarByName(selectedCar)
+    if car then table.insert(ignore, car) end
+    params.FilterDescendantsInstances = ignore
+    params.IgnoreWater = false
+    local hit = workspace:Raycast(fromPos + Vector3.new(0, 5, 0), Vector3.new(0, -300, 0), params)
+    if hit then return hit.Position.Y end
+    return nil
+end
 
 -- noclip tạm thời
 local function setCharCollide(on)
@@ -173,19 +239,7 @@ local function flyTo(target, timeout)
     local hrp = root()
     if not h or not hrp then return false end
 
-    -- bật noclip trong lúc bay
-    setCharCollide(false)
-    -- xe cũng noclip
-    local car = myCar or findMyCar()
-    local carParts = {}
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then
-                carParts[p] = p.CanCollide
-                pcall(function() p.CanCollide = false end)
-            end
-        end
-    end
+    
 
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
@@ -211,45 +265,28 @@ local function flyTo(target, timeout)
 
             bv.Velocity = delta.Unit * FLY_SPEED
 
-            -- void scan mỗi 0.4s
-            if os.clock() - lastCheck > 0.4 then
-                -- check sàn 30 studs phía trước
-                local forward = delta.Unit
-                local aheadPos = hrp.Position + forward * 30
-                local floorY = rayFloorY(aheadPos)
+            
+            -- void scan phía trước mỗi 0.4s
+if os.clock() - lastCheck > 0.4 then
+    local forward = delta.Unit
+    local aheadPos = hrp.Position + forward * 30
+    local floorY = rayFloorY(aheadPos)
+    local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
 
-                -- sàn thấp hơn 80 studs hoặc không có sàn → void
-                if floorY == nil or (hrp.Position.Y - floorY) > 80 then
-                    -- tele thẳng qua void
-                    bv.Velocity = Vector3.zero
-                    local carModel = nil
-                    if h.SeatPart then carModel = h.SeatPart:FindFirstAncestorOfClass("Model") end
-                    local dest = target
-                    if carModel then
-                        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-                    end
-                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
-                    task.wait(0.5)
-                end
-                lastCheck = os.clock()
-            end
-            task.wait(0.05)
-        end
-    end)
+    if isVoid then
+        bv.Velocity = Vector3.zero
+        local carModel = nil
+        if h.SeatPart then carModel = h.SeatPart:FindFirstAncestorOfClass("Model") end
+        if carModel then pcall(function() carModel:PivotTo(CFrame.new(target)) end) end
+        pcall(function() hrp.CFrame = CFrame.new(target) end)
+        task.wait(0.5)
+    end
+    lastCheck = os.clock()
+end
 
     if bv and bv.Parent then bv:Destroy() end
 
-    -- khôi phục collide
-    setCharCollide(true)
-    if car then
-        for p, orig in pairs(carParts) do
-            if p.Parent then
-                pcall(function() p.CanCollide = orig end)
-            end
-        end
-    end
-
-    return reached
+return reached
 end
 
 local function seatCar(timeout)
@@ -259,39 +296,38 @@ local function seatCar(timeout)
         local h = hum()
         local hrp = root()
         if h and h.Sit then return true end
-        if not h or not hrp then task.wait(0.3) end
 
-        local car = findCarByName(selectedCar) or findMyCar()
-        if car then
-            -- tìm VehicleSeat
-            local vs = nil
-            for _, d in ipairs(car:GetDescendants()) do
-                if d:IsA("VehicleSeat") or d:IsA("Seat") then
-                    vs = d
-                    break
-                end
-            end
-
-            if vs then
-                -- tele HRP tới seat trước
-                local seatPos = vs.Position + Vector3.new(0, 3, 0)
-                pcall(function() hrp.CFrame = CFrame.new(seatPos) end)
-                task.wait(0.4)
-
-                -- ép seat
-                pcall(function() vs:Sit(h) end)
-                task.wait(0.6)
-                if h.Sit then
-                    myCar = car
-                    return true
+        if h and hrp then
+            local car = findCarByName(selectedCar) or findMyCar()
+            if car then
+                local vs = nil
+                for _, d in ipairs(car:GetDescendants()) do
+                    if (d:IsA("VehicleSeat") or d:IsA("Seat")) and not d.Occupant then
+                        vs = d
+                        break
+                    end
                 end
 
-                -- ép Humanoid.Sit nếu vẫn không
-                pcall(function() h.Sit = true end)
-                task.wait(0.5)
-                if h.Sit then
-                    myCar = car
-                    return true
+                if vs then
+                    -- tele HRP vào tâm ghế, cao 2 studs
+                    pcall(function()
+                        hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0))
+                    end)
+                    task.wait(0.4)
+
+                    -- 1) chờ game auto-sit (King Akbar style)
+                    task.wait(1.2)
+                    if h.Sit then myCar = car return true end
+
+                    -- 2) ép seat
+                    pcall(function() vs:Sit(h) end)
+                    task.wait(0.5)
+                    if h.Sit then myCar = car return true end
+
+                    -- 3) ép Humanoid.Sit
+                    pcall(function() h.Sit = true end)
+                    task.wait(0.6)
+                    if h.Sit then myCar = car return true end
                 end
             end
         end
@@ -309,13 +345,28 @@ local function spawnAndSeat()
 
     setState("spawn " .. selectedCar:sub(1, 20))
     fire(SpawnCarEv, selectedCar)
-    task.wait(3)
+
+    -- chờ model xe hiện trong workspace
+    local car = nil
+    local deadline = os.clock() + 10
+    while os.clock() < deadline and enabled do
+        car = findCarByName(selectedCar)
+        if car and car:FindFirstChildWhichIsA("BasePart", true) then break end
+        task.wait(0.4)
+    end
+    if not car then
+        setState("xe chưa hiện")
+        return false
+    end
+
+    task.wait(1)   -- chờ xe rơi xuống ổn định
 
     if seatCar(12) then
         setState("sẵn sàng")
+        task.wait(1.5)   -- chờ UI lái xe load
         return true
     end
-    setState("spawn fail")
+    setState("seat fail")
     return false
 end
 
@@ -343,77 +394,52 @@ end
 
 -- ============ LOOP (chỉ đợi đơn + đón trả) ============
 local function runTrip()
-    -- đảm bảo còn ngồi xe
     local h = hum()
     if not h or not h.Sit then
-        setState("mất xe → respawn")
+        setState("respawn xe")
         if not spawnAndSeat() then return end
     end
+    myCar = findCarByName(selectedCar) or findMyCar()
+
+    -- BẬT NOCLIP cho cả trip
+    setNoclip(true)
 
     setState("chờ đơn")
-orderToken = nil
-pickupPos = nil
-local deadline = os.clock() + ORDER_TIMEOUT
-while os.clock() < deadline and enabled do
-    if pickupPos then break end
-    task.wait(0.4)
-end
-
-    deadline = os.clock() + 8
+    orderToken = nil
+    pickupPos = nil
+    local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
         if pickupPos then break end
-        task.wait(0.2)
+        task.wait(0.4)
     end
     if not pickupPos then
         setState("no pickup")
+        setNoclip(false)
         return
     end
 
     setState("đón khách")
     flyTo(pickupPos, 40)
-    task.wait(PICKUP_WAIT)
+
+    -- đứng im 5s cho khách lên
+    setState("khách lên xe (5s)")
+    task.wait(5)
 
     if dropPos then
         setState("trả khách")
         flyTo(dropPos, 50)
-        task.wait(DROP_WAIT)
+        setState("khách xuống xe (6s)")
+        task.wait(6)
     end
+
+    -- TẮT NOCLIP sau trip
+    setNoclip(false)
 
     pickupPos = nil
     dropPos = nil
     orderToken = nil
-    setState("chờ đơn")
+    setState("chu kỳ xong")
 end
-
-local function startLoop()
-    if loopBusy then return end
-    loopBusy = true
-    task.spawn(function()
-        -- init 1 lần
-        if not initialized then
-            local ok = pcall(doInit)
-            if ok then initialized = true else initialized = false end
-        end
-        if not initialized then
-            setState("init fail")
-            loopBusy = false
-            return
-        end
-
-        -- loop chính
-        while enabled do
-            local ok, err = pcall(runTrip)
-            if not ok then
-                setState("ERR: " .. tostring(err):sub(1, 40))
-            end
-            task.wait(2)
-        end
-        loopBusy = false
-        setState("OFF")
-    end)
-end
-
-local loopBusy = false
 
 -- ============ GUI ============
 local cg = game:GetService("CoreGui")
