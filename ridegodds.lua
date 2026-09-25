@@ -60,6 +60,10 @@ if TaxiEvent then
         if type(data) ~= "table" then return end
         if action == "OrderOffer" then
             orderToken = data.Token
+            -- auto accept ngay
+            pcall(function()
+                TaxiEvent:FireServer("AcceptOrder", data.Token)
+            end)
         elseif action == "OrderAccepted" then
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
@@ -134,7 +138,34 @@ local function findCarByName(name)
     return nil
 end
 
--- fly bằng BodyVelocity, chỉ CFrame khi rơi void
+-- noclip tạm thời
+local function setCharCollide(on)
+    local c = char()
+    if not c then return end
+    for _, p in ipairs(c:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.CanCollide = on end)
+        end
+    end
+end
+
+-- quét void phía trước: tìm Y của sàn dưới ray từ vị trí hiện tại
+local function rayFloorY(fromPos)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local c = char()
+    local car = myCar or findMyCar()
+    local ignore = {}
+    if c then table.insert(ignore, c) end
+    if car then table.insert(ignore, car) end
+    params.FilterDescendantsInstances = ignore
+    params.IgnoreWater = false
+
+    local hit = workspace:Raycast(fromPos + Vector3.new(0, 5, 0), Vector3.new(0, -300, 0), params)
+    if hit then return hit.Position.Y end
+    return nil
+end
+
 local function flyTo(target, timeout)
     timeout = timeout or FLY_TIMEOUT
     local deadline = os.clock() + timeout
@@ -142,15 +173,28 @@ local function flyTo(target, timeout)
     local hrp = root()
     if not h or not hrp then return false end
 
+    -- bật noclip trong lúc bay
+    setCharCollide(false)
+    -- xe cũng noclip
+    local car = myCar or findMyCar()
+    local carParts = {}
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                carParts[p] = p.CanCollide
+                pcall(function() p.CanCollide = false end)
+            end
+        end
+    end
+
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
 
     local attach = hrp
     if h.SeatPart then attach = h.SeatPart end
     bv.Parent = attach
 
-    local lastY = hrp.Position.Y
     local lastCheck = os.clock()
     local reached = false
 
@@ -167,18 +211,25 @@ local function flyTo(target, timeout)
 
             bv.Velocity = delta.Unit * FLY_SPEED
 
-            if os.clock() - lastCheck > 0.5 then
-                local dy = lastY - hrp.Position.Y
-                if dy > VOID_DY then
+            -- void scan mỗi 0.4s
+            if os.clock() - lastCheck > 0.4 then
+                -- check sàn 30 studs phía trước
+                local forward = delta.Unit
+                local aheadPos = hrp.Position + forward * 30
+                local floorY = rayFloorY(aheadPos)
+
+                -- sàn thấp hơn 80 studs hoặc không có sàn → void
+                if floorY == nil or (hrp.Position.Y - floorY) > 80 then
+                    -- tele thẳng qua void
                     bv.Velocity = Vector3.zero
-                    local car = nil
-                    if h.SeatPart then car = h.SeatPart:FindFirstAncestorOfClass("Model") end
-                    if car then pcall(function() car:PivotTo(CFrame.new(target)) end) end
-                    pcall(function() hrp.CFrame = CFrame.new(target) end)
-                    task.wait(0.4)
-                    lastY = target.Y
-                else
-                    lastY = hrp.Position.Y
+                    local carModel = nil
+                    if h.SeatPart then carModel = h.SeatPart:FindFirstAncestorOfClass("Model") end
+                    local dest = target
+                    if carModel then
+                        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+                    end
+                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
+                    task.wait(0.5)
                 end
                 lastCheck = os.clock()
             end
@@ -187,44 +238,64 @@ local function flyTo(target, timeout)
     end)
 
     if bv and bv.Parent then bv:Destroy() end
+
+    -- khôi phục collide
+    setCharCollide(true)
+    if car then
+        for p, orig in pairs(carParts) do
+            if p.Parent then
+                pcall(function() p.CanCollide = orig end)
+            end
+        end
+    end
+
     return reached
 end
 
 local function seatCar(timeout)
-    timeout = timeout or 12
+    timeout = timeout or 15
     local deadline = os.clock() + timeout
     while os.clock() < deadline and enabled do
         local h = hum()
         local hrp = root()
         if h and h.Sit then return true end
+        if not h or not hrp then task.wait(0.3) end
 
-        -- tìm xe theo tên (không dựa vào SeatPart)
         local car = findCarByName(selectedCar) or findMyCar()
-
-        if car and h and hrp then
-            -- tele tới xe trước
-            local carPart = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
-            if carPart then
-                local dist = (carPart.Position - hrp.Position).Magnitude
-                if dist > 8 then
-                    pcall(function() hrp.CFrame = CFrame.new(carPart.Position + Vector3.new(0, 3, 0)) end)
-                    task.wait(0.5)
+        if car then
+            -- tìm VehicleSeat
+            local vs = nil
+            for _, d in ipairs(car:GetDescendants()) do
+                if d:IsA("VehicleSeat") or d:IsA("Seat") then
+                    vs = d
+                    break
                 end
             end
 
-            -- seat
-            for _, d in ipairs(car:GetDescendants()) do
-                if d:IsA("VehicleSeat") or d:IsA("Seat") then
-                    pcall(function() d:Sit(h) end)
-                    task.wait(0.6)
-                    if h.Sit then
-                        myCar = car
-                        return true
-                    end
+            if vs then
+                -- tele HRP tới seat trước
+                local seatPos = vs.Position + Vector3.new(0, 3, 0)
+                pcall(function() hrp.CFrame = CFrame.new(seatPos) end)
+                task.wait(0.4)
+
+                -- ép seat
+                pcall(function() vs:Sit(h) end)
+                task.wait(0.6)
+                if h.Sit then
+                    myCar = car
+                    return true
+                end
+
+                -- ép Humanoid.Sit nếu vẫn không
+                pcall(function() h.Sit = true end)
+                task.wait(0.5)
+                if h.Sit then
+                    myCar = car
+                    return true
                 end
             end
         end
-        task.wait(0.5)
+        task.wait(0.4)
     end
     return false
 end
@@ -280,16 +351,13 @@ local function runTrip()
     end
 
     setState("chờ đơn")
-    orderToken = nil
-    local deadline = os.clock() + ORDER_TIMEOUT
-    while os.clock() < deadline and enabled do
-        if orderToken then
-            setState("accept")
-            fire(TaxiEvent, "AcceptOrder", orderToken)
-            break
-        end
-        task.wait(0.4)
-    end
+orderToken = nil
+pickupPos = nil
+local deadline = os.clock() + ORDER_TIMEOUT
+while os.clock() < deadline and enabled do
+    if pickupPos then break end
+    task.wait(0.4)
+end
 
     deadline = os.clock() + 8
     while os.clock() < deadline and enabled do
