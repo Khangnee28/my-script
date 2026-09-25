@@ -385,8 +385,8 @@ if os.clock() - lastCheck > 0.15 then
 
     lastCheck = os.clock()
             end
-        end              ← đóng while (dòng 307)
-    end)                 ← đóng pcall (dòng 306)
+        end              
+    end)                 
 
     if bv and bv.Parent then bv:Destroy() end
     local h2 = hum()
