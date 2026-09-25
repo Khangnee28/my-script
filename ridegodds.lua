@@ -396,50 +396,59 @@ end
         end
     end
 
-    -- ==== HA XE XUONG TU TU ====
+        -- ==== BAY XONG ====
     if bv and bv.Parent then bv:Destroy() end
     task.wait(0.15)
 
+    -- check có sàn thật dưới không (tránh biển/void)
     car = myCar or findMyCar()
-    if car then
-        local vs2 = getDriveSeat(car)
-        local curPos = (vs2 and vs2.Position) or (root() and root().Position)
+    local vs2 = car and getDriveSeat(car)
+    local curPos = (vs2 and vs2.Position) or (root() and root().Position)
+    local hasGround = false
 
-        if curPos then
-            local floorY = rayFloorY(curPos)
-            if not floorY then floorY = curPos.Y - 5 end
-
-            local startY = curPos.Y
-            local targetY = floorY + 1
-            local dropDist = startY - targetY
-
-            if dropDist > 0.5 then
-                local step = 3
-                local y = startY
-                while y > targetY and enabled do
-                    y = y - step
-                    if y < targetY then y = targetY end
-                    local carM = myCar or findMyCar()
-                    if carM then
-                        local newPos = Vector3.new(curPos.X, y, curPos.Z)
-                        pcall(function() carM:PivotTo(CFrame.new(newPos)) end)
-                    end
-                    if not h.Sit then forceSeat() end
-                    task.wait(0.05)
-                end
-            end
+    if curPos then
+        local floorY = rayFloorY(curPos)
+        -- sàn cách < 25 studs → coi như có đất
+        if floorY and (curPos.Y - floorY) < 25 then
+            hasGround = true
         end
     end
 
-    task.wait(0.3)
+    if hasGround then
+        -- TẮT NOCLIP NGAY khi bắt đầu hạ xuống
+        setCarNoclip(false)
+
+        -- chờ xe rơi xuống tự nhiên
+        local t0 = os.clock()
+        while os.clock() - t0 < 3 and enabled do
+            task.wait(0.1)
+            local hrp3 = root()
+            if not hrp3 then break end
+            local floorY = rayFloorY(hrp3.Position)
+            if floorY and hrp3.Position.Y - floorY < 6 then
+                break
+            end
+        end
+    else
+        -- không có sàn → giữ noclip, tele xe lên cao
+        setState("khong co san - giu noclip")
+        local hrp3 = root()
+        if hrp3 then
+            pcall(function()
+                hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 40, 0))
+            end)
+        end
+    end
+
+    -- force seat
+    task.wait(0.15)
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
-        task.wait(0.3)
+        task.wait(0.2)
     end
 
-    setCarNoclip(false)
-    task.wait(0.2)
+    task.wait(0.15)
     return reached
 end
 -- ============ SPAWN ============
