@@ -268,8 +268,7 @@ local function flyTo(target, timeout)
     if h.SeatPart then attach = h.SeatPart end
     bv.Parent = attach
 
-    forceNoclip(char())
-    forceNoclip(myCar or findMyCar())
+    setNoclip(true)
 
     local lastCheck = os.clock()
     local reached = false
@@ -363,7 +362,8 @@ local function flyTo(target, timeout)
         end)
     end
 
-    task.wait(0.3)
+        task.wait(0.3)
+    setNoclip(false)
     return reached
 end
 
@@ -420,8 +420,9 @@ local function doInit()
     local h = hum()
     if h and h.Sit then
         myCar = findMyCar()
-        setState("sẵn sàng")
-        return true
+setNoclip(false)
+setState("sẵn sàng")
+return true
     end
 
     setState("đổi job")
@@ -455,9 +456,9 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-    setNoclip(true)
+setNoclip(false)   -- đứng chờ đơn, không noclip
 
-    setState("chờ đơn")
+setState("chờ đơn")
     orderToken = nil
     pickupPos = nil
     local deadline = os.clock() + ORDER_TIMEOUT
@@ -479,8 +480,11 @@ local function runTrip()
     end
 
     -- bay pickup
-    setState("đón khách")
-    flyTo(pickupPos, 40)
+    -- bay pickup
+setState("đón khách")
+setNoclip(true)    -- bật noclip khi bay
+flyTo(pickupPos, 40)
+setNoclip(false)   -- tới nơi, tắt noclip
 
     -- đợi khách lên
     setState("khách lên xe (" .. PICKUP_WAIT .. "s)")
@@ -495,8 +499,11 @@ local function runTrip()
 
     -- bay drop
     if dropPos then
-        setState("trả khách")
-        flyTo(dropPos, 50)
+        
+    setState("trả khách")
+    setNoclip(true)
+    flyTo(dropPos, 50)
+    setNoclip(false)
         setState("khách xuống xe (" .. DROP_WAIT .. "s)")
         task.wait(DROP_WAIT)
     end
