@@ -284,9 +284,11 @@ if os.clock() - lastCheck > 0.4 then
     lastCheck = os.clock()
 end
 
-    if bv and bv.Parent then bv:Destroy() end
+            end
+    end)
 
-return reached
+    if bv and bv.Parent then bv:Destroy() end
+    return reached
 end
 
 local function seatCar(timeout)
@@ -400,9 +402,9 @@ local function runTrip()
         if not spawnAndSeat() then return end
     end
     myCar = findCarByName(selectedCar) or findMyCar()
-
-    -- BẬT NOCLIP cho cả trip
-    setNoclip(true)
+setNoclip(true)
+setState("sẵn sàng")
+return true
 
     setState("chờ đơn")
     orderToken = nil
@@ -440,112 +442,38 @@ local function runTrip()
     orderToken = nil
     setState("chu kỳ xong")
 end
+local loopBusy = false
 
+local function startLoop()
+    if loopBusy then return end
+    loopBusy = true
+    task.spawn(function()
+        -- init 1 lần
+        if not initialized then
+            local ok = pcall(doInit)
+            initialized = ok
+        end
+        if not initialized then
+            setState("init fail")
+            loopBusy = false
+            return
+        end
+
+        while enabled do
+            local ok, err = pcall(runTrip)
+            if not ok then
+                setState("ERR: " .. tostring(err):sub(1, 40))
+            end
+            task.wait(2)
+        end
+        loopBusy = false
+        setState("OFF")
+    end)
+end
 -- ============ GUI ============
 local cg = game:GetService("CoreGui")
 if cg:FindFirstChild("RideGoFarmUI") then cg.RideGoFarmUI:Destroy() end
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "RideGoFarmUI"
-gui.ResetOnSpawn = false
-gui.DisplayOrder = 999
-gui.Parent = cg
-
-local rootUI = Instance.new("Frame", gui)
-rootUI.Size = UDim2.new(0, 280, 0, 320)
-rootUI.Position = UDim2.new(0, 20, 0.5, -160)
-rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-rootUI.BorderSizePixel = 0
-rootUI.Active = true
-Instance.new("UICorner", rootUI).CornerRadius = UDim.new(0, 10)
-local st = Instance.new("UIStroke", rootUI)
-st.Color = Color3.fromRGB(255, 140, 40)
-st.Thickness = 1.5
-
-local title = Instance.new("TextLabel", rootUI)
-title.Size = UDim2.new(1, -16, 0, 24)
-title.Position = UDim2.new(0, 8, 0, 4)
-title.BackgroundTransparency = 1
-title.Text = "◈ RIDEGO v4"
-title.TextColor3 = Color3.fromRGB(255, 140, 40)
-title.TextSize = 13
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
-
-local statLbl = Instance.new("TextLabel", rootUI)
-statLbl.Size = UDim2.new(1, -16, 0, 44)
-statLbl.Position = UDim2.new(0, 8, 0, 30)
-statLbl.BackgroundTransparency = 1
-statLbl.Text = "trips: 0 | earn: 0\n..."
-statLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
-statLbl.TextSize = 10
-statLbl.Font = Enum.Font.Code
-statLbl.TextXAlignment = Enum.TextXAlignment.Left
-statLbl.TextYAlignment = Enum.TextYAlignment.Top
-
-local toggleBtn = Instance.new("TextButton", rootUI)
-toggleBtn.Size = UDim2.new(1, -16, 0, 30)
-toggleBtn.Position = UDim2.new(0, 8, 0, 78)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
-toggleBtn.Text = "▶ BẮT ĐẦU FARM"
-toggleBtn.TextColor3 = Color3.new(1,1,1)
-toggleBtn.TextSize = 12
-toggleBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
-
--- header bảng xe (đóng/mở)
-local carHeader = Instance.new("TextButton", rootUI)
-carHeader.Size = UDim2.new(1, -16, 0, 26)
-carHeader.Position = UDim2.new(0, 8, 0, 114)
-carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
-carHeader.Text = "▶ 🚗 CHỌN XE (0)"
-carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
-carHeader.TextSize = 11
-carHeader.Font = Enum.Font.GothamBold
-carHeader.TextXAlignment = Enum.TextXAlignment.Left
-Instance.new("UICorner", carHeader).CornerRadius = UDim.new(0, 6)
-local chp = Instance.new("UIPadding", carHeader)
-chp.PaddingLeft = UDim.new(0, 8)
-
--- body bảng xe (ẩn mặc định)
-local carBody = Instance.new("Frame", rootUI)
-carBody.Size = UDim2.new(1, -16, 0, 0)
-carBody.Position = UDim2.new(0, 8, 0, 146)
-carBody.BackgroundTransparency = 1
-carBody.Visible = false
-
--- nút quét
-local scanBtn = Instance.new("TextButton", carBody)
-scanBtn.Size = UDim2.new(1, 0, 0, 26)
-scanBtn.Position = UDim2.new(0, 0, 0, 0)
-scanBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 90)
-scanBtn.Text = "🔍 QUÉT XE"
-scanBtn.TextColor3 = Color3.new(1,1,1)
-scanBtn.TextSize = 11
-scanBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
-
--- scroll list
-local scroll = Instance.new("ScrollingFrame", carBody)
-scroll.Size = UDim2.new(1, 0, 0, 150)
-scroll.Position = UDim2.new(0, 0, 0, 32)
-scroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 4
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 6)
-
-local sList = Instance.new("UIListLayout", scroll)
-sList.Padding = UDim.new(0, 4)
-sList.SortOrder = Enum.SortOrder.LayoutOrder
-local sPad = Instance.new("UIPadding", scroll)
-sPad.PaddingTop = UDim.new(0, 6)
-sPad.PaddingLeft = UDim.new(0, 6)
-sPad.PaddingRight = UDim.new(0, 6)
--- ============ GUI ============
-local cg = game:GetService("CoreGui")
-if cg:FindFirstChild("RideGoFarmUI") then cg.RideGoFarmUI:Destroy() end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "RideGoFarmUI"
