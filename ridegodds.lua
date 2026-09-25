@@ -151,20 +151,29 @@ end
 local carNoclipOn = false
 local noclipHooked = {}
 
-local function forceCarNoclip()
+local function forceNoclip()
     local car = myCar or findMyCar()
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") and p.CanCollide then
-            pcall(function() p.CanCollide = false end)
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") and p.CanCollide then
+                pcall(function() p.CanCollide = false end)
+            end
+        end
+    end
+    local c = char()
+    if c then
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") and p.CanCollide then
+                pcall(function() p.CanCollide = false end)
+            end
         end
     end
 end
 
-local function hookCarNoclip(car)
-    if not car or noclipHooked[car] then return end
-    noclipHooked[car] = true
-    car.DescendantAdded:Connect(function(d)
+local function hookNoclip(inst)
+    if not inst or noclipHooked[inst] then return end
+    noclipHooked[inst] = true
+    inst.DescendantAdded:Connect(function(d)
         if carNoclipOn and d:IsA("BasePart") then
             pcall(function() d.CanCollide = false end)
         end
@@ -174,18 +183,18 @@ end
 local function setCarNoclip(on)
     carNoclipOn = on
     if not on then return end
+    forceNoclip()
     local car = myCar or findMyCar()
-    if car then
-        forceCarNoclip()
-        hookCarNoclip(car)
-    end
+    if car then hookNoclip(car) end
+    local c = char()
+    if c then hookNoclip(c) end
 end
 
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.05)
         if carNoclipOn then
-            forceCarNoclip()
+            forceNoclip()
         end
     end
 end)
