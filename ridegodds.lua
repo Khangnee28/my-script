@@ -298,6 +298,16 @@ end
     bv.Velocity = Vector3.zero
     bv.Parent = attach
 
+-- BodyGyro giu xe khong xoay
+local bg = Instance.new("BodyGyro")
+bg.Name = "RGGyro"
+bg.MaxTorque = Vector3.new(1e7, 1e7, 1e7)
+bg.P = 5000
+bg.D = 500
+bg.CFrame = CFrame.new(attach.Position, target)   -- nhin ve target
+bg.Parent = attach
+    
+
     local reached = false
     local DECEL_DIST = 200   -- bat dau giam toc tu 200 studs
     local ARRIVE = 8         -- dung khi cach target < 8
@@ -396,47 +406,71 @@ end
         end
     end
 
-        -- ==== BAY XONG ====
+        --     -- ==== BAY XONG ====
     if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
     task.wait(0.15)
 
-    -- check có sàn thật dưới không (tránh biển/void)
     car = myCar or findMyCar()
     local vs2 = car and getDriveSeat(car)
     local curPos = (vs2 and vs2.Position) or (root() and root().Position)
-    local hasGround = false
 
-    if curPos then
-        local floorY = rayFloorY(curPos)
-        -- sàn cách < 25 studs → coi như có đất
-        if floorY and (curPos.Y - floorY) < 25 then
-            hasGround = true
+    if not curPos then
+        task.wait(0.2)
+        return reached
+    end
+
+    -- raycast xuong check san
+    local floorY = rayFloorY(curPos)
+    local ABOVE_GROUND = false
+
+    if floorY then
+        if curPos.Y >= floorY then
+            -- dang O TREN san -> OK
+            ABOVE_GROUND = true
+        else
+            -- dang O DUOI san (xuyen qua) -> nang len tren
+            ABOVE_GROUND = false
         end
     end
 
-    if hasGround then
-        -- TẮT NOCLIP NGAY khi bắt đầu hạ xuống
-        setCarNoclip(false)
-
-        -- chờ xe rơi xuống tự nhiên
-        local t0 = os.clock()
-        while os.clock() - t0 < 3 and enabled do
-            task.wait(0.1)
-            local hrp3 = root()
-            if not hrp3 then break end
-            local floorY = rayFloorY(hrp3.Position)
-            if floorY and hrp3.Position.Y - floorY < 6 then
-                break
+    if not ABOVE_GROUND then
+        -- dang duoi san hoac khong co san -> giu noclip + nang xe len
+        if floorY then
+            -- nang len ngang san + 3
+            local liftPos = Vector3.new(curPos.X, floorY + 3, curPos.Z)
+            local carM = myCar or findMyCar()
+            if carM then
+                pcall(function() carM:PivotTo(CFrame.new(liftPos)) end)
             end
+            task.wait(0.2)
+        else
+            -- khong co san -> nang len 50 studs
+            local hrp3 = root()
+            if hrp3 then
+                pcall(function()
+                    hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 50, 0))
+                end)
+            end
+            task.wait(0.2)
         end
-    else
-        -- không có sàn → giữ noclip, tele xe lên cao
-        setState("khong co san - giu noclip")
+        -- giu noclip, khong tat
+        task.wait(0.15)
+        return reached
+    end
+
+    -- ==== TAT NOCLIP NGAY KHI BAT DAU HA ====
+    setCarNoclip(false)
+
+    -- cho roi tu nhien xuong san
+    local t0 = os.clock()
+    while os.clock() - t0 < 3 and enabled do
+        task.wait(0.1)
         local hrp3 = root()
-        if hrp3 then
-            pcall(function()
-                hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 40, 0))
-            end)
+        if not hrp3 then break end
+        local fY = rayFloorY(hrp3.Position)
+        if fY and math.abs(hrp3.Position.Y - fY) < 4 then
+            break
         end
     end
 
