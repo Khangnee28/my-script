@@ -124,6 +124,15 @@ local function findMyCar()
     end
     return nil
 end
+local function findCarByName(name)
+    if not name or name == "" then return nil end
+    for _, d in ipairs(workspace:GetChildren()) do
+        if d:IsA("Model") and d.Name == name then
+            return d
+        end
+    end
+    return nil
+end
 
 -- fly bằng BodyVelocity, chỉ CFrame khi rơi void
 local function flyTo(target, timeout)
@@ -181,19 +190,37 @@ local function flyTo(target, timeout)
     return reached
 end
 
--- ngồi xe
 local function seatCar(timeout)
-    local deadline = os.clock() + (timeout or 8)
+    timeout = timeout or 12
+    local deadline = os.clock() + timeout
     while os.clock() < deadline and enabled do
         local h = hum()
+        local hrp = root()
         if h and h.Sit then return true end
-        local car = findMyCar()
-        if car and h then
+
+        -- tìm xe theo tên (không dựa vào SeatPart)
+        local car = findCarByName(selectedCar) or findMyCar()
+
+        if car and h and hrp then
+            -- tele tới xe trước
+            local carPart = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
+            if carPart then
+                local dist = (carPart.Position - hrp.Position).Magnitude
+                if dist > 8 then
+                    pcall(function() hrp.CFrame = CFrame.new(carPart.Position + Vector3.new(0, 3, 0)) end)
+                    task.wait(0.5)
+                end
+            end
+
+            -- seat
             for _, d in ipairs(car:GetDescendants()) do
                 if d:IsA("VehicleSeat") or d:IsA("Seat") then
                     pcall(function() d:Sit(h) end)
-                    task.wait(0.4)
-                    if h.Sit then return true end
+                    task.wait(0.6)
+                    if h.Sit then
+                        myCar = car
+                        return true
+                    end
                 end
             end
         end
@@ -204,12 +231,16 @@ end
 
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
+    if not selectedCar or selectedCar == "" then
+        setState("chưa chọn xe")
+        return false
+    end
+
     setState("spawn " .. selectedCar:sub(1, 20))
     fire(SpawnCarEv, selectedCar)
-    task.wait(2.5)
+    task.wait(3)
 
-    if seatCar(8) then
-        myCar = findMyCar()
+    if seatCar(12) then
         setState("sẵn sàng")
         return true
     end
