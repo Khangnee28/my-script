@@ -328,7 +328,7 @@ local function flyTo(target, timeout)
             end
             bv.Velocity = dir * speed
 
-            -- void detect mỗi 0.15s
+            -- void detect
 if os.clock() - lastCheck > 0.15 then
     local origin = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
     local belowY = rayFloorY(origin)
