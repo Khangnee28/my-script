@@ -148,13 +148,39 @@ local function anchorCar(on)
 end
 
 -- ============ SEAT WATCHER ============
+local function getDriveSeat(car)
+    if not car then return nil end
+    -- ưu tiên DriveSeat / DriverSeat
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") then
+            local n = d.Name:lower()
+            if n:find("drive") or n:find("driver") then
+                return d
+            end
+        end
+    end
+    -- fallback: VehicleSeat đầu tiên
+    return car:FindFirstChildWhichIsA("VehicleSeat", true)
+end
+
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return end
-    if h.Sit then return end
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    if h.Sit then
+        -- check có đang ngồi DriveSeat không
+        local vs = getDriveSeat(car)
+        if vs and h.SeatPart ~= vs then
+            -- ngồi nhầm ghế → đứng lên
+            pcall(function() h.Sit = false end)
+            task.wait(0.2)
+        else
+            return
+        end
+    end
+    local vs = getDriveSeat(car)
     if not vs then return end
+    if vs.Occupant and vs.Occupant ~= h then return end
     local hrp = root()
     if hrp then
         pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
@@ -162,22 +188,10 @@ local function forceSeat()
     end
     pcall(function() vs:Sit(h) end)
     task.wait(0.05)
-    if not h.Sit then
+    if not h.Sit or h.SeatPart ~= vs then
         pcall(function() h.Sit = true end)
     end
 end
-
-task.spawn(function()
-    while true do
-        task.wait(0.15)
-        if enabled and (myCar or findMyCar()) then
-            local h = hum()
-            if h and not h.Sit then
-                forceSeat()
-            end
-        end
-    end
-end)
 
 -- ============ SEAT ============
 local function seatCar(timeout)
@@ -185,12 +199,39 @@ local function seatCar(timeout)
     local deadline = os.clock() + timeout
     while os.clock() < deadline and enabled do
         local h = hum()
-        if h and h.Sit then
-            myCar = findMyCar()
-            return true
+        local car = findMyCar()
+        if h and car then
+            local vs = getDriveSeat(car)
+            if h.Sit and h.SeatPart == vs then
+                myCar = car
+                return true
+            end
+            if h.Sit and h.SeatPart ~= vs then
+                -- ngồi nhầm ghế → đứng lên
+                pcall(function() h.Sit = false end)
+                task.wait(0.3)
+            end
+            if vs and not vs.Occupant then
+                local hrp = root()
+                if hrp then
+                    pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
+                    task.wait(0.3)
+                end
+                pcall(function() vs:Sit(h) end)
+                task.wait(0.5)
+                if h.Sit and h.SeatPart == vs then
+                    myCar = car
+                    return true
+                end
+                pcall(function() h.Sit = true end)
+                task.wait(0.4)
+                if h.Sit and h.SeatPart == vs then
+                    myCar = car
+                    return true
+                end
+            end
         end
-        forceSeat()
-        task.wait(0.3)
+        task.wait(0.4)
     end
     return false
 end
