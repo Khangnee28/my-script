@@ -384,7 +384,7 @@ if os.clock() - lastCheck > 0.15 then
     end
 
     lastCheck = os.clock()
-end
+
 
 -- ============ SPAWN & SEAT ============
 local function spawnAndSeat()
