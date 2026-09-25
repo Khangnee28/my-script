@@ -290,22 +290,24 @@ local function flyTo(target, timeout)
 
         -- raycast phia truoc 40 studs: check void
         local aheadPos = curPos + dir * 40
-        local aheadFloorY = rayFloorY(aheadPos)
-        local isVoidAhead = (aheadFloorY == nil) or (aheadFloorY < -50)
+local aheadFloorY = rayFloorY(aheadPos)
+local curFloorY = rayFloorY(curPos)
+local isVoidAhead = (aheadFloorY == nil)
+    or (curFloorY and (curFloorY - aheadFloorY > 30))
+    or (aheadFloorY < -50)
 
         if isVoidAhead then
             -- tim bo ben kia void
-            local jumpDist = 80
-            local jumpFloorY = nil
-            for testDist = 50, 400, 25 do
-                local testPos = curPos + dir * testDist
-                local fY = rayFloorY(testPos)
-                if fY and fY > -50 then
-                    jumpDist = testDist
-                    jumpFloorY = fY
-                    break
-                end
-            end
+            for testDist = 80, 500, 20 do
+    local testPos = curPos + dir * testDist
+    local fY = rayFloorY(testPos)
+    -- bờ bên kia: sàn cao ngang sàn hiện tại (không phải đáy vực)
+    if fY and curFloorY and (curFloorY - fY < 30) then
+        jumpDist = testDist
+        jumpFloorY = fY
+        break
+    end
+end
             if jumpFloorY then
                 local dest = Vector3.new(
                     curPos.X + dir.X * jumpDist,
