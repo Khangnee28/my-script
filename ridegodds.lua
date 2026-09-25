@@ -316,7 +316,7 @@ local function flyTo(target, timeout)
                 reached = true
                 break
             end
-            end
+
             local speed = FLY_SPEED
             if dist < 60 then
                 speed = math.max(FLY_SPEED * (dist / 60), 20)
@@ -328,66 +328,66 @@ local function flyTo(target, timeout)
             end
             bv.Velocity = dir * speed
 
-            -- void detect
-if os.clock() - lastCheck > 0.15 then
-    local origin = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
-    local belowY = rayFloorY(origin)
-    local isVoid = (belowY == nil) or (hrp.Position.Y - belowY > 50)
+            if os.clock() - lastCheck > 0.15 then
+                local origin = Vector3.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
+                local belowY = rayFloorY(origin)
+                local isVoid = (belowY == nil) or (hrp.Position.Y - belowY > 50)
 
-    if isVoid then
-        bv.Velocity = Vector3.zero
-        bv.MaxForce = Vector3.new(0, 0, 0)
+                if isVoid then
+                    bv.Velocity = Vector3.zero
+                    bv.MaxForce = Vector3.new(0, 0, 0)
 
-        local forward = delta.Unit
-        local curY = hrp.Position.Y
+                    local forward = delta.Unit
+                    local curY = hrp.Position.Y
 
-        local jumpDist = 100
-        for testDist = 60, 400, 25 do
-            local testPos = hrp.Position + forward * testDist
-            local fY = rayFloorY(testPos)
-            if fY and math.abs(curY - fY) < 80 then
-                jumpDist = testDist
-                break
-            end
-        end
+                    local jumpDist = 100
+                    for testDist = 60, 400, 25 do
+                        local testPos = hrp.Position + forward * testDist
+                        local fY = rayFloorY(testPos)
+                        if fY and math.abs(curY - fY) < 80 then
+                            jumpDist = testDist
+                            break
+                        end
+                    end
 
-        local dest = hrp.Position + forward * jumpDist
-        dest = Vector3.new(dest.X, curY + 8, dest.Z)
+                    local dest = hrp.Position + forward * jumpDist
+                    dest = Vector3.new(dest.X, curY + 8, dest.Z)
 
-        local carModel = nil
-        if h.SeatPart then
-            carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
-        elseif myCar then
-            carModel = myCar
-        end
+                    local carModel = nil
+                    if h.SeatPart then
+                        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+                    elseif myCar then
+                        carModel = myCar
+                    end
 
-        if carModel then
-            pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-        end
-        pcall(function() hrp.CFrame = CFrame.new(dest) end)
-        task.wait(0.2)
-
-        if not h.Sit then
-            local vs = carModel and carModel:FindFirstChildWhichIsA("VehicleSeat", true)
-            if vs then
-                pcall(function() vs:Sit(h) end)
-                task.wait(0.2)
-                if not h.Sit then
-                    pcall(function() h.Sit = true end)
+                    if carModel then
+                        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+                    end
+                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
                     task.wait(0.2)
+
+                    if not h.Sit then
+                        local vs = carModel and carModel:FindFirstChildWhichIsA("VehicleSeat", true)
+                        if vs then
+                            pcall(function() vs:Sit(h) end)
+                            task.wait(0.2)
+                            if not h.Sit then
+                                pcall(function() h.Sit = true end)
+                                task.wait(0.2)
+                            end
+                        end
+                    end
+
+                    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+                    task.wait(0.3)
                 end
+
+                lastCheck = os.clock()
             end
+
+            task.wait(0.05)
         end
-
-        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        task.wait(0.3)
-    end
-
-    lastCheck = os.clock()
-            end
-        end              
-        end)
-end)                 
+    end)
 
     if bv and bv.Parent then bv:Destroy() end
     local h2 = hum()
@@ -407,7 +407,7 @@ end)
     task.wait(0.3)
     setNoclip(false)
     return reached
-end                      ← đóng flyTo
+end
 -- ============ SPAWN & SEAT ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
