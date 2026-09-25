@@ -334,58 +334,55 @@ if os.clock() - lastCheck > 0.15 then
     local belowY = rayFloorY(origin)
     local isVoid = (belowY == nil) or (hrp.Position.Y - belowY > 50)
 
-                if isVoid then
-    -- TẮT velocity ngay để không trôi
-    bv.Velocity = Vector3.zero
-    bv.MaxForce = Vector3.new(0, 0, 0)
+    if isVoid then
+        bv.Velocity = Vector3.zero
+        bv.MaxForce = Vector3.new(0, 0, 0)
 
-    local forward = delta.Unit
-    local curY = hrp.Position.Y
+        local forward = delta.Unit
+        local curY = hrp.Position.Y
 
-    -- tìm bờ bên kia void
-    local jumpDist = 100
-    for testDist = 60, 400, 25 do
-        local testPos = hrp.Position + forward * testDist
-        local fY = rayFloorY(testPos)
-        if fY and math.abs(curY - fY) < 80 then
-            jumpDist = testDist
-            break
-        end
-    end
-
-    local dest = hrp.Position + forward * jumpDist
-    dest = Vector3.new(dest.X, curY + 8, dest.Z)
-
-    -- tele cả xe + char cùng lúc
-    local carModel = nil
-    if h.SeatPart then
-        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
-    elseif myCar then
-        carModel = myCar
-    end
-
-    if carModel then
-        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-    end
-    pcall(function() hrp.CFrame = CFrame.new(dest) end)
-    task.wait(0.2)
-
-    -- check ngồi lại, nếu té ép sit
-    if not h.Sit then
-        local vs = carModel and carModel:FindFirstChildWhichIsA("VehicleSeat", true)
-        if vs then
-            pcall(function() vs:Sit(h) end)
-            task.wait(0.2)
-            if not h.Sit then
-                pcall(function() h.Sit = true end)
-                task.wait(0.2)
+        local jumpDist = 100
+        for testDist = 60, 400, 25 do
+            local testPos = hrp.Position + forward * testDist
+            local fY = rayFloorY(testPos)
+            if fY and math.abs(curY - fY) < 80 then
+                jumpDist = testDist
+                break
             end
         end
+
+        local dest = hrp.Position + forward * jumpDist
+        dest = Vector3.new(dest.X, curY + 8, dest.Z)
+
+        local carModel = nil
+        if h.SeatPart then
+            carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+        elseif myCar then
+            carModel = myCar
+        end
+
+        if carModel then
+            pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+        end
+        pcall(function() hrp.CFrame = CFrame.new(dest) end)
+        task.wait(0.2)
+
+        if not h.Sit then
+            local vs = carModel and carModel:FindFirstChildWhichIsA("VehicleSeat", true)
+            if vs then
+                pcall(function() vs:Sit(h) end)
+                task.wait(0.2)
+                if not h.Sit then
+                    pcall(function() h.Sit = true end)
+                    task.wait(0.2)
+                end
+            end
+        end
+
+        bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        task.wait(0.3)
     end
 
-    -- bật lại velocity
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    task.wait(0.3)
     lastCheck = os.clock()
 end
 
