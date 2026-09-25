@@ -477,71 +477,125 @@ end
 
 local function runTrip()
     local h = hum()
-if not h or not h.Sit then
-    setState("chờ spawnAndSeat")
-    if not spawnAndSeat() then
-        task.wait(5)
-        return
+    if not h or not h.Sit then
+        setState("respawn xe")
+        if not spawnAndSeat() then
+            task.wait(5)
+            return
+        end
     end
-end
     myCar = findMyCar()
 
     setNoclip(true)
+    setAntiGravity(true)   -- chỉ giữ khi chờ đơn
 
     setState("chờ đơn")
-orderToken = nil
-pickupPos = nil
--- giữ xe không rơi trong lúc chờ
-setAntiGravity(true)
-
+    orderToken = nil
+    pickupPos = nil
     local deadline = os.clock() + ORDER_TIMEOUT
-while os.clock() < deadline and enabled do
-    if pickupPos then
-        break
-    end
+    while os.clock() < deadline and enabled do
+        if pickupPos then break end
 
-    -- void check: nếu rơi quá thấp → tele về CHAIR_POS
-    local hrp = root()
-    if hrp and hrp.Position.Y < -50 then
-        setState("void — tele lên")
-        pcall(function() hrp.CFrame = CFrame.new(hrp.Position.X, 10, hrp.Position.Z) end)
-        task.wait(0.5)
+        -- void check
+        local hrp = root()
+        if hrp and hrp.Position.Y < -50 then
+            setState("void — tele lên")
+            pcall(function() hrp.CFrame = CFrame.new(hrp.Position.X, 10, hrp.Position.Z) end)
+            task.wait(0.5)
+        end
+        task.wait(0.4)
     end
-
-    task.wait(0.4)
-end
 
     if not pickupPos then
         setState("no pickup")
-        setNoclip(false)
+        setAntiGravity(false)
         return
     end
 
+    -- ============ BAY TỚI PICKUP ============
     setState("đón khách")
-setAntiGravity(false)
-flyTo(pickupPos, 40)
-setAntiGravity(true)   -- chống trôi/rơi tại điểm đón
+    setAntiGravity(false)
+    flyTo(pickupPos, 40)
 
-    setState("khách lên xe (5s)")
--- đảm bảo đứng yên
-local hrp0 = root()
-if hrp0 then
-    pcall(function()
-        hrp0.AssemblyLinearVelocity = Vector3.zero
-        hrp0.AssemblyAngularVelocity = Vector3.zero
-    end)
-end
-task.wait(5)
+    -- TẮT anti-gravity để xe rơi xuống đất
+    setAntiGravity(false)
 
-    if dropPos then
-        setState("trả khách")
-setAntiGravity(false)
-flyTo(dropPos, 50)
-setState("khách xuống xe (6s)")
-setAntiGravity(true)
-task.wait(6)
+    -- đợi xe tiếp đất ổn định
+    setState("chờ xe đáp")
+    local lastY = nil
+    local stableTime = 0
+    local t0 = os.clock()
+    while os.clock() - t0 < 4 and enabled do
+        task.wait(0.2)
+        local hrp = root()
+        if not hrp then break end
+        if not lastY then
+            lastY = hrp.Position.Y
+        else
+            local dy = math.abs(hrp.Position.Y - lastY)
+            if dy < 0.15 then
+                stableTime = stableTime + 0.2
+                if stableTime >= 0.8 then break end
+            else
+                stableTime = 0
+                lastY = hrp.Position.Y
+            end
+        end
     end
 
+    -- kiểm tra vẫn ngồi xe, nếu té → seat lại
+    local hh = hum()
+    if hh and not hh.Sit then
+        setState("té — seat lại")
+        seatCar(6)
+    end
+
+    -- ============ ĐỢI KHÁCH LÊN ============
+    setState("khách lên xe (8s)")
+    local hrp0 = root()
+    if hrp0 then
+        pcall(function()
+            hrp0.AssemblyLinearVelocity = Vector3.zero
+            hrp0.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    task.wait(8)
+
+    -- ============ BAY TỚI DROP ============
+    if dropPos then
+        setState("trả khách")
+        setAntiGravity(false)
+        flyTo(dropPos, 50)
+        setAntiGravity(false)
+
+        -- đợi xe đáp
+        setState("chờ đáp drop")
+        lastY = nil
+        stableTime = 0
+        t0 = os.clock()
+        while os.clock() - t0 < 4 and enabled do
+            task.wait(0.2)
+            local hrp = root()
+            if not hrp then break end
+            if not lastY then
+                lastY = hrp.Position.Y
+            else
+                local dy = math.abs(hrp.Position.Y - lastY)
+                if dy < 0.15 then
+                    stableTime = stableTime + 0.2
+                    if stableTime >= 0.8 then break end
+                else
+                    stableTime = 0
+                    lastY = hrp.Position.Y
+                end
+            end
+        end
+
+        setState("khách xuống xe (8s)")
+        task.wait(8)
+    end
+
+    setAntiGravity(false)
     setNoclip(false)
 
     pickupPos = nil
