@@ -1,14 +1,15 @@
 -- language: Luau, executor: Delta
--- RideGo Farm - anchor teleport edition
--- Xe anchor trong lúc bay -> khong roi void, khong va tuong, khong xe char.
+-- RideGo Farm — bodyvelocity low-altitude edition
+-- Bay thap 5 studs tren mat dat. Gap void -> CFrame qua bo ben kia.
+-- Xe noclip khi bay. Khong anchor.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST     = 55      -- studs moi buoc
-local STEP_DELAY    = 0.06    -- giay giua cac buoc
+local STEP_DIST     = 55
+local FLY_Y         = 5
 local ARRIVE_DIST   = 8
 local FLY_TIMEOUT   = 60
 local ORDER_TIMEOUT = 30
@@ -35,7 +36,7 @@ local TaxiAssets = rs:WaitForChild("TaxiAssets", 10)
 local TaxiEvent
 if TaxiAssets then
     local ev = TaxiAssets:WaitForChild("Events", 5)
-    if ev then TaxiEvent = ev:WaitForChild("SpawnCar", 5) or ev:WaitForChild("TaxiEvent", 5) end
+    if ev then TaxiEvent = ev:FindFirstChild("TaxiEvent", true) end
 end
 
 local SpawnCarEvents = rs:WaitForChild("SpawnCarEvents", 10)
@@ -130,113 +131,7 @@ local function findMyCar()
     return nil
 end
 
--- ============ ANCHOR CAR ============
-local function anchorCar(on)
-    local car = myCar or findMyCar()
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.Anchored = on end)
-            if on then
-                pcall(function()
-                    p.AssemblyLinearVelocity = Vector3.zero
-                    p.AssemblyAngularVelocity = Vector3.zero
-                end)
-            end
-        end
-    end
-end
-
--- ============ SEAT WATCHER ============
-local function getDriveSeat(car)
-    if not car then return nil end
-    -- ưu tiên DriveSeat / DriverSeat
-    for _, d in ipairs(car:GetDescendants()) do
-        if d:IsA("VehicleSeat") then
-            local n = d.Name:lower()
-            if n:find("drive") or n:find("driver") then
-                return d
-            end
-        end
-    end
-    -- fallback: VehicleSeat đầu tiên
-    return car:FindFirstChildWhichIsA("VehicleSeat", true)
-end
-
-local function forceSeat()
-    local h = hum()
-    local car = myCar or findMyCar()
-    if not h or not car then return end
-    if h.Sit then
-        -- check có đang ngồi DriveSeat không
-        local vs = getDriveSeat(car)
-        if vs and h.SeatPart ~= vs then
-            -- ngồi nhầm ghế → đứng lên
-            pcall(function() h.Sit = false end)
-            task.wait(0.2)
-        else
-            return
-        end
-    end
-    local vs = getDriveSeat(car)
-    if not vs then return end
-    if vs.Occupant and vs.Occupant ~= h then return end
-    local hrp = root()
-    if hrp then
-        pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
-        task.wait(0.05)
-    end
-    pcall(function() vs:Sit(h) end)
-    task.wait(0.05)
-    if not h.Sit or h.SeatPart ~= vs then
-        pcall(function() h.Sit = true end)
-    end
-end
-
--- ============ SEAT ============
-local function seatCar(timeout)
-    timeout = timeout or 15
-    local deadline = os.clock() + timeout
-    while os.clock() < deadline and enabled do
-        local h = hum()
-        local car = findMyCar()
-        if h and car then
-            local vs = getDriveSeat(car)
-            if h.Sit and h.SeatPart == vs then
-                myCar = car
-                return true
-            end
-            if h.Sit and h.SeatPart ~= vs then
-                -- ngồi nhầm ghế → đứng lên
-                pcall(function() h.Sit = false end)
-                task.wait(0.3)
-            end
-            if vs and not vs.Occupant then
-                local hrp = root()
-                if hrp then
-                    pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
-                    task.wait(0.3)
-                end
-                pcall(function() vs:Sit(h) end)
-                task.wait(0.5)
-                if h.Sit and h.SeatPart == vs then
-                    myCar = car
-                    return true
-                end
-                pcall(function() h.Sit = true end)
-                task.wait(0.4)
-                if h.Sit and h.SeatPart == vs then
-                    myCar = car
-                    return true
-                end
-            end
-        end
-        task.wait(0.4)
-    end
-    return false
-end
-
--- ============ FLY (anchored + PivotTo) ============
+-- ============ RAYCAST ============
 local function rayFloorY(fromPos)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
@@ -252,6 +147,126 @@ local function rayFloorY(fromPos)
     return nil
 end
 
+-- ============ NOCLIP (chi part xe) ============
+local carNoclipOn = false
+local noclipHooked = {}
+
+local function forceCarNoclip()
+    local car = myCar or findMyCar()
+    if not car then return end
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") and p.CanCollide then
+            pcall(function() p.CanCollide = false end)
+        end
+    end
+end
+
+local function hookCarNoclip(car)
+    if not car or noclipHooked[car] then return end
+    noclipHooked[car] = true
+    car.DescendantAdded:Connect(function(d)
+        if carNoclipOn and d:IsA("BasePart") then
+            pcall(function() d.CanCollide = false end)
+        end
+    end)
+end
+
+local function setCarNoclip(on)
+    carNoclipOn = on
+    if not on then return end
+    local car = myCar or findMyCar()
+    if car then
+        forceCarNoclip()
+        hookCarNoclip(car)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if carNoclipOn then
+            forceCarNoclip()
+        end
+    end
+end)
+
+-- ============ SEAT ============
+local function getDriveSeat(car)
+    if not car then return nil end
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") then
+            local n = d.Name:lower()
+            if n:find("drive") or n:find("driver") then
+                return d
+            end
+        end
+    end
+    return car:FindFirstChildWhichIsA("VehicleSeat", true)
+end
+
+local function forceSeat()
+    local h = hum()
+    local car = myCar or findMyCar()
+    if not h or not car then return end
+    local vs = getDriveSeat(car)
+    if not vs then return end
+
+    if h.Sit and h.SeatPart == vs then return end
+    if h.Sit and h.SeatPart ~= vs then
+        pcall(function() h.Sit = false end)
+        task.wait(0.2)
+    end
+
+    if vs.Occupant and vs.Occupant ~= h then return end
+
+    local hrp = root()
+    if hrp then
+        pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
+        task.wait(0.1)
+    end
+    pcall(function() vs:Sit(h) end)
+    task.wait(0.1)
+    if not h.Sit or h.SeatPart ~= vs then
+        pcall(function() h.Sit = true end)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.15)
+        if enabled and (myCar or findMyCar()) then
+            local h = hum()
+            if h then
+                local car = myCar or findMyCar()
+                local vs = getDriveSeat(car)
+                if not h.Sit or (vs and h.SeatPart ~= vs) then
+                    forceSeat()
+                end
+            end
+        end
+    end
+end)
+
+local function seatCar(timeout)
+    timeout = timeout or 15
+    local deadline = os.clock() + timeout
+    while os.clock() < deadline and enabled do
+        local h = hum()
+        local car = findMyCar()
+        if h and car then
+            local vs = getDriveSeat(car)
+            if h.Sit and h.SeatPart == vs then
+                myCar = car
+                return true
+            end
+            forceSeat()
+        end
+        task.wait(0.4)
+    end
+    return false
+end
+
+-- ============ FLY ============
 local function flyTo(target, timeout)
     timeout = timeout or FLY_TIMEOUT
     local deadline = os.clock() + timeout
@@ -260,11 +275,9 @@ local function flyTo(target, timeout)
     local car = myCar or findMyCar()
     if not h or not car then return false end
 
-    anchorCar(false)   -- KHÔNG anchor
-    task.wait(0.1)
+    setCarNoclip(true)
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
-    -- BV gắn vào DriveSeat (hoặc HRP nếu không có)
     local vs = getDriveSeat(car)
     local attach = vs or root()
     if not attach then return false end
@@ -272,24 +285,26 @@ local function flyTo(target, timeout)
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
     bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 5000  -- độ bám cao, không lag
+    bv.P = 5000
     bv.Velocity = Vector3.zero
     bv.Parent = attach
 
     local reached = false
-    local FLY_Y = 15   -- cao cách đất 15 studs
 
     while os.clock() < deadline and enabled do
         car = myCar or findMyCar()
         if not car then break end
-
         local hrp = root()
         if not hrp then break end
 
         vs = getDriveSeat(car)
+        if vs and attach ~= vs then
+            attach = vs
+            bv.Parent = vs
+        end
+
         local curPos = (h.Sit and vs) and vs.Position or hrp.Position
 
-        -- khoảng cách ngang
         local delta = target - curPos
         local flat = Vector3.new(delta.X, 0, delta.Z)
         local dist = flat.Magnitude
@@ -299,40 +314,74 @@ local function flyTo(target, timeout)
             break
         end
 
-        -- target Y: giữ cao trên mặt đất hoặc trên sàn đích
-        local targetFloorY = rayFloorY(target)
-        local targetY
-        if targetFloorY then
-            targetY = targetFloorY + FLY_Y
-        else
-            targetY = target.Y + FLY_Y
-        end
-
-        -- vector bay: ngang tới target + Y giữ cao
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-        local speed = STEP_DIST   -- 25 studs/s
-        -- gần tới → giảm tốc
-        if dist < 80 then
-            speed = math.max(STEP_DIST * dist / 80, 5)
+
+        -- check void phia truoc 40 studs
+        local aheadPos = curPos + dir * 40
+        local aheadFloorY = rayFloorY(aheadPos)
+        local curFloorY = rayFloorY(curPos)
+        local isVoidAhead = (aheadFloorY == nil)
+            or (curFloorY and aheadFloorY and (curFloorY - aheadFloorY > 30))
+            or (aheadFloorY and aheadFloorY < -50)
+
+        if isVoidAhead then
+            -- tim bo ben kia: Y gan bang san hien tai
+            local jumpDist = 100
+            local jumpFloorY = nil
+            for testDist = 60, 500, 20 do
+                local testPos = curPos + dir * testDist
+                local fY = rayFloorY(testPos)
+                if fY and curFloorY and math.abs(curFloorY - fY) < 25 then
+                    jumpDist = testDist
+                    jumpFloorY = fY
+                    break
+                end
+            end
+            if jumpFloorY then
+                local dest = Vector3.new(
+                    curPos.X + dir.X * jumpDist,
+                    jumpFloorY + FLY_Y,
+                    curPos.Z + dir.Z * jumpDist
+                )
+                -- tele ca xe
+                local carModel = myCar or findMyCar()
+                if carModel then
+                    pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+                end
+                if not h.Sit then forceSeat() end
+                task.wait(0.2)
+            else
+                break
+            end
+        else
+            -- target Y: giu 5 studs tren mat dat
+            local targetY
+            if curFloorY then
+                targetY = curFloorY + FLY_Y
+            else
+                targetY = curPos.Y
+            end
+
+            local speed = STEP_DIST
+            if dist < 80 then
+                speed = math.max(STEP_DIST * dist / 80, 5)
+            end
+
+            local vx = dir.X * speed
+            local vz = dir.Z * speed
+            local vy = (targetY - curPos.Y) * 3
+            vy = math.clamp(vy, -50, 50)
+
+            bv.Velocity = Vector3.new(vx, vy, vz)
+
+            if not h.Sit then forceSeat() end
+            task.wait(0.1)
         end
-
-        local vx = dir.X * speed
-        local vz = dir.Z * speed
-        -- Y: kéo về độ cao mục tiêu
-        local vy = (targetY - curPos.Y) * 3
-        vy = math.clamp(vy, -50, 50)
-
-        bv.Velocity = Vector3.new(vx, vy, vz)
-
-        if not h.Sit then forceSeat() end
-
-        task.wait(0.1)
     end
 
-    -- gần tới: tắt BV → xe rơi tự do
     if bv and bv.Parent then bv:Destroy() end
 
-    -- chờ xe hạ xuống đất
+    -- ha canh
     local t0 = os.clock()
     while os.clock() - t0 < 3 and enabled do
         task.wait(0.1)
@@ -344,9 +393,11 @@ local function flyTo(target, timeout)
         end
     end
 
+    setCarNoclip(false)
     task.wait(0.2)
     return reached
 end
+
 -- ============ SPAWN ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
@@ -397,7 +448,6 @@ end
 
 -- ============ INIT ============
 local function doInit()
-    -- 1. spawn xe + seat TRUOC
     setState("spawn xe")
     if not spawnAndSeat() then
         return false
@@ -405,12 +455,10 @@ local function doInit()
 
     myCar = findMyCar()
 
-    -- 2. doi job
     setState("doi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
-    -- 3. online (nhan don)
     setState("online")
     fire(TaxiEvent, "GoOnline")
     task.wait(2)
@@ -430,7 +478,6 @@ local function runTrip()
         end
     end
     myCar = findMyCar()
-    anchorCar(true)   -- giu xe dung yen khi cho don
 
     setState("cho don")
     orderToken = nil
@@ -441,7 +488,6 @@ local function runTrip()
         if pickupPos then break end
         local hrp = root()
         if hrp and hrp.Position.Y < -50 then
-            -- re-seat + tele len
             forceSeat()
             pcall(function() hrp.CFrame = CFrame.new(hrp.Position.X, 10, hrp.Position.Z) end)
         end
@@ -450,27 +496,25 @@ local function runTrip()
 
     if not pickupPos then
         setState("no pickup")
-        anchorCar(false)
         return
     end
 
     setState("don khach")
     flyTo(pickupPos, 50)
-    -- anchored -> khong roi
-    anchorCar(true)
+    task.wait(1)
+    forceSeat()
 
     setState("khach len xe")
     task.wait(PICKUP_WAIT)
-    anchorCar(false)
 
     if dropPos then
         setState("tra khach")
         flyTo(dropPos, 60)
-        anchorCar(true)
+        task.wait(1)
+        forceSeat()
 
         setState("khach xuong xe")
         task.wait(DROP_WAIT)
-        anchorCar(false)
     end
 
     pickupPos = nil
