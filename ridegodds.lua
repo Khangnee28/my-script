@@ -385,7 +385,28 @@ if os.clock() - lastCheck > 0.15 then
 
     lastCheck = os.clock()
             end
+        end              ← đóng while (dòng 307)
+    end)                 ← đóng pcall (dòng 306)
 
+    if bv and bv.Parent then bv:Destroy() end
+    local h2 = hum()
+    if h2 and h2.SeatPart then
+        pcall(function()
+            h2.SeatPart.AssemblyLinearVelocity = Vector3.zero
+            h2.SeatPart.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    local hrp2 = root()
+    if hrp2 then
+        pcall(function()
+            hrp2.AssemblyLinearVelocity = Vector3.zero
+            hrp2.AssemblyAngularVelocity = Vector3.zero
+        end)
+    end
+    task.wait(0.3)
+    setNoclip(false)
+    return reached
+end                      ← đóng flyTo
 -- ============ SPAWN & SEAT ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
