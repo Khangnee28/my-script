@@ -191,7 +191,33 @@ local function rayFloorY(fromPos)
     if hit then return hit.Position.Y end
     return nil
 end
+-- freeze xe tại vị trí (không rơi, không trôi)
+local freezeBV = nil
+local function freezeCar(on)
+    if freezeBV then
+        pcall(function() freezeBV:Destroy() end)
+        freezeBV = nil
+    end
+    if not on then return end
 
+    local h = hum()
+    if not h or not h.SeatPart then return end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFreeze"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.Velocity = Vector3.zero
+    bv.Parent = h.SeatPart
+    freezeBV = bv
+
+    -- loop giữ velocity = 0
+    task.spawn(function()
+        while freezeBV == bv and bv.Parent do
+            bv.Velocity = Vector3.zero
+            task.wait(0.1)
+        end
+    end)
+end
 -- ============ SEAT CAR ============
 local function seatCar(timeout)
     timeout = timeout or 15
@@ -298,30 +324,117 @@ local function flyTo(target, timeout)
             end
             bv.Velocity = dir * speed
 
-            -- void scan
-            if os.clock() - lastCheck > 0.4 then
-                local forward = delta.Unit
-                local aheadPos = hrp.Position + forward * 30
-                local floorY = rayFloorY(aheadPos)
-                local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
+            -- void detect: check Y hiện tại + raycast xuống dưới 300 studs
+if os.clock() - lastCheck > 0.2 then
+    -- raycast xuống dưới chân hiện tại
+    local belowHit = rayFloorY(hrp.Position)
+    local isVoid = (belowHit == nil) or (hrp.Position.Y - belowHit > 60)
+
+    if isVoid then
+        bv.Velocity = Vector3.zero
+        local forward = delta.Unit
+        local curY = hrp.Position.Y
+
+        -- tìm bờ bên kia: raycast ngang để tìm vị trí có sàn
+        local jumpDist = 100
+        for testDist = 60, 400, 25 do
+            local testPos = hrp.Position + forward * testDist
+            local fY = rayFloorY(testPos)
+            if fY and math.abs(curY - fY) < 80 then
+                jumpDist = testDist
+                break
+            end
+        end
+
+        local dest = hrp.Position + forward * jumpDist
+        dest = Vector3.new(dest.X, curY + 5, dest.Z)
+
+        local carModel = nil
+        if h.SeatPart then
+            carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+        elseif myCar then
+            carModel = myCar
+        end
+
+        if carModel then
+            pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+        end
+        pcall(function() hrp.CFrame = CFrame.new(dest) end)
+        task.wait(0.4)
+    end
+    lastCheck = os.clock()
+end
+
+            task.wait(0.05)
+        end
+local function flyTo(target, timeout)
+    timeout = timeout or FLY_TIMEOUT
+    local deadline = os.clock() + timeout
+    local h = hum()
+    local hrp = root()
+    if not h or not hrp then return false end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFly"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+
+    local attach = hrp
+    if h.SeatPart then attach = h.SeatPart end
+    bv.Parent = attach
+
+    setNoclip(true)
+
+    local lastCheck = os.clock()
+    local reached = false
+
+    pcall(function()
+        while os.clock() < deadline and enabled do
+            hrp = root()
+            if not hrp then break end
+            if h.SeatPart then attach = h.SeatPart else attach = hrp end
+            if bv.Parent ~= attach then bv.Parent = attach end
+
+            local delta = target - hrp.Position
+            local dist = delta.Magnitude
+            if dist < ARRIVE_DIST then
+                reached = true
+                break
+            end
+
+            local speed = FLY_SPEED
+            if dist < 60 then
+                speed = math.max(FLY_SPEED * (dist / 60), 20)
+            end
+
+            local dir = delta.Unit
+            if hrp.Position.Y - target.Y < -20 then
+                dir = Vector3.new(dir.X, math.max(dir.Y, 0.5), dir.Z).Unit
+            end
+            bv.Velocity = dir * speed
+
+            -- void detect mỗi 0.2s
+            if os.clock() - lastCheck > 0.2 then
+                local belowY = rayFloorY(hrp.Position)
+                local isVoid = (belowY == nil) or (hrp.Position.Y - belowY > 60)
 
                 if isVoid then
                     bv.Velocity = Vector3.zero
+                    local forward = delta.Unit
                     local curY = hrp.Position.Y
 
-                    -- tìm bờ bên kia
-                    local jumpDist = 80
-                    for testDist = 60, 300, 20 do
+                    -- tìm bờ bên kia: raycast xuống, min 60 → max 400
+                    local jumpDist = 100
+                    for testDist = 60, 400, 25 do
                         local testPos = hrp.Position + forward * testDist
                         local fY = rayFloorY(testPos)
-                        if fY and math.abs(curY - fY) < 100 then
+                        if fY and math.abs(curY - fY) < 80 then
                             jumpDist = testDist
                             break
                         end
                     end
 
                     local dest = hrp.Position + forward * jumpDist
-                    dest = Vector3.new(dest.X, curY, dest.Z)
+                    dest = Vector3.new(dest.X, curY + 5, dest.Z)
 
                     local carModel = nil
                     if h.SeatPart then
@@ -332,9 +445,8 @@ local function flyTo(target, timeout)
 
                     if carModel then
                         pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-                    else
-                        pcall(function() hrp.CFrame = CFrame.new(dest) end)
                     end
+                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
                     task.wait(0.4)
                 end
                 lastCheck = os.clock()
@@ -346,7 +458,6 @@ local function flyTo(target, timeout)
 
     if bv and bv.Parent then bv:Destroy() end
 
-    -- brake
     local h2 = hum()
     if h2 and h2.SeatPart then
         pcall(function()
@@ -362,7 +473,7 @@ local function flyTo(target, timeout)
         end)
     end
 
-        task.wait(0.3)
+    task.wait(0.3)
     setNoclip(false)
     return reached
 end
@@ -445,6 +556,7 @@ return true
 end
 
 -- ============ RUN TRIP ============
+
 local function runTrip()
     local h = hum()
     if not h or not h.Sit then
@@ -456,15 +568,15 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-setNoclip(false)   -- đứng chờ đơn, không noclip
-
-setState("chờ đơn")
+    setNoclip(false)
+    setState("chờ đơn")
     orderToken = nil
     pickupPos = nil
+    freezeCar(true)
+
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
         if pickupPos then break end
-
         local hrp = root()
         if hrp and hrp.Position.Y < -50 then
             setState("void — tele lên")
@@ -476,36 +588,31 @@ setState("chờ đơn")
 
     if not pickupPos then
         setState("no pickup")
+        freezeCar(false)
         return
     end
 
-    -- bay pickup
-    -- bay pickup
-setState("đón khách")
-setNoclip(true)    -- bật noclip khi bay
-flyTo(pickupPos, 40)
-setNoclip(false)   -- tới nơi, tắt noclip
-
-    -- đợi khách lên
-    setState("khách lên xe (" .. PICKUP_WAIT .. "s)")
-    local hrp0 = root()
-    if hrp0 then
-        pcall(function()
-            hrp0.AssemblyLinearVelocity = Vector3.zero
-            hrp0.AssemblyAngularVelocity = Vector3.zero
-        end)
-    end
-    task.wait(PICKUP_WAIT)
-
-    -- bay drop
-    if dropPos then
-        
-    setState("trả khách")
+    freezeCar(false)
+    setState("đón khách")
     setNoclip(true)
-    flyTo(dropPos, 50)
+    flyTo(pickupPos, 40)
     setNoclip(false)
+    freezeCar(true)
+
+    setState("khách lên xe (" .. PICKUP_WAIT .. "s)")
+    task.wait(PICKUP_WAIT)
+    freezeCar(false)
+
+    if dropPos then
+        setState("trả khách")
+        setNoclip(true)
+        flyTo(dropPos, 50)
+        setNoclip(false)
+        freezeCar(true)
+
         setState("khách xuống xe (" .. DROP_WAIT .. "s)")
         task.wait(DROP_WAIT)
+        freezeCar(false)
     end
 
     pickupPos = nil
