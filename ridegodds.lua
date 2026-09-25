@@ -449,21 +449,179 @@ local sPad = Instance.new("UIPadding", scroll)
 sPad.PaddingTop = UDim.new(0, 6)
 sPad.PaddingLeft = UDim.new(0, 6)
 sPad.PaddingRight = UDim.new(0, 6)
+-- ============ GUI ============
+local cg = game:GetService("CoreGui")
+if cg:FindFirstChild("RideGoFarmUI") then cg.RideGoFarmUI:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "RideGoFarmUI"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.Parent = cg
+
+local rootUI = Instance.new("Frame", gui)
+rootUI.Size = UDim2.new(0, 280, 0, 148)
+rootUI.Position = UDim2.new(0, 20, 0.5, -74)
+rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
+rootUI.BorderSizePixel = 0
+rootUI.Active = true
+Instance.new("UICorner", rootUI).CornerRadius = UDim.new(0, 10)
+local st = Instance.new("UIStroke", rootUI)
+st.Color = Color3.fromRGB(255, 140, 40)
+st.Thickness = 1.5
+
+local title = Instance.new("TextLabel", rootUI)
+title.Size = UDim2.new(1, -16, 0, 24)
+title.Position = UDim2.new(0, 8, 0, 4)
+title.BackgroundTransparency = 1
+title.Text = "◈ RIDEGO v4"
+title.TextColor3 = Color3.fromRGB(255, 140, 40)
+title.TextSize = 13
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local statLbl = Instance.new("TextLabel", rootUI)
+statLbl.Size = UDim2.new(1, -16, 0, 44)
+statLbl.Position = UDim2.new(0, 8, 0, 30)
+statLbl.BackgroundTransparency = 1
+statLbl.Text = "trips: 0 | earn: 0\n..."
+statLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
+statLbl.TextSize = 10
+statLbl.Font = Enum.Font.Code
+statLbl.TextXAlignment = Enum.TextXAlignment.Left
+statLbl.TextYAlignment = Enum.TextYAlignment.Top
+
+local toggleBtn = Instance.new("TextButton", rootUI)
+toggleBtn.Size = UDim2.new(1, -16, 0, 30)
+toggleBtn.Position = UDim2.new(0, 8, 0, 78)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
+toggleBtn.Text = "▶ BẮT ĐẦU FARM"
+toggleBtn.TextColor3 = Color3.new(1,1,1)
+toggleBtn.TextSize = 12
+toggleBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
+
+-- header bảng xe
+local carHeader = Instance.new("TextButton", rootUI)
+carHeader.Size = UDim2.new(1, -16, 0, 26)
+carHeader.Position = UDim2.new(0, 8, 0, 114)
+carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
+carHeader.Text = "▶ 🚗 CHỌN XE (0)"
+carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
+carHeader.TextSize = 11
+carHeader.Font = Enum.Font.GothamBold
+carHeader.TextXAlignment = Enum.TextXAlignment.Left
+Instance.new("UICorner", carHeader).CornerRadius = UDim.new(0, 6)
+local chp = Instance.new("UIPadding", carHeader)
+chp.PaddingLeft = UDim.new(0, 8)
+
+-- body bảng xe
+local carBody = Instance.new("Frame", rootUI)
+carBody.Size = UDim2.new(1, -16, 0, 0)
+carBody.Position = UDim2.new(0, 8, 0, 146)
+carBody.BackgroundTransparency = 1
+carBody.Visible = false
+
+local scanBtn = Instance.new("TextButton", carBody)
+scanBtn.Size = UDim2.new(1, 0, 0, 26)
+scanBtn.Position = UDim2.new(0, 0, 0, 0)
+scanBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 90)
+scanBtn.Text = "🔍 QUÉT XE"
+scanBtn.TextColor3 = Color3.new(1,1,1)
+scanBtn.TextSize = 11
+scanBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
+
+local scroll = Instance.new("ScrollingFrame", carBody)
+scroll.Size = UDim2.new(1, 0, 0, 150)
+scroll.Position = UDim2.new(0, 0, 0, 32)
+scroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 4
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 6)
+
+local sList = Instance.new("UIListLayout", scroll)
+sList.Padding = UDim.new(0, 4)
+sList.SortOrder = Enum.SortOrder.LayoutOrder
+local sPad = Instance.new("UIPadding", scroll)
+sPad.PaddingTop = UDim.new(0, 6)
+sPad.PaddingLeft = UDim.new(0, 6)
+sPad.PaddingRight = UDim.new(0, 6)
 sPad.PaddingBottom = UDim.new(0, 6)
 
--- toggle
 local carOpen = false
+
+local function clearList()
+    for _, c in ipairs(scroll:GetChildren()) do
+        if c:IsA("GuiObject") then c:Destroy() end
+    end
+end
+
+local function renderCars()
+    clearList()
+    scroll.CanvasSize = UDim2.new(0, 0, 0, #carList * 38 + 12)
+
+    if #carList == 0 then
+        local lbl = Instance.new("TextLabel", scroll)
+        lbl.Size = UDim2.new(1, -12, 0, 40)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = "chưa quét xe — tap QUÉT XE"
+        lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
+        lbl.TextSize = 10
+        lbl.Font = Enum.Font.GothamMedium
+        lbl.TextWrapped = true
+        carHeader.Text = (carOpen and "▼ " or "▶ ") .. "🚗 CHỌN XE (0)"
+        return
+    end
+
+    for i, name in ipairs(carList) do
+        local btn = Instance.new("TextButton", scroll)
+        btn.Size = UDim2.new(1, -12, 0, 34)
+        btn.BackgroundColor3 = (name == selectedCar)
+            and Color3.fromRGB(0, 150, 120)
+            or Color3.fromRGB(30, 38, 54)
+        btn.Text = "  " .. name
+        btn.TextColor3 = Color3.fromRGB(220, 230, 240)
+        btn.TextSize = 10
+        btn.Font = Enum.Font.Code
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.TextTruncate = Enum.TextTruncate.AtEnd
+        btn.LayoutOrder = i
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+        btn.MouseButton1Click:Connect(function()
+            selectedCar = name
+            renderCars()
+        end)
+    end
+
+    carHeader.Text = (carOpen and "▼ " or "▶ ") .. "🚗 CHỌN XE (" .. #carList .. ")"
+end
+
 carHeader.MouseButton1Click:Connect(function()
     carOpen = not carOpen
     carBody.Visible = carOpen
     if carOpen then
-        carBody.Size = UDim2.new(1, -16, 0, 186)
-        rootUI.Size = UDim2.new(0, 280, 0, 340)
+        carBody.Size = UDim2.new(1, -16, 0, 190)
+        rootUI.Size = UDim2.new(0, 280, 0, 348)
     else
         carBody.Size = UDim2.new(1, -16, 0, 0)
         rootUI.Size = UDim2.new(0, 280, 0, 148)
     end
     carHeader.Text = (carOpen and "▼ " or "▶ ") .. "🚗 CHỌN XE (" .. #carList .. ")"
+end)
+
+scanBtn.MouseButton1Click:Connect(function()
+    scanBtn.Text = "⏳ đang quét..."
+    task.spawn(function()
+        scanCars()
+        if #carList > 0 and (not selectedCar or selectedCar == "") then
+            selectedCar = carList[1]
+        end
+        renderCars()
+        scanBtn.Text = "🔍 QUÉT XE (" .. #carList .. ")"
+    end)
 end)
 
 local function paint()
@@ -490,7 +648,7 @@ task.spawn(function()
         statLbl.Text = string.format(
             "trips: %d | earn: %d\nstate: %s\ncar: %s",
             stats.trips, stats.earn, curState,
-            selectedCar:sub(1, 30)
+            (selectedCar ~= "" and selectedCar:sub(1, 30)) or "(chưa chọn)"
         )
     end
 end)
@@ -515,6 +673,7 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
+-- tự scan lần đầu
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -522,7 +681,7 @@ task.spawn(function()
         selectedCar = carList[1]
     end
     renderCars()
-    carHeader.Text = "▶ 🚗 CHỌN XE (" .. #carList .. ")"
+    scanBtn.Text = "🔍 QUÉT XE (" .. #carList .. ")"
 end)
 
 print("[ridego v4] loaded")
