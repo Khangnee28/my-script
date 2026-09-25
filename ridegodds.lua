@@ -403,10 +403,10 @@ local function runTrip()
     end
     myCar = findCarByName(selectedCar) or findMyCar()
 setNoclip(true)
-setState("sẵn sàng")
+setState("chờ đơn")
 return true
 
-    setState("chờ đơn")
+    
     orderToken = nil
     pickupPos = nil
     local deadline = os.clock() + ORDER_TIMEOUT
