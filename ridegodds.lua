@@ -165,23 +165,40 @@ local function setAntiGravity(on)
     bv.Parent = h.SeatPart
     antiGravBV = bv
 end
-local function setNoclip(on)
-    noclipOn = on
-    local c = char()
-    if c then
-        for _, p in ipairs(c:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.CanCollide = not on end)
-            end
+local noclipHookedChars = {}
+local noclipHookedCars = {}
+
+local function hookNoclipFor(inst)
+    if not inst or noclipHookedChars[inst] then return end
+    noclipHookedChars[inst] = true
+    inst.DescendantAdded:Connect(function(d)
+        if noclipOn and d:IsA("BasePart") then
+            pcall(function() d.CanCollide = false end)
+        end
+    end)
+end
+
+local function forceNoclip(inst)
+    if not inst then return end
+    for _, p in ipairs(inst:GetDescendants()) do
+        if p:IsA("BasePart") and p.CanCollide then
+            pcall(function() p.CanCollide = false end)
         end
     end
-    local car = findMyCar()
+end
+
+local function setNoclip(on)
+    noclipOn = on
+    if not on then return end
+    local c = char()
+    if c then
+        forceNoclip(c)
+        hookNoclipFor(c)
+    end
+    local car = myCar or findMyCar()
     if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.CanCollide = not on end)
-            end
-        end
+        forceNoclip(car)
+        hookNoclipFor(car)
     end
 end
 
@@ -311,18 +328,45 @@ local function flyTo(target, timeout)
                 local isVoid = (floorY == nil) or (hrp.Position.Y - floorY > 80)
 
                 if isVoid then
-                    bv.Velocity = Vector3.zero
-                    local carModel = nil
-                    if h.SeatPart then
-                        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
-                    end
-                    local dest = Vector3.new(target.X, target.Y + 15, target.Z)
-                    if carModel then
-                        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
-                    end
-                    pcall(function() hrp.CFrame = CFrame.new(dest) end)
-                    task.wait(0.5)
-                end
+    bv.Velocity = Vector3.zero
+    local curY = hrp.Position.Y
+
+    -- tìm bờ bên kia void: raycast xuống tại các điểm xa dần
+    local jumpDist = 80
+    for testDist = 60, 300, 20 do
+        local testPos = hrp.Position + forward * testDist
+        local floorY = rayFloorY(testPos)
+        if floorY and math.abs(curY - floorY) < 100 then
+            jumpDist = testDist
+            break
+        end
+    end
+
+    -- tele tới bờ bên kia, giữ Y hiện tại
+    local dest = hrp.Position + forward * jumpDist
+    dest = Vector3.new(dest.X, curY, dest.Z)
+
+    local carModel = nil
+    if h.SeatPart then
+        carModel = h.SeatPart:FindFirstAncestorOfClass("Model")
+    end
+    if carModel then
+        pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+    end
+    pcall(function() hrp.CFrame = CFrame.new(dest) end)
+    task.wait(0.4)
+
+    -- re-seat nếu té
+    if not h.Sit then
+        local vs = carModel and carModel:FindFirstChildWhichIsA("VehicleSeat", true)
+        if vs then
+            pcall(function() vs:Sit(h) end)
+            task.wait(0.3)
+            pcall(function() h.Sit = true end)
+            task.wait(0.3)
+        end
+    end
+end
                 lastCheck = os.clock()
             end
 
