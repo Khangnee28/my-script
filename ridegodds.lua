@@ -72,7 +72,10 @@ end
 
 local function fire(remote, ...)
     if not remote then return false end
-    local ok = pcall(function() remote:FireServer(...) end)
+    local args = {...}
+    local ok = pcall(function()
+        remote:FireServer(table.unpack(args))
+    end)
     return ok
 end
 
