@@ -128,16 +128,17 @@ local function findMyCar()
     end
     return nil
 end
+
 local function findCarByName(name)
     if not name or name == "" then return nil end
-    -- match chính xác trước
+    local lower = name:lower()
+    -- ưu tiên exact
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("Model") and d.Name == name then
             return d
         end
     end
-    -- match substring (tránh suffix hoặc prefix)
-    local lower = name:lower()
+    -- fallback substring
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("Model") and d.Name:lower():find(lower, 1, true) then
             return d
@@ -309,38 +310,31 @@ local function seatCar(timeout)
     while os.clock() < deadline and enabled do
         local h = hum()
         local hrp = root()
-        if h and h.Sit then return true end
+        if h and h.Sit then
+            myCar = findCarByName(selectedCar) or findMyCar()
+            return true
+        end
 
         if h and hrp then
             local car = findCarByName(selectedCar) or findMyCar()
             if car then
-                local vs = nil
-                for _, d in ipairs(car:GetDescendants()) do
-                    if (d:IsA("VehicleSeat") or d:IsA("Seat")) and not d.Occupant then
-                        vs = d
-                        break
-                    end
-                end
+                -- tìm VehicleSeat
+                local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+                    or car:FindFirstChildWhichIsA("Seat", true)
 
-                if vs then
-                    -- tele HRP vào tâm ghế, cao 2 studs
-                    pcall(function()
-                        hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0))
-                    end)
-                    task.wait(0.4)
-
-                    -- 1) chờ game auto-sit (King Akbar style)
-                    task.wait(1.2)
-                    if h.Sit then myCar = car return true end
-
-                    -- 2) ép seat
-                    pcall(function() vs:Sit(h) end)
+                if vs and not vs.Occupant then
+                    -- tele char tới seat trước
+                    local seatPos = vs.Position + Vector3.new(0, 2, 0)
+                    pcall(function() hrp.CFrame = CFrame.new(seatPos) end)
                     task.wait(0.5)
+
+                    -- thử seat 3 cách
+                    pcall(function() vs:Sit(h) end)
+                    task.wait(0.6)
                     if h.Sit then myCar = car return true end
 
-                    -- 3) ép Humanoid.Sit
                     pcall(function() h.Sit = true end)
-                    task.wait(0.6)
+                    task.wait(0.8)
                     if h.Sit then myCar = car return true end
                 end
             end
@@ -357,27 +351,46 @@ local function spawnAndSeat()
         return false
     end
 
+    -- BƯỚC 1: check xe đã có sẵn chưa
+    local car = findCarByName(selectedCar)
+    if car and car:FindFirstChildWhichIsA("BasePart", true) then
+        -- xe có → chỉ cần seat
+        setState("ngồi xe có sẵn")
+        if seatCar(10) then
+            setState("sẵn sàng")
+            task.wait(1.5)
+            return true
+        end
+    end
+
+    -- BƯỚC 2: spawn xe
     setState("spawn " .. selectedCar:sub(1, 20))
     fire(SpawnCarEv, selectedCar)
 
-    -- chờ model xe hiện trong workspace
-    local car = nil
-    local deadline = os.clock() + 10
+    -- BƯỚC 3: chờ xe hiện (async, tối đa 20s)
+    local deadline = os.clock() + 20
     while os.clock() < deadline and enabled do
         car = findCarByName(selectedCar)
-        if car and car:FindFirstChildWhichIsA("BasePart", true) then break end
-        task.wait(0.4)
+        if car and car:FindFirstChildWhichIsA("BasePart", true) then
+            -- check part đã anchor chưa (xe rơi xong)
+            local root = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
+            if root and root.AssemblyLinearVelocity.Magnitude < 5 then
+                break
+            end
+        end
+        task.wait(0.5)
     end
+
     if not car then
         setState("xe chưa hiện")
         return false
     end
 
-    task.wait(1)   -- chờ xe rơi xuống ổn định
+    task.wait(1.5)
 
-    if seatCar(12) then
+    if seatCar(15) then
         setState("sẵn sàng")
-        task.wait(1.5)   -- chờ UI lái xe load
+        task.wait(1.5)
         return true
     end
     setState("seat fail")
@@ -386,32 +399,43 @@ end
 
 -- ============ INIT (1 LẦN) ============
 local function doInit()
+    -- check đã ngồi xe chưa
+    local h = hum()
+    if h and h.Sit then
+        myCar = findMyCar()
+        setState("sẵn sàng")
+        return true
+    end
+
     setState("đổi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
     setState("online")
     fire(TaxiEvent, "GoOnline")
-    task.wait(1.5)
+    task.wait(2)
 
     setState("spawn xe")
-    if not (hum() and hum().Sit) then
-        if not spawnAndSeat() then
-            setState("spawn fail")
-            return false
-        end
+    if not spawnAndSeat() then
+        setState("spawn fail")
+        return false
     end
-    myCar = findMyCar()
+
+    myCar = findCarByName(selectedCar) or findMyCar()
+    setNoclip(true)
     setState("sẵn sàng")
     return true
 end
 
 local function runTrip()
     local h = hum()
-    if not h or not h.Sit then
-        setState("respawn xe")
-        if not spawnAndSeat() then return end
+if not h or not h.Sit then
+    setState("chờ spawnAndSeat")
+    if not spawnAndSeat() then
+        task.wait(5)
+        return
     end
+end
     myCar = findCarByName(selectedCar) or findMyCar()
 
     setNoclip(true)
