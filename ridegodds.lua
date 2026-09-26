@@ -1,8 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26
--- AckTripComplete sau khi tra khach 3s. Offline/Online neu >15s khong co don.
--- UNDERGROUND_DEPTH=200. LAND_OFFSET=8. Timer farm. UI status trong suot. LED RGB.
--- Menu chinh 2 nut. Nut an/hien UI. Ten xe hien thi. Print tieng Viet.
+-- RideGo Farm — FINAL v26.1
+-- AckTripComplete. Offline/Online neu >15s. UNDERGROUND_DEPTH=200. LAND_OFFSET=8.
+-- Hold dung ANCHOR → xe dung im tuyet doi. Chon xe quay ve main menu.
+-- Ten xe hien full. Menu 2 nut + nut an/hien. LED RGB. Timer farm.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -37,7 +37,7 @@ local selectedCar = ""
 local carList     = {}
 local stats       = { trips = 0, earn = 0 }
 local curStatus   = "◦ TẮT"
-local holdBV      = nil
+local holdActive  = false
 local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
@@ -53,10 +53,7 @@ local function resetState()
     acceptingOrder = false
     initialized = false
     farmStartTime = 0
-    if holdBV then
-        pcall(function() holdBV:Destroy() end)
-        holdBV = nil
-    end
+    holdActive = false
 end
 
 local function setStatus(s)
@@ -350,35 +347,29 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ GIỮ XE ĐỨNG YÊN ============
+-- ============ GIỮ XE ĐỨNG YÊN (ANCHOR) ============
 local function startHold()
-    if holdBV then
-        pcall(function() holdBV:Destroy() end)
-        holdBV = nil
-    end
     local car = myCar or findMyCar()
     if not car then return end
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-    if not vs then return end
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "RGHold"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 10000
-    bv.Velocity = Vector3.zero
-    bv.Parent = vs
-    holdBV = bv
-    task.spawn(function()
-        while holdBV == bv and bv.Parent do
-            bv.Velocity = Vector3.zero
-            task.wait(0.03)
+
+    -- Anchor toàn bộ part → xe đứng im tuyệt đối, không xoay, không trôi
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") and not p.Anchored then
+            pcall(function() p.Anchored = true end)
         end
-    end)
+    end
+    holdActive = true
 end
 
 local function stopHold()
-    if holdBV then
-        pcall(function() holdBV:Destroy() end)
-        holdBV = nil
+    holdActive = false
+    local car = myCar or findMyCar()
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") and p.Anchored then
+                pcall(function() p.Anchored = false end)
+            end
+        end
     end
 end
 
@@ -396,7 +387,6 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- TELE THẲNG VÀO TÂM GHẾ LÁI + ÉP SIT
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -423,7 +413,6 @@ local function forceSeat()
         if vs.Occupant and vs.Occupant ~= h then return false end
     end
 
-    -- Vô hiệu ghế khác để engine không chọn nhầm
     local disabledList = {}
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d ~= vs and not d.Disabled then
@@ -432,7 +421,6 @@ local function forceSeat()
         end
     end
 
-    -- Tele vào TÂM ghế lái (offset 1 stud trên tâm)
     local hrp = root()
     if hrp then
         local centerCF = vs.CFrame * CFrame.new(0, 1, 0)
@@ -440,7 +428,6 @@ local function forceSeat()
         task.wait(0.05)
     end
 
-    -- Ép sit
     pcall(function() vs:Sit(h) end)
     task.wait(0.12)
     pcall(function() h.AutoRotate = false end)
@@ -466,7 +453,6 @@ local function forceSeat()
         pcall(function() d.Disabled = false end)
     end
 
-    -- Khóa AutoRotate
     pcall(function() h.AutoRotate = false end)
 
     return h.Sit and h.SeatPart == vs
@@ -494,6 +480,7 @@ task.spawn(function()
                     elseif notSeated and not flying then
                         forceSeat()
                     end
+                    pcall(function() h.AutoRotate = false end)
                 end
             end
         end
@@ -573,7 +560,7 @@ local function flyTo(target)
     flying = true
 
     local startPivot = car:GetPivot()
-    local rotOnly = startPivot - startPivot.Position  -- rotation khóa
+    local rotOnly = startPivot - startPivot.Position
 
     local curPos = startPivot.Position
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
@@ -618,7 +605,6 @@ local function flyTo(target)
             underY,
             curP.Z + dir.Z * step
         )
-        -- Dùng rotOnly cố định → xe không xoay
         pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
         fakeVelCounter = fakeVelCounter + 1
@@ -644,7 +630,7 @@ local function flyTo(target)
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
-        startHold()
+        startHold()  -- ANCHOR — xe đứng im tuyệt đối
         pcall(function() hum().AutoRotate = false end)
     end
 
@@ -737,7 +723,7 @@ local function runTrip()
     myCar = findMyCar()
     pcall(function() h.AutoRotate = false end)
 
-    startHold()
+    startHold()  -- ANCHOR — xe đứng im khi chờ
 
     orderToken = nil
     pickupPos = nil
@@ -752,11 +738,10 @@ local function runTrip()
 
     while os.clock() < deadline and enabled do
         if pickupPos then break end
-        if not holdBV or not holdBV.Parent then
+        if not holdActive then
             startHold()
         end
 
-        -- Nếu chờ > 15s chưa có đơn → off/on 1 lần
         if not didReconnect and (os.time() - waitStart) >= RECONNECT_AFTER then
             setStatus("◦ Chờ lâu — tắt/mở lại online")
             fire(TaxiEvent, "GoOffline")
@@ -775,7 +760,6 @@ local function runTrip()
         return
     end
 
-    -- Đón khách
     setStatus("➤ Bay đón khách")
     flyTo(pickupPos)
     task.wait(0.3)
@@ -783,7 +767,6 @@ local function runTrip()
     setStatus("⌛ Đợi khách lên xe (4s)")
     task.wait(PICKUP_WAIT)
 
-    -- Trả khách
     if dropPos then
         setStatus("➤ Bay trả khách")
         flyTo(dropPos)
@@ -799,7 +782,6 @@ local function runTrip()
         pendingFare = 0
         setStatus("✓ Hoàn thành chuyến")
 
-        -- Báo hoàn thành sau ACK_DELAY (3s)
         task.wait(ACK_DELAY)
         fire(TaxiEvent, "AckTripComplete")
         setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
@@ -849,12 +831,11 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 999
 gui.Parent = cg
 
--- Khung chính
 local rootUI = Instance.new("Frame", gui)
 rootUI.Size = UDim2.new(0, 290, 0, 148)
 rootUI.Position = UDim2.new(0, 20, 0.5, -74)
 rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-rootUI.BackgroundTransparency = 0.15  -- trong suốt nhẹ
+rootUI.BackgroundTransparency = 0.15
 rootUI.BorderSizePixel = 0
 rootUI.Active = true
 Instance.new("UICorner", rootUI).CornerRadius = UDim.new(0, 10)
@@ -863,7 +844,6 @@ local borderStroke = Instance.new("UIStroke", rootUI)
 borderStroke.Color = Color3.fromRGB(255, 140, 40)
 borderStroke.Thickness = 2
 
--- LED RGB viền
 task.spawn(function()
     local hue = 0
     while true do
@@ -875,7 +855,6 @@ task.spawn(function()
     end
 end)
 
--- Tiêu đề
 local title = Instance.new("TextLabel", rootUI)
 title.Size = UDim2.new(1, -40, 0, 24)
 title.Position = UDim2.new(0, 10, 0, 4)
@@ -886,7 +865,6 @@ title.TextSize = 13
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Nút ẩn/hiện
 local eyeBtn = Instance.new("TextButton", rootUI)
 eyeBtn.Size = UDim2.new(0, 24, 0, 20)
 eyeBtn.Position = UDim2.new(1, -34, 0, 6)
@@ -897,7 +875,7 @@ eyeBtn.TextSize = 14
 eyeBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", eyeBtn).CornerRadius = UDim.new(0, 4)
 
--- ============ MENU CHÍNH (2 nút) ============
+-- ============ MENU CHÍNH ============
 local mainMenu = Instance.new("Frame", rootUI)
 mainMenu.Size = UDim2.new(1, -20, 0, 106)
 mainMenu.Position = UDim2.new(0, 10, 0, 32)
@@ -927,7 +905,7 @@ farmBtn.TextSize = 14
 farmBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", farmBtn).CornerRadius = UDim.new(0, 7)
 
--- ============ PANEL STATUS (hiện khi farm) ============
+-- ============ PANEL STATUS ============
 local statusPanel = Instance.new("Frame", rootUI)
 statusPanel.Size = UDim2.new(1, -20, 0, 106)
 statusPanel.Position = UDim2.new(0, 10, 0, 32)
@@ -942,8 +920,9 @@ local function makeStatusLabel(y)
     lbl.Text = ""
     lbl.TextColor3 = Color3.fromRGB(200, 220, 240)
     lbl.TextSize = 11
-    lbl.Font = Enum.Font.Code
+    lbl.Font = Enum.Font.GothamMedium
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextTruncate = Enum.TextTruncate.AtEnd
     return lbl
 end
 
@@ -1021,6 +1000,7 @@ local function renderCars()
             carOpen = false
             carListPanel.Visible = false
             carListPanel.Size = UDim2.new(1, -20, 0, 0)
+            mainMenu.Visible = true       -- QUAY VE MENU CHINH
             rootUI.Size = UDim2.new(0, 290, 0, 148)
             carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
             print("[RideGo] Đã chọn xe: " .. name)
@@ -1031,7 +1011,7 @@ end
 
 -- ============ NÚT CHỌN XE ============
 carBtn.MouseButton1Click:Connect(function()
-    if enabled then return end  -- đang farm thì không cho đổi
+    if enabled then return end
     carOpen = not carOpen
     carListPanel.Visible = carOpen
     mainMenu.Visible = not carOpen
@@ -1071,7 +1051,6 @@ end)
 -- ============ NÚT BẮT ĐẦU/DỪNG ============
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
-        -- Dừng + reset toàn bộ
         enabled = false
         resetState()
         detachNpcFollowers()
@@ -1098,7 +1077,6 @@ farmBtn.MouseButton1Click:Connect(function()
 
         print("[RideGo] Đã DỪNG farm — reset toàn bộ")
     else
-        -- Bắt đầu
         resetState()
         enabled = true
         farmStartTime = os.time()
@@ -1115,7 +1093,7 @@ farmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ VÒNG CẬP NHẬT STATUS ============
+-- ============ CẬP NHẬT STATUS ============
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1124,7 +1102,7 @@ task.spawn(function()
             timeLbl.Text   = "⏱ Thời gian: " .. formatTime(sec)
             tripsLbl.Text  = "🚕 Chuyến: " .. tostring(stats.trips)
             earnLbl.Text   = "💰 Kiếm: Rp " .. tostring(stats.earn)
-            carLbl.Text    = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar:sub(1, 24)) or "(chưa chọn)")
+            carLbl.Text    = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
             statusLbl.Text = "📍 " .. curStatus
         end
     end
@@ -1158,4 +1136,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26")
+print("[RideGo] Đã load v26.1")
