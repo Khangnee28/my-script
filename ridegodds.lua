@@ -279,7 +279,7 @@ local function seatCar(timeout)
 end
 
 -- ============ FLY ============
- function flyTo(target)
+ local function flyTo(target)
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
@@ -287,44 +287,28 @@ end
     setCarNoclip(true)
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
-    local vs = getDriveSeat(car)
-    local attach = vs or root()
-    if not attach then return false end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "RGFly"
-    bv.MaxForce = Vector3.new(1e8, 1e8, 1e8)
-    bv.P = 10000
-    bv.Velocity = Vector3.zero
-    bv.Parent = attach
-
--- BodyGyro giu xe khong xoay
-local bg = Instance.new("BodyGyro")
-bg.Name = "RGGyro"
-bg.MaxTorque = Vector3.new(1e7, 1e7, 1e7)
-bg.P = 5000
-bg.D = 500
-bg.CFrame = CFrame.new(attach.Position, target)   -- nhin ve target
-bg.Parent = attach
-    
+    -- ANCHOR CA XE - khong xoay, khong roi
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.Anchored = true end)
+        end
+    end
+    task.wait(0.1)
 
     local reached = false
-    local DECEL_DIST = 200   -- bat dau giam toc tu 200 studs
-    local ARRIVE = 8         -- dung khi cach target < 8
+    local DECEL_DIST = 200
+    local ARRIVE = 8
+    local VOID_SCAN = 2000
+    local TICK = 0.05
+    local lastVoidCheck = 0
 
     while enabled do
         car = myCar or findMyCar()
         if not car then break end
-        local hrp = root()
-        if not hrp then break end
 
-        vs = getDriveSeat(car)
-        if vs and attach ~= vs then
-            attach = vs
-            bv.Parent = vs
-        end
-
-        local curPos = (h.Sit and vs) and vs.Position or hrp.Position
+        local vs = getDriveSeat(car)
+        local curPos = (vs and vs.Position) or (root() and root().Position)
+        if not curPos then break end
 
         local delta = target - curPos
         local flat = Vector3.new(delta.X, 0, delta.Z)
@@ -332,156 +316,152 @@ bg.Parent = attach
 
         if dist < ARRIVE then
             reached = true
-            bv.Velocity = Vector3.zero
-            bv.MaxForce = Vector3.new(0, 0, 0)
             break
         end
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        local aheadPos = curPos + dir * 50
-        local aheadFloorY = rayFloorY(aheadPos)
-        local curFloorY = rayFloorY(curPos)
-        local isVoidAhead = (aheadFloorY == nil)
-            or (curFloorY and aheadFloorY and (curFloorY - aheadFloorY > 30))
-            or (aheadFloorY and aheadFloorY < -50)
+        -- void check moi 0.2s
+        local voidHandled = false
+        if os.clock() - lastVoidCheck > 0.2 then
+            lastVoidCheck = os.clock()
 
-        if isVoidAhead then
-            local jumpDist = 100
-            local jumpFloorY = nil
-            for testDist = 60, VOID_SEARCH, 20 do
-                local testPos = curPos + dir * testDist
-                local fY = rayFloorY(testPos)
-                if fY and curFloorY and math.abs(curFloorY - fY) < 25 then
-                    jumpDist = testDist
-                    jumpFloorY = fY
-                    break
+            local curFloorY = rayFloorY(curPos)
+            local aheadFloorY = rayFloorY(curPos + dir * 60)
+
+            local isVoid = (curFloorY == nil and aheadFloorY == nil)
+                or (curFloorY and curFloorY < -20)
+                or (aheadFloorY and aheadFloorY < -20)
+                or (curFloorY and curFloorY > -20 and aheadFloorY == nil)
+
+            if isVoid then
+                -- tim bo ben kia
+                local jumpDist = 0
+                local jumpFloorY = nil
+                for testDist = 60, VOID_SCAN, 30 do
+                    local fY = rayFloorY(curPos + dir * testDist)
+                    if fY and fY > -5 then
+                        jumpDist = testDist
+                        jumpFloorY = fY
+                        break
+                    end
                 end
-            end
-            if jumpFloorY then
-                local dest = Vector3.new(
-                    curPos.X + dir.X * jumpDist,
-                    jumpFloorY + FLY_Y,
-                    curPos.Z + dir.Z * jumpDist
-                )
-                local carModel = myCar or findMyCar()
-                if carModel then
-                    pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+
+                local dest
+                if jumpFloorY then
+                    dest = Vector3.new(
+                        curPos.X + dir.X * jumpDist,
+                        jumpFloorY + FLY_Y,
+                        curPos.Z + dir.Z * jumpDist
+                    )
+                    setState("void - tele bo " .. jumpDist)
+                else
+                    -- khong co bo -> tele xa 500 studs ve huong target
+                    dest = Vector3.new(
+                        curPos.X + dir.X * 500,
+                        curPos.Y + 15,
+                        curPos.Z + dir.Z * 500
+                    )
+                    setState("void - tele xa")
                 end
+
+                pcall(function() car:PivotTo(CFrame.new(dest)) end)
                 if not h.Sit then forceSeat() end
-                task.wait(0.2)
-            else
-                break
+                task.wait(0.35)
+                voidHandled = true
             end
+        end
+
+        if voidHandled then
+            -- tiep tuc loop sau khi tele
         else
-            local targetY
-            if curFloorY then
+            -- bay binh thuong
+            local curFloorY = rayFloorY(curPos)
+            local targetY = curPos.Y
+            if curFloorY and curFloorY > -20 then
                 targetY = curFloorY + FLY_Y
-            else
-                targetY = curPos.Y
+                if targetY < curPos.Y - 15 then
+                    targetY = curPos.Y
+                end
             end
 
-            -- ==== GIAM TOC TUYEN TINH ====
-            -- dist 200 -> speed = STEP_DIST
-            -- dist 20  -> speed ~ 18
-            -- dist 8   -> speed ~ 7
             local speed
             if dist >= DECEL_DIST then
                 speed = STEP_DIST
             else
-                -- ty le: dist/200 * STEP_DIST, san 4
-                speed = math.max(STEP_DIST * dist / DECEL_DIST, 4)
-                -- dist 8 -> 180*8/200 = 7.2 -> van > ARRIVE nen stop som
+                speed = math.max(STEP_DIST * dist / DECEL_DIST, 6)
             end
 
-            local vx = dir.X * speed
-            local vz = dir.Z * speed
-            local vy = (targetY - curPos.Y) * 5
-            vy = math.clamp(vy, -60, 60)
+            local step = speed * TICK
+            if step > dist - 2 then step = dist - 2 end
+            if step < 1 then step = 1 end
 
-            bv.Velocity = Vector3.new(vx, vy, vz)
+            local nextPos = Vector3.new(
+                curPos.X + dir.X * step,
+                targetY,
+                curPos.Z + dir.Z * step
+            )
 
+            pcall(function() car:PivotTo(CFrame.new(nextPos)) end)
             if not h.Sit then forceSeat() end
-            task.wait(0.03)
+            task.wait(TICK)
         end
     end
 
-        --     -- ==== BAY XONG ====
-    if bv and bv.Parent then bv:Destroy() end
-    if bg and bg.Parent then bg:Destroy() end
-    task.wait(0.15)
-
+    -- UNANCHOR
     car = myCar or findMyCar()
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.Anchored = false end)
+            end
+        end
+    end
+    task.wait(0.1)
+
+    -- HA XUONG
     local vs2 = car and getDriveSeat(car)
-    local curPos = (vs2 and vs2.Position) or (root() and root().Position)
+    local endPos = (vs2 and vs2.Position) or (root() and root().Position)
 
-    if not curPos then
-        task.wait(0.2)
-        return reached
-    end
-
-    -- raycast xuong check san
-    local floorY = rayFloorY(curPos)
-    local ABOVE_GROUND = false
-
-    if floorY then
-        if curPos.Y >= floorY then
-            -- dang O TREN san -> OK
-            ABOVE_GROUND = true
-        else
-            -- dang O DUOI san (xuyen qua) -> nang len tren
-            ABOVE_GROUND = false
+    local hasGround = false
+    local floorY = nil
+    if endPos then
+        floorY = rayFloorY(endPos)
+        if floorY and floorY > -10 then
+            hasGround = true
         end
     end
 
-    if not ABOVE_GROUND then
-        -- dang duoi san hoac khong co san -> giu noclip + nang xe len
-        if floorY then
-            -- nang len ngang san + 3
-            local liftPos = Vector3.new(curPos.X, floorY + 3, curPos.Z)
-            local carM = myCar or findMyCar()
-            if carM then
-                pcall(function() carM:PivotTo(CFrame.new(liftPos)) end)
-            end
-            task.wait(0.2)
-        else
-            -- khong co san -> nang len 50 studs
+    if hasGround then
+        -- co dat -> tat noclip, cho roi
+        setCarNoclip(false)
+
+        local t0 = os.clock()
+        while os.clock() - t0 < 3 and enabled do
+            task.wait(0.1)
             local hrp3 = root()
-            if hrp3 then
-                pcall(function()
-                    hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 50, 0))
-                end)
+            if not hrp3 then break end
+            local fY = rayFloorY(hrp3.Position)
+            if fY and math.abs(hrp3.Position.Y - fY) < 4 then
+                break
             end
-            task.wait(0.2)
         end
-        -- giu noclip, khong tat
-        task.wait(0.15)
-        return reached
-    end
-
-    -- ==== TAT NOCLIP NGAY KHI BAT DAU HA ====
-    setCarNoclip(false)
-
-    -- cho roi tu nhien xuong san
-    local t0 = os.clock()
-    while os.clock() - t0 < 3 and enabled do
-        task.wait(0.1)
+    else
+        -- khong co dat -> giu noclip, tele len
         local hrp3 = root()
-        if not hrp3 then break end
-        local fY = rayFloorY(hrp3.Position)
-        if fY and math.abs(hrp3.Position.Y - fY) < 4 then
-            break
+        if hrp3 then
+            pcall(function()
+                hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 30, 0))
+            end)
         end
     end
 
-    -- force seat
     task.wait(0.15)
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
         task.wait(0.2)
     end
-
     task.wait(0.15)
     return reached
 end
