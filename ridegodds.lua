@@ -1,7 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v5
--- Hold BV giu xe dung yen suot trip. Noclip ON tu khi bat.
+-- RideGo Farm — FINAL v6
+-- Hold BV giu xe dung yen suot trip. Noclip ON tu khi bat (ca khach).
 -- Void scan 100 -> 100000. Khong thay bo -> tele target.
+-- Ha xuong: raycast 1 nhat, khong chunk loop -> khong lun duoi map.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -19,6 +20,7 @@ local VOID_SCAN_MIN  = 100
 local VOID_SCAN_MAX  = 100000
 local VOID_SCAN_STEP = 150
 local TICK           = 0.05
+local LAND_OFFSET    = 3   -- chieu cao chassis so voi mat dat khi ha
 
 -- ============ STATE ============
 local enabled     = false
@@ -172,21 +174,14 @@ end
 local carNoclipOn = false
 local noclipHooked = {}
 
-local function forceNoclip()
-    local car = myCar or findMyCar()
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") and p.CanCollide then
-                pcall(function() p.CanCollide = false end)
-            end
-        end
+local function walkNoclip(inst)
+    if not inst then return end
+    if inst:IsA("BasePart") and inst.CanCollide then
+        pcall(function() inst.CanCollide = false end)
     end
-    local c = char()
-    if c then
-        for _, p in ipairs(c:GetDescendants()) do
-            if p:IsA("BasePart") and p.CanCollide then
-                pcall(function() p.CanCollide = false end)
-            end
+    for _, p in ipairs(inst:GetDescendants()) do
+        if p:IsA("BasePart") and p.CanCollide then
+            pcall(function() p.CanCollide = false end)
         end
     end
 end
@@ -201,15 +196,52 @@ local function hookNoclip(inst)
     end)
 end
 
+-- hook character cua moi player (khach ngoi len cung duoc noclip)
+local function hookPassengerChars()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local c = plr.Character
+        if c then
+            hookNoclip(c)
+            walkNoclip(c)
+        end
+    end
+end
+
+local function forceNoclip()
+    local car = myCar or findMyCar()
+    if car then
+        walkNoclip(car)
+        -- khach dang ngoi trong xe
+        local vs = getDriveSeat and getDriveSeat(car) or nil
+        if vs and vs.Occupant then
+            local h = vs.Occupant
+            if h and h.Parent then walkNoclip(h.Parent) end
+        end
+    end
+    local c = char()
+    if c then walkNoclip(c) end
+    hookPassengerChars()
+end
+
 local function setCarNoclip(on)
     carNoclipOn = on
     if not on then return end
-    forceNoclip()
     local car = myCar or findMyCar()
     if car then hookNoclip(car) end
     local c = char()
     if c then hookNoclip(c) end
+    hookPassengerChars()
+    forceNoclip()
 end
+
+Players.PlayerAdded:Connect(function(plr)
+    plr.CharacterAdded:Connect(function(c)
+        if carNoclipOn then hookNoclip(c); walkNoclip(c) end
+    end)
+end)
+Players.PlayerRemoving:Connect(function(plr)
+    noclipHooked[plr] = nil
+end)
 
 task.spawn(function()
     while true do
@@ -230,7 +262,8 @@ local function startHold()
     if not vs then return end
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGHold"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    -- truc Y = 0: khong keo len/xuong, trong luc tu dat xe len mat dat
+    bv.MaxForce = Vector3.new(1e6, 0, 1e6)
     bv.P = 10000
     bv.Velocity = Vector3.zero
     bv.Parent = vs
@@ -462,7 +495,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG =====
+    -- ===== HA XUONG: raycast 1 nhat, khong chunk loop =====
     car = myCar or findMyCar()
     if not car then task.wait(0.2) return reached end
 
@@ -470,29 +503,31 @@ local function flyTo(target)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then task.wait(0.2) return reached end
 
-    local floorY = rayFloorY(endPos, 1500)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ign = {}
+    local cc = char()
+    if cc then table.insert(ign, cc) end
+    table.insert(ign, car)
+    params.FilterDescendantsInstances = ign
+    params.IgnoreWater = false
+
+    local origin = Vector3.new(endPos.X, endPos.Y + 200, endPos.Z)
+    local hit = workspace:Raycast(origin, Vector3.new(0, -2000, 0), params)
+
     local targetY
-    if floorY and floorY > -10 then
-        targetY = floorY + 2
+    if hit and hit.Material ~= Enum.Material.Water then
+        targetY = hit.Position.Y + LAND_OFFSET
     else
         targetY = endPos.Y - 3
     end
 
-    local y = endPos.Y
-    local cnt = 0
-    while y > targetY and cnt < 200 and enabled do
-        y = y - 3
-        if y < targetY then y = targetY end
-        local newPos = Vector3.new(endPos.X, y, endPos.Z)
-        pcall(function() car:PivotTo(CFrame.new(newPos)) end)
-        if not h.Sit then forceSeat() end
-        cnt = cnt + 1
-        task.wait(0.03)
-    end
+    local landed = Vector3.new(endPos.X, targetY, endPos.Z)
+    pcall(function() car:PivotTo(CFrame.new(landed)) end)
+    if not h.Sit then forceSeat() end
+    task.wait(0.2)
 
-    task.wait(0.15)
-
-    -- HOLD ngay khi ha xuong
+    -- HOLD sau khi da dat mat, khoa Y nen khong lun
     startHold()
 
     local h2 = hum()
@@ -577,7 +612,6 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-    -- noclip + hold ngay khi bat dau trip
     setCarNoclip(true)
     startHold()
 
@@ -872,4 +906,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded")
+print("[ridego] loaded v6")
