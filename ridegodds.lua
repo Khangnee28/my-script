@@ -8,7 +8,7 @@ local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST         = 200
+local STEP_DIST         = 250
 local LAND_OFFSET       = 6
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
@@ -17,7 +17,7 @@ local DROP_WAIT         = 2
 local DECEL_DIST        = 200
 local TICK              = 0.05
 local UNDERGROUND_DEPTH = 120
-local UNDER_STEP_MAX    = 100
+local UNDER_STEP_MAX    = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
 
