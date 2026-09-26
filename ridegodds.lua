@@ -1,8 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26.1
--- AckTripComplete. Offline/Online neu >15s. UNDERGROUND_DEPTH=200. LAND_OFFSET=8.
--- Hold dung ANCHOR → xe dung im tuyet doi. Chon xe quay ve main menu.
--- Ten xe hien full. Menu 2 nut + nut an/hien. LED RGB. Timer farm.
+-- RideGo Farm — FINAL v26.2
+-- Hold = BodyPosition + BodyGyro (khong troi, khach van len duoc).
+-- Trip chi tinh khi don hoan thanh sach, khong reconnect giua chung.
+-- Status panel khoa khi farm on. EyeBtn chi hoat dong khi farm off.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -38,9 +38,13 @@ local carList     = {}
 local stats       = { trips = 0, earn = 0 }
 local curStatus   = "◦ TẮT"
 local holdActive  = false
+local holdBP      = nil
+local holdGyro    = nil
 local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
+local tripValid      = false
+local reconnectHappened = false
 
 local function resetState()
     orderToken = nil
@@ -53,7 +57,11 @@ local function resetState()
     acceptingOrder = false
     initialized = false
     farmStartTime = 0
+    tripValid = false
+    reconnectHappened = false
     holdActive = false
+    if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+    if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
 end
 
 local function setStatus(s)
@@ -112,6 +120,11 @@ if TaxiEvent then
             orderToken = data.Token
             pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
         elseif action == "OrderAccepted" then
+            -- Bo qua don cu neu vua reconnect
+            if reconnectHappened then
+                setStatus("⚠ Bỏ đơn cũ sau reconnect")
+                return
+            end
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
             orderToken = data.Token
@@ -120,6 +133,7 @@ if TaxiEvent then
             else
                 pendingFare = 0
             end
+            tripValid = true
         end
     end)
 end
@@ -347,30 +361,55 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ GIỮ XE ĐỨNG YÊN (ANCHOR) ============
+-- ============ GIỮ XE ĐỨNG YÊN (BodyPosition + BodyGyro) ============
 local function startHold()
+    if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+    if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
+
     local car = myCar or findMyCar()
     if not car then return end
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    if not vs then return end
 
-    -- Anchor toàn bộ part → xe đứng im tuyệt đối, không xoay, không trôi
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") and not p.Anchored then
-            pcall(function() p.Anchored = true end)
-        end
-    end
+    local curCF = vs.CFrame
+
+    -- BodyPosition: neo vi tri, response mem -> khach day duoc nhung tu keo ve
+    local bp = Instance.new("BodyPosition")
+    bp.Name = "RGHoldPos"
+    bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bp.P = 4000
+    bp.D = 300
+    bp.Position = curCF.Position
+    bp.Parent = vs
+    holdBP = bp
+
+    -- BodyGyro: khoa rotation
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "RGHoldGyro"
+    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bg.P = 4000
+    bg.D = 600
+    bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
+    bg.Parent = vs
+    holdGyro = bg
+
     holdActive = true
+
+    task.spawn(function()
+        while holdActive and holdBP == bp and bp.Parent do
+            bp.Position = curCF.Position
+            if holdGyro == bg and bg.Parent then
+                bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
+            end
+            task.wait(0.1)
+        end
+    end)
 end
 
 local function stopHold()
     holdActive = false
-    local car = myCar or findMyCar()
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") and p.Anchored then
-                pcall(function() p.Anchored = false end)
-            end
-        end
-    end
+    if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+    if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
 end
 
 -- ============ GHẾ LÁI ============
@@ -630,7 +669,7 @@ local function flyTo(target)
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
-        startHold()  -- ANCHOR — xe đứng im tuyệt đối
+        startHold()
         pcall(function() hum().AutoRotate = false end)
     end
 
@@ -723,12 +762,14 @@ local function runTrip()
     myCar = findMyCar()
     pcall(function() h.AutoRotate = false end)
 
-    startHold()  -- ANCHOR — xe đứng im khi chờ
+    startHold()
 
     orderToken = nil
     pickupPos = nil
     dropPos = nil
     pendingFare = 0
+    tripValid = false
+    reconnectHappened = false
     acceptingOrder = true
     setStatus("◦ Đang chờ đơn")
 
@@ -748,6 +789,9 @@ local function runTrip()
             task.wait(1)
             fire(TaxiEvent, "GoOnline")
             didReconnect = true
+            reconnectHappened = true
+            pendingFare = 0
+            tripValid = false
         end
 
         task.wait(0.4)
@@ -775,16 +819,20 @@ local function runTrip()
         setStatus("⌛ Đợi khách xuống xe (4s)")
         task.wait(DROP_WAIT)
 
-        stats.trips = stats.trips + 1
-        if pendingFare > 0 then
-            stats.earn = stats.earn + pendingFare
+        if tripValid then
+            stats.trips = stats.trips + 1
+            if pendingFare > 0 then
+                stats.earn = stats.earn + pendingFare
+            end
+            setStatus("✓ Hoàn thành chuyến — +" .. tostring(pendingFare))
+            task.wait(ACK_DELAY)
+            fire(TaxiEvent, "AckTripComplete")
+            setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
+        else
+            setStatus("⚠ Chuyến không hợp lệ — không tính")
         end
         pendingFare = 0
-        setStatus("✓ Hoàn thành chuyến")
-
-        task.wait(ACK_DELAY)
-        fire(TaxiEvent, "AckTripComplete")
-        setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
+        tripValid = false
     end
 
     pickupPos = nil
@@ -1000,7 +1048,7 @@ local function renderCars()
             carOpen = false
             carListPanel.Visible = false
             carListPanel.Size = UDim2.new(1, -20, 0, 0)
-            mainMenu.Visible = true       -- QUAY VE MENU CHINH
+            mainMenu.Visible = true
             rootUI.Size = UDim2.new(0, 290, 0, 148)
             carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
             print("[RideGo] Đã chọn xe: " .. name)
@@ -1024,13 +1072,18 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ NÚT ẨN/HIỆN ============
+-- ============ NÚT ẨN/HIỆN (khóa khi farm on) ============
 eyeBtn.MouseButton1Click:Connect(function()
+    -- Đang farm: khóa nút ẩn/hiện, chỉ tắt farm mới ẩn được status
+    if enabled then
+        return
+    end
+
     uiHidden = not uiHidden
     if uiHidden then
         mainMenu.Visible = false
-        statusPanel.Visible = false
         carListPanel.Visible = false
+        statusPanel.Visible = false
         rootUI.Size = UDim2.new(0, 60, 0, 32)
         title.Visible = false
         eyeBtn.Position = UDim2.new(0, 6, 0, 6)
@@ -1040,11 +1093,7 @@ eyeBtn.MouseButton1Click:Connect(function()
         title.Visible = true
         eyeBtn.Position = UDim2.new(1, -34, 0, 6)
         eyeBtn.Text = "−"
-        if enabled then
-            statusPanel.Visible = true
-        else
-            mainMenu.Visible = true
-        end
+        mainMenu.Visible = true
     end
 end)
 
@@ -1136,4 +1185,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26.1")
+print("[RideGo] Đã load v26.2")
