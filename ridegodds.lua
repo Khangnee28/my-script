@@ -9,7 +9,7 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST         = 270
-local LAND_OFFSET       = 1
+local LAND_OFFSET       = 5
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 2
