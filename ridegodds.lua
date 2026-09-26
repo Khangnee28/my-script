@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.7
--- Ascend +1 stud, anchor giu xe dung im. Wait 2s. Stats cong sau dropoff. Cash display.
+-- RideGo Farm — FINAL v25.8
+-- Ascend +1 stud (khong anchor). Tat/bat lai = doInit lai tu dau. State co icon.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,7 +23,7 @@ local UNDER_STEP_TIME   = 0.03
 
 -- ============ STATE ============
 local enabled     = false
-local jobInitialized = false
+local initialized = false
 local orderToken  = nil
 local pickupPos   = nil
 local dropPos     = nil
@@ -32,7 +32,7 @@ local myCar       = nil
 local selectedCar = ""
 local carList     = {}
 local stats = { trips = 0, earn = 0 }
-local curState = "OFF"
+local curState = "◦ OFF"
 local holdBV = nil
 local flying = false
 local acceptingOrder = false
@@ -43,9 +43,10 @@ local function resetState()
     dropPos = nil
     pendingFare = 0
     myCar = nil
-    curState = "OFF"
+    curState = "◦ OFF"
     flying = false
     acceptingOrder = false
+    initialized = false
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
@@ -89,7 +90,6 @@ end
 
 local function setState(s) curState = s end
 
--- Doc tien hien co cua nguoi choi
 local function getMoney()
     local ls = lp:FindFirstChild("leaderstats")
     if ls then
@@ -121,7 +121,6 @@ if TaxiEvent then
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
             orderToken = data.Token
-            -- Chi luu fare, chua cong vao stats
             if type(data.Fare) == "number" then
                 pendingFare = data.Fare
             else
@@ -334,15 +333,6 @@ local function claimNetworkOwner(inst)
 end
 
 -- ============ ANCHOR ============
-local function anchorCar(car)
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") and not p.Anchored then
-            pcall(function() p.Anchored = true end)
-        end
-    end
-end
-
 local function unanchorCar(car)
     if not car then return end
     for _, p in ipairs(car:GetDescendants()) do
@@ -486,7 +476,7 @@ task.spawn(function()
                     local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
                     local notSeated = not h.Sit
                     if wrongSeat then
-                        setState("sai ghe - nhay ra seat lai")
+                        setState("⚠ sai ghe - nhay ra seat lai")
                         pcall(function() h.Sit = false end)
                         task.wait(0.25)
                         for attempt = 1, 6 do
@@ -524,7 +514,7 @@ end
 -- ============ ASCEND LEN MAT DAT ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
-    setState("◆ noi len mat dat +1")
+    setState("⬆ noi len mat dat +1")
 
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
@@ -533,12 +523,7 @@ local function ascendToGround(car, target, targetFloor)
     local rotOnly = cp - cp.Position
     local dest = Vector3.new(target.X, upTargetY, target.Z)
     pcall(function() car:PivotTo(CFrame.new(dest) * rotOnly) end)
-    task.wait(0.1)
-
-    -- Anchor ngay -> xe dung im, khong nga nghieng, khong cam dau
-    anchorCar(car)
-    task.wait(0.1)
-    setState("◆ da ha - anchor")
+    task.wait(0.15)
 end
 
 -- ============ FLY UNDERGROUND (CFrame-only) ============
@@ -554,9 +539,8 @@ local function flyTo(target)
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
-    setState("▶ under - chuan bi")
+    setState("⬇ under - chuan bi")
 
-    -- Unanchor truoc khi di chuyen
     unanchorCar(car)
     task.wait(0.05)
 
@@ -589,7 +573,7 @@ local function flyTo(target)
         pcall(function() car:PivotTo(cf) end)
         task.wait(UNDER_STEP_TIME)
     end
-    setState("▶ under - bay")
+    setState("⬇ under - bay")
 
     local reached = false
     local lastNpcRefresh = 0
@@ -646,7 +630,7 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== NOI LEN MAT DAT + ANCHOR =====
+    -- ===== NOI LEN MAT DAT +1 STUD =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
@@ -674,20 +658,20 @@ end
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
     if not selectedCar or selectedCar == "" then
-        setState("chua chon xe")
+        setState("⚠ chua chon xe")
         return false
     end
 
     local car = findMyCar()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
-        setState("ngoi xe co san")
+        setState("◦ ngoi xe co san")
         if seatCar(10) then
-            setState("san sang")
+            setState("◦ san sang")
             return true
         end
     end
 
-    setState("spawn xe")
+    setState("◦ spawn xe")
     fire(SpawnCarEv, selectedCar)
 
     local deadline = os.clock() + 20
@@ -701,35 +685,35 @@ local function spawnAndSeat()
     end
 
     if not car then
-        setState("xe chua hien")
+        setState("⚠ xe chua hien")
         return false
     end
     task.wait(1.5)
 
     if seatCar(15) then
-        setState("san sang")
+        setState("◦ san sang")
         task.wait(1)
         return true
     end
-    setState("seat fail")
+    setState("⚠ seat fail")
     return false
 end
 
 -- ============ INIT ============
 local function doInit()
-    setState("doi job")
+    setState("◦ doi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
-    setState("spawn xe")
+    setState("◦ spawn xe")
     if not spawnAndSeat() then return false end
     myCar = findMyCar()
 
-    setState("online")
+    setState("◦ online")
     fire(TaxiEvent, "GoOnline")
     task.wait(2)
 
-    setState("san sang")
+    setState("◦ san sang")
     return true
 end
 
@@ -737,7 +721,7 @@ end
 local function runTrip()
     local h = hum()
     if not h or not h.Sit then
-        setState("respawn xe")
+        setState("⚠ respawn xe")
         if not spawnAndSeat() then task.wait(5); return end
     end
     myCar = findMyCar()
@@ -749,7 +733,7 @@ local function runTrip()
     dropPos = nil
     pendingFare = 0
     acceptingOrder = true
-    setState("● cho don")
+    setState("◦ cho don")
 
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
@@ -763,37 +747,37 @@ local function runTrip()
     acceptingOrder = false
 
     if not pickupPos then
-        setState("no pickup")
+        setState("⚠ no pickup")
         return
     end
 
-    setState("● don khach")
+    setState("➤ bay don khach")
     flyTo(pickupPos)
     task.wait(0.3)
     forceSeat()
-    setState("● khach len xe (2s)")
+    setState("⌛ khach len xe (2s)")
     task.wait(PICKUP_WAIT)
 
     if dropPos then
-        setState("● tra khach")
+        setState("➤ bay tra khach")
         flyTo(dropPos)
         task.wait(0.3)
         forceSeat()
-        setState("● khach xuong xe (2s)")
+        setState("⌛ khach xuong xe (2s)")
         task.wait(DROP_WAIT)
 
-        -- Cong stats SAU khi khach xuong xe
         stats.trips = stats.trips + 1
         if pendingFare > 0 then
             stats.earn = stats.earn + pendingFare
         end
         pendingFare = 0
+        setState("✓ xong trip")
     end
 
     pickupPos = nil
     dropPos = nil
     orderToken = nil
-    -- Khong set "chu ky xong" -> vong lap tu dong quay lai cho don
+    task.wait(0.3)
 end
 
 -- ============ LOOP ============
@@ -802,34 +786,24 @@ local function startLoop()
     if loopBusy then return end
     loopBusy = true
     task.spawn(function()
-        if not jobInitialized then
-            local ok = pcall(doInit)
-            jobInitialized = ok
-        end
+        -- LUON chay doInit khi bat dau -> doi job, spawn xe, online lai tu dau
+        setState("◦ init...")
+        local ok = pcall(doInit)
+        initialized = ok
 
-        if not jobInitialized then
+        if not initialized then
             loopBusy = false
-            setState("init fail")
+            setState("⚠ init fail")
             return
-        end
-
-        local h = hum()
-        if not h or not h.Sit then
-            setState("respawn xe")
-            if not spawnAndSeat() then
-                loopBusy = false
-                setState("respawn fail")
-                return
-            end
         end
 
         while enabled do
             local ok, err = pcall(runTrip)
-            if not ok then setState("ERR: " .. tostring(err):sub(1, 40)) end
+            if not ok then setState("⚠ ERR: " .. tostring(err):sub(1, 40)) end
             task.wait(1)
         end
         loopBusy = false
-        setState("OFF")
+        setState("◦ OFF")
     end)
 end
 
@@ -1018,7 +992,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Cap nhat status: trips, earn, cash, state
 task.spawn(function()
     while true do
         task.wait(0.5)
@@ -1057,4 +1030,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v25.7")
+print("[ridego] loaded v25.8")
