@@ -1,11 +1,11 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v23
--- Void: quet 11 huong (thang + cheo ±80°). Uu tien goc nho + dist nho.
---       Khong tim thay bo nao -> BAY TIEP (khong dung im).
--- Bay: BodyVelocity. Ha xuong: anchor -> bbox -> PivotTo -> unanchor.
--- NPC: anchor client-side + PivotTo theo ghe.
+-- RideGo Farm — FINAL v24
+-- Nut GUI chuyen che do bay: AUTO / NORMAL / HIGH / UNDERGROUND.
+-- Fix crash line 837: pcall wrap toan bo loop + NPC follower.
+-- NPC: anchor + weld + RenderStepped refresh.
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
@@ -27,6 +27,7 @@ local TICK              = 0.05
 local LAND_OFFSET       = 2
 local MAX_GROUND_FLY    = 280
 local UNDERGROUND_DEPTH = 120
+local HIGH_EXTRA        = 80
 local SURROUND_RADIUS   = 220
 local SURROUND_HIGH_MARGIN = 30
 local BUILDING_MIN_H    = 8
@@ -45,6 +46,7 @@ local stats = { trips = 0, earn = 0 }
 local curState = "OFF"
 local holdBV = nil
 local flying = false
+local flyModeOverride = "auto"
 
 local function resetState()
     orderToken = nil
@@ -189,6 +191,7 @@ local function makeOverlapParams()
 end
 
 local function floorBelow(pos)
+    if not pos then return nil end
     local params = makeRayParams()
     local origin = Vector3.new(pos.X, pos.Y + 4, pos.Z)
     local hit = workspace:Raycast(origin, Vector3.new(0, -800, 0), params)
@@ -196,9 +199,35 @@ local function floorBelow(pos)
     return nil
 end
 
--- ============ NPC FOLLOWERS (3 lop) ============
+-- ============ NPC FOLLOWERS ============
 local npcFollowers = {}
 local npcRenderConn = nil
+
+local function safeRefreshNpc()
+    for _, f in ipairs(npcFollowers) do
+        if not f then continue end
+        local ok, err = pcall(function()
+            if not f.char or not f.char.Parent then return end
+            if not f.seat or not f.seat.Parent then return end
+            if not f.hrp or not f.hrp.Parent then return end
+
+            if not f.hrp.Anchored then
+                f.hrp.Anchored = true
+            end
+            local targetCF = f.seat.CFrame * f.offset
+            f.hrp.CFrame = targetCF
+
+            if not f.hrp:FindFirstChild("RG_NpcWeld") then
+                local w = Instance.new("WeldConstraint")
+                w.Name = "RG_NpcWeld"
+                w.Part0 = f.seat
+                w.Part1 = f.hrp
+                w.Parent = f.hrp
+            end
+        end)
+        -- silent
+    end
+end
 
 local function attachNpcFollowers(car)
     npcFollowers = {}
@@ -214,7 +243,6 @@ local function attachNpcFollowers(car)
                 if hrp then
                     local offset = d.CFrame:ToObjectSpace(hrp.CFrame)
 
-                    -- LOP 1: tat physics + anchor
                     for _, p in ipairs(npcChar:GetDescendants()) do
                         if p:IsA("BasePart") then
                             pcall(function() p.Anchored = true end)
@@ -224,7 +252,6 @@ local function attachNpcFollowers(car)
                         end
                     end
 
-                    -- LOP 2: weld cung HRP vao ghe
                     local existing = hrp:FindFirstChild("RG_NpcWeld")
                     if existing then pcall(function() existing:Destroy() end) end
                     local w = Instance.new("WeldConstraint")
@@ -233,7 +260,6 @@ local function attachNpcFollowers(car)
                     w.Part1 = hrp
                     w.Parent = hrp
 
-                    -- LOP 3: tat humanoid state machine
                     pcall(function()
                         oh.PlatformStand = true
                         oh.WalkSpeed = 0
@@ -262,33 +288,17 @@ local function attachNpcFollowers(car)
         end
     end
 
-    -- LOP bonus: RenderStepped loop -> refresh o 60+Hz (cao hon Heartbeat)
     if npcRenderConn then
         pcall(function() npcRenderConn:Disconnect() end)
         npcRenderConn = nil
     end
-    local RunService = game:GetService("RunService")
     npcRenderConn = RunService.RenderStepped:Connect(function()
-        for _, f in ipairs(npcFollowers) do
-            if f.char and f.char.Parent and f.seat and f.seat.Parent and f.hrp and f.hrp.Parent then
-                -- Re-anchor neu server ghi de
-                if not f.hrp.Anchored then
-                    pcall(function() f.hrp.Anchored = true end)
-                end
-                -- Re-set CFrame theo ghe
-                local targetCF = f.seat.CFrame * f.offset
-                pcall(function() f.hrp.CFrame = targetCF end)
-                -- Re-weld neu weld bi pha
-                if not f.hrp:FindFirstChild("RG_NpcWeld") then
-                    local w = Instance.new("WeldConstraint")
-                    w.Name = "RG_NpcWeld"
-                    w.Part0 = f.seat
-                    w.Part1 = f.hrp
-                    w.Parent = f.hrp
-                end
-            end
-        end
+        pcall(safeRefreshNpc)
     end)
+end
+
+local function updateNpcFollowers()
+    pcall(safeRefreshNpc)
 end
 
 local function detachNpcFollowers()
@@ -297,7 +307,7 @@ local function detachNpcFollowers()
         npcRenderConn = nil
     end
     for _, f in ipairs(npcFollowers) do
-        if f.char and f.char.Parent then
+        if f and f.char and f.char.Parent then
             local hrp = f.char:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local w = hrp:FindFirstChild("RG_NpcWeld")
@@ -320,6 +330,7 @@ local function detachNpcFollowers()
     end
     npcFollowers = {}
 end
+
 -- ============ NETWORK OWNER ============
 local function claimNetworkOwner(inst)
     if not inst then return end
@@ -569,8 +580,6 @@ local function voidOnPath(curPos, dir)
     return false
 end
 
--- Quet 11 huong: thang + cheo ±15/30/45/60/80 do.
--- Tra ve {dist, floorY, dir, deg, score} hoac nil.
 local function scanVoidLandingMulti(curPos, dir)
     local params = makeRayParams()
     local angles = {0, 15, -15, 30, -30, 45, -45, 60, -60, 80, -80}
@@ -593,7 +602,6 @@ local function scanVoidLandingMulti(curPos, dir)
                 local origin = Vector3.new(px, curPos.Y + 500, pz)
                 local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
                 if hit and hit.Position.Y > -50 then
-                    -- score: uu tien goc nho (thang) + dist nho
                     local score = dist + math.abs(deg) * 15
                     if not best or score < best.score then
                         best = {
@@ -695,21 +703,32 @@ local function flyTo(target)
     local myChar = char()
 
     setState("quet vung")
-    local surroundTop = scanSurroundHeight(target)
-    local targetFloor = floorBelow(target) or target.Y
-
     local flyMode = "normal"
     local cruiseY = CRUISE_Y
-    if surroundTop then
-        local buildingH = surroundTop - targetFloor
-        if buildingH > MAX_GROUND_FLY then
-            flyMode = "underground"
-        elseif buildingH > 30 then
-            flyMode = "high"
-            cruiseY = buildingH + SURROUND_HIGH_MARGIN
+
+    if flyModeOverride ~= "auto" then
+        flyMode = flyModeOverride
+        if flyMode == "high" then
+            cruiseY = HIGH_EXTRA
+        elseif flyMode == "underground" then
+            cruiseY = -UNDERGROUND_DEPTH
         end
+        setState("bay: " .. flyMode .. " (manual)")
+    else
+        local surroundTop = scanSurroundHeight(target)
+        local targetFloor = floorBelow(target) or target.Y
+        if surroundTop then
+            local buildingH = surroundTop - targetFloor
+            if buildingH > MAX_GROUND_FLY then
+                flyMode = "underground"
+                cruiseY = -UNDERGROUND_DEPTH
+            elseif buildingH > 30 then
+                flyMode = "high"
+                cruiseY = buildingH + SURROUND_HIGH_MARGIN
+            end
+        end
+        setState("bay: " .. flyMode .. " (auto)")
     end
-    setState("bay: " .. flyMode)
 
     claimNetworkOwner(car)
     attachNpcFollowers(car)
@@ -748,107 +767,116 @@ local function flyTo(target)
     local lastVoidScan = 0
 
     while enabled do
-        local c = myCar or findMyCar()
-        if not c then break end
+        -- ===== WRAP TOAN BO LOOP BODY TRONG PCALL =====
+        local ok, loopErr = pcall(function()
+            local c = myCar or findMyCar()
+            if not c then return "break" end
 
-        local curPos = c:GetPivot().Position
-        local flat = Vector3.new(target.X - curPos.X, 0, target.Z - curPos.Z)
-        local dist = flat.Magnitude
+            local curPos = c:GetPivot().Position
+            local flat = Vector3.new(target.X - curPos.X, 0, target.Z - curPos.Z)
+            local dist = flat.Magnitude
 
-        if dist < ARRIVE_DIST then
-            reached = true
-            break
-        end
-
-        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-
-        -- ===== VOID CHECK MOI TICK =====
-        local nextStep = TICK * STEP_DIST * 1.5
-        local probeAheadX = curPos.X + dir.X * math.max(nextStep, 40)
-        local probeAheadZ = curPos.Z + dir.Z * math.max(nextStep, 40)
-
-        local blocked = false
-        if pointIsVoid(probeAheadX, curPos.Y, probeAheadZ) then
-            blocked = true
-        end
-        if not blocked then
-            if voidOnPath(curPos, dir) then blocked = true end
-        end
-
-        if blocked and os.clock() - lastVoidScan > VOID_SCAN_COOLDOWN then
-            lastVoidScan = os.clock()
-            setState("void - quet da huong")
-            bv.Velocity = Vector3.zero
-
-            local landing = scanVoidLandingMulti(curPos, dir)
-            if landing and landing.dist <= MAX_CFRAME_DIST then
-                local landPos = curPos + landing.dir * landing.dist
-                local destY
-                if flyMode == "underground" then
-                    destY = landing.floorY - UNDERGROUND_DEPTH
-                else
-                    destY = landing.floorY + cruiseY
-                end
-                anchorCar(c)
-                local dest = Vector3.new(landPos.X, destY, landPos.Z)
-                local startPivot = c:GetPivot()
-                local rot = startPivot - startPivot.Position
-                pcall(function() c:PivotTo(CFrame.new(dest) * rot) end)
-                task.wait(0.08)
-                unanchorCar(c)
-                claimNetworkOwner(c)
-                setState(string.format("void-CFrame%.0f/%d°", landing.dist, landing.deg))
-                task.wait(0.3)
-                task.wait(TICK)
-                continue
-            else
-                setState("void - bay tiep")
-                -- khong tim thay bo -> bay tiep (5-10s tren void OK)
-                -- fall through -> bay binh thuong
+            if dist < ARRIVE_DIST then
+                reached = true
+                return "break"
             end
-        end
 
-        -- DO CAO
-        local floorY = floorBelow(curPos) or (curPos.Y - cruiseY)
-        local targetY
-        if flyMode == "underground" then
-            targetY = floorY - UNDERGROUND_DEPTH
-        else
-            targetY = floorY + cruiseY
-        end
+            local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        pcall(function()
+            -- VOID CHECK MOI TICK
+            local nextStep = TICK * STEP_DIST * 1.5
+            local probeAheadX = curPos.X + dir.X * math.max(nextStep, 40)
+            local probeAheadZ = curPos.Z + dir.Z * math.max(nextStep, 40)
+
+            local blocked = false
+            if pointIsVoid(probeAheadX, curPos.Y, probeAheadZ) then
+                blocked = true
+            end
+            if not blocked then
+                if voidOnPath(curPos, dir) then blocked = true end
+            end
+
+            if blocked and os.clock() - lastVoidScan > VOID_SCAN_COOLDOWN then
+                lastVoidScan = os.clock()
+                setState("void - quet da huong")
+                bv.Velocity = Vector3.zero
+
+                local landing = scanVoidLandingMulti(curPos, dir)
+                if landing and landing.dist <= MAX_CFRAME_DIST then
+                    local landPos = curPos + landing.dir * landing.dist
+                    local destY
+                    if flyMode == "underground" then
+                        destY = landing.floorY - UNDERGROUND_DEPTH
+                    elseif flyMode == "high" then
+                        destY = landing.floorY + cruiseY
+                    else
+                        destY = landing.floorY + cruiseY
+                    end
+                    anchorCar(c)
+                    local dest = Vector3.new(landPos.X, destY, landPos.Z)
+                    local startPivot = c:GetPivot()
+                    local rot = startPivot - startPivot.Position
+                    c:PivotTo(CFrame.new(dest) * rot)
+                    task.wait(0.08)
+                    unanchorCar(c)
+                    claimNetworkOwner(c)
+                    setState(string.format("void-CFrame%.0f/%d°", landing.dist, landing.deg))
+                    task.wait(0.3)
+                    return "continue"
+                else
+                    setState("void - bay tiep")
+                end
+            end
+
+            -- DO CAO
+            local floorY = floorBelow(curPos) or (curPos.Y - math.abs(cruiseY))
+            local targetY
+            if flyMode == "underground" then
+                targetY = floorY - UNDERGROUND_DEPTH
+            else
+                targetY = floorY + cruiseY
+            end
+
             bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
+
+            local spd
+            if dist >= DECEL_DIST then
+                spd = STEP_DIST
+            else
+                spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
+            end
+            local vx = dir.X * spd
+            local vz = dir.Z * spd
+            local dy = targetY - curPos.Y
+            local vy = math.clamp(dy * 4, -50, 50)
+
+            bv.Velocity = Vector3.new(vx, vy, vz)
+
+            updateNpcFollowers()
+
+            ownerRefreshCounter = ownerRefreshCounter + 1
+            if ownerRefreshCounter >= 10 then
+                ownerRefreshCounter = 0
+                claimNetworkOwner(c)
+            end
+
+            return "tick"
         end)
 
-        local spd
-        if dist >= DECEL_DIST then
-            spd = STEP_DIST
-        else
-            spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
+        if not ok then
+            setState("ERR loop: " .. tostring(loopErr):sub(1, 50))
+            task.wait(0.2)
+        elseif loopErr == "break" then
+            break
         end
-        local vx = dir.X * spd
-        local vz = dir.Z * spd
-        local dy = targetY - curPos.Y
-        local vy = math.clamp(dy * 4, -50, 50)
-
-        bv.Velocity = Vector3.new(vx, vy, vz)
-
-        updateNpcFollowers()
-
-        ownerRefreshCounter = ownerRefreshCounter + 1
-        if ownerRefreshCounter >= 10 then
-            ownerRefreshCounter = 0
-            pcall(function() claimNetworkOwner(c) end)
-        end
+        -- "continue" va "tick" deu di tiep task.wait
 
         task.wait(TICK)
     end
 
     car = myCar or findMyCar()
-    descendAndLand(car, target, cruiseY, flyMode, bv, bg)
-
-    detachNpcFollowers()
+    pcall(function() descendAndLand(car, target, cruiseY, flyMode, bv, bg) end)
+    pcall(detachNpcFollowers)
 
     flying = false
     if not h.Sit then forceSeat() end
@@ -1007,8 +1035,8 @@ gui.DisplayOrder = 999
 gui.Parent = cg
 
 local rootUI = Instance.new("Frame", gui)
-rootUI.Size = UDim2.new(0, 280, 0, 148)
-rootUI.Position = UDim2.new(0, 20, 0.5, -74)
+rootUI.Size = UDim2.new(0, 280, 0, 184)
+rootUI.Position = UDim2.new(0, 20, 0.5, -92)
 rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
 rootUI.BorderSizePixel = 0
 rootUI.Active = true
@@ -1048,9 +1076,19 @@ toggleBtn.TextSize = 12
 toggleBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
 
+local modeBtn = Instance.new("TextButton", rootUI)
+modeBtn.Size = UDim2.new(1, -16, 0, 26)
+modeBtn.Position = UDim2.new(0, 8, 0, 114)
+modeBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 100)
+modeBtn.Text = "MODE: AUTO"
+modeBtn.TextColor3 = Color3.fromRGB(220, 200, 255)
+modeBtn.TextSize = 11
+modeBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 6)
+
 local carHeader = Instance.new("TextButton", rootUI)
 carHeader.Size = UDim2.new(1, -16, 0, 26)
-carHeader.Position = UDim2.new(0, 8, 0, 114)
+carHeader.Position = UDim2.new(0, 8, 0, 146)
 carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
 carHeader.Text = "> CHON XE (0)"
 carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
@@ -1063,7 +1101,7 @@ chp.PaddingLeft = UDim.new(0, 8)
 
 local carBody = Instance.new("Frame", rootUI)
 carBody.Size = UDim2.new(1, -16, 0, 0)
-carBody.Position = UDim2.new(0, 8, 0, 146)
+carBody.Position = UDim2.new(0, 8, 0, 178)
 carBody.BackgroundTransparency = 1
 carBody.Visible = false
 
@@ -1143,12 +1181,38 @@ carHeader.MouseButton1Click:Connect(function()
     carBody.Visible = carOpen
     if carOpen then
         carBody.Size = UDim2.new(1, -16, 0, 190)
-        rootUI.Size = UDim2.new(0, 280, 0, 348)
+        rootUI.Size = UDim2.new(0, 280, 0, 384)
     else
         carBody.Size = UDim2.new(1, -16, 0, 0)
-        rootUI.Size = UDim2.new(0, 280, 0, 148)
+        rootUI.Size = UDim2.new(0, 280, 0, 184)
     end
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
+end)
+
+local modeTexts = {
+    auto = "MODE: AUTO",
+    normal = "MODE: NORMAL (thap)",
+    high = "MODE: HIGH (cao)",
+    underground = "MODE: UNDER (duoi dat)",
+}
+local modeOrder = {"auto", "normal", "high", "underground"}
+local modeColors = {
+    auto = Color3.fromRGB(60, 40, 100),
+    normal = Color3.fromRGB(30, 90, 60),
+    high = Color3.fromRGB(100, 70, 20),
+    underground = Color3.fromRGB(80, 30, 30),
+}
+
+modeBtn.MouseButton1Click:Connect(function()
+    local idx = 1
+    for i, m in ipairs(modeOrder) do
+        if m == flyModeOverride then idx = i; break end
+    end
+    idx = idx + 1
+    if idx > #modeOrder then idx = 1 end
+    flyModeOverride = modeOrder[idx]
+    modeBtn.Text = modeTexts[flyModeOverride]
+    modeBtn.BackgroundColor3 = modeColors[flyModeOverride]
 end)
 
 scanBtn.MouseButton1Click:Connect(function()
@@ -1239,4 +1303,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v23")
+print("[ridego] loaded v24")
