@@ -1,9 +1,10 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v19
--- Di chuyen: ANCHOR + PivotTo + set AssemblyLinearVelocity gia -> game van tinh quang duong.
--- Void: quet toi 10000 stud, CFrame qua bo ben kia.
--- Quet building: GetPartBoundsInBox (1 call thay 16 raycast) -> nhanh.
--- Ha xuong: PivotTo bbox chinh xac -> khong lun.
+-- RideGo Farm — FINAL v20
+-- Bay: BodyVelocity (physics that -> game tinh quang duong).
+-- Noclip: SetNetworkOwner + CanCollide=false khi bay.
+-- Ha xuong: ANCHOR ngay khi toi -> xe dung yen -> raycast bbox -> PivotTo -> unanchor.
+-- Khong bao gio roi san vi anchor truoc khi tat BV.
+-- Quet building: GetPartBoundsInBox (nhanh).
 -- Ngoi sai ghe: tu dong seat lai.
 
 local Players = game:GetService("Players")
@@ -224,26 +225,6 @@ local function unanchorCar(car)
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.Anchored = false end)
-        end
-    end
-end
-
--- ============ FAKE VELOCITY ============
--- Dat AssemblyLinearVelocity gia -> game doc thay di chuyen -> tinh quang duong
-local function setFakeVelocity(car, vel)
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.AssemblyLinearVelocity = vel end)
-        end
-    end
-    -- ca char nguoi choi
-    local c = char()
-    if c then
-        for _, p in ipairs(c:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.AssemblyLinearVelocity = vel end)
-            end
         end
     end
 end
@@ -471,10 +452,9 @@ local function scanVoidLanding(curPos, dir)
     return nil, nil
 end
 
--- ============ SURROUND SCAN (nhanh bang GetPartBoundsInBox) ============
+-- ============ SURROUND SCAN ============
 local function scanSurroundHeight(targetPos)
     local params = makeOverlapParams()
-
     local boxSize = Vector3.new(SURROUND_RADIUS * 2, 900, SURROUND_RADIUS * 2)
     local boxCF = CFrame.new(targetPos + Vector3.new(0, 250, 0))
 
@@ -494,11 +474,63 @@ local function scanSurroundHeight(targetPos)
             end
         end
     end
-
     return maxTop
 end
 
--- ============ FLY (anchor + PivotTo + fake velocity) ============
+-- ============ DESCEND (anchor + PivotTo) ============
+local function descendAndLand(car, target, cruiseY, flyMode, bv, bg)
+    if not car then return end
+    setState("ha xuong")
+
+    -- 1. Dung BV ngay
+    if bv and bv.Parent then
+        bv.Velocity = Vector3.zero
+        bv.MaxForce = Vector3.new(0, 0, 0)
+    end
+
+    -- 2. ANCHOR NGAY -> xe dung yen tren khong, khong the roi
+    anchorCar(car)
+    task.wait(0.08)
+
+    -- 3. Destroy BV/BG (khong con tac dung)
+    if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
+    task.wait(0.05)
+
+    -- 4. Raycast tim dat
+    local pivotPos = car:GetPivot().Position
+    local params = makeRayParams()
+    local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
+    local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
+
+    if not hit then
+        setState("khong thay dat - giu anchor")
+        -- khong tim thay dat -> giu anchor, khong tut
+        return
+    end
+
+    -- 5. Tinh bbox -> PivotTo chinh xac
+    local bbCF, bbSize = car:GetBoundingBox()
+    local bbCenter = bbCF.Position
+    local bbBottomOffset = bbSize.Y / 2
+    local targetCenterY = hit.Position.Y + bbBottomOffset + LAND_OFFSET
+    local offsetPivotToCenterY = bbCenter.Y - pivotPos.Y
+    local targetPivotY = targetCenterY - offsetPivotToCenterY
+
+    local curPivotCF = car:GetPivot()
+    local curPos = curPivotCF.Position
+    local rot = curPivotCF - curPos
+    local finalPos = Vector3.new(target.X, targetPivotY, target.Z)
+    pcall(function() car:PivotTo(CFrame.new(finalPos) * rot) end)
+    task.wait(0.15)
+
+    -- 6. Unanchor + bat collide chassis-only
+    unanchorCar(car)
+    task.wait(0.08)
+    chassisCollideOn(car)
+end
+
+-- ============ FLY (BodyVelocity bay) ============
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -529,7 +561,7 @@ local function flyTo(target)
     -- 2. Claim network owner
     claimNetworkOwner(car)
 
-    -- 3. NPC: claim + tat collide
+    -- 3. NPC: claim + tat collide + PlatformStand
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d.Occupant then
             local oh = d.Occupant
@@ -561,19 +593,28 @@ local function flyTo(target)
         end
     end
 
-    -- 5. ANCHOR toan bo
-    anchorCar(car)
-
     flying = true
 
-    local startPivot = car:GetPivot()
-    local rotOnly = startPivot - startPivot.Position
+    -- BodyVelocity + BodyGyro (physics that -> game tinh quang duong)
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFly"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 5000
+    bv.Velocity = Vector3.zero
+    bv.Parent = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "RGGyro"
+    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    bg.P = 5000
+    bg.D = 500
+    bg.Parent = bv.Parent
 
     local reached = false
     local lastVoidCheck = 0
     local voidJustHandled = false
-    local reanchorCounter = 0
-    local fakeVelCounter = 0
+    local ownerRefreshCounter = 0
+    local npcRefreshCounter = 0
 
     while enabled do
         local c = myCar or findMyCar()
@@ -595,6 +636,7 @@ local function flyTo(target)
             lastVoidCheck = os.clock()
             if voidAhead(curPos, dir) then
                 setState("void - scan")
+                bv.Velocity = Vector3.zero
                 local landDist, landFloorY = scanVoidLanding(curPos, dir)
                 if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
                     local landPos = curPos + dir * landDist
@@ -604,8 +646,15 @@ local function flyTo(target)
                     else
                         destY = landFloorY + cruiseY
                     end
+                    -- Anchor tam de PivotTo an toan
+                    anchorCar(c)
                     local dest = Vector3.new(landPos.X, destY, landPos.Z)
-                    pcall(function() c:PivotTo(CFrame.new(dest) * rotOnly) end)
+                    local startPivot = c:GetPivot()
+                    local rot = startPivot - startPivot.Position
+                    pcall(function() c:PivotTo(CFrame.new(dest) * rot) end)
+                    task.wait(0.1)
+                    unanchorCar(c)
+                    claimNetworkOwner(c)
                     setState(string.format("void - CFrame %.0f", landDist))
                     task.wait(0.3)
                     voidJustHandled = true
@@ -627,77 +676,55 @@ local function flyTo(target)
             targetY = floorY + cruiseY
         end
 
-        -- TOC DO
+        pcall(function()
+            bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
+        end)
+
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
         else
             spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
-
-        local step = math.min(spd * TICK, dist)
-        local moveX = dir.X * step
-        local moveZ = dir.Z * step
+        local vx = dir.X * spd
+        local vz = dir.Z * spd
         local dy = targetY - curPos.Y
-        local moveY = math.clamp(dy * 0.15, -step, step)
+        local vy = math.clamp(dy * 4, -50, 50)
 
-        local nextPos = Vector3.new(curPos.X + moveX, curPos.Y + moveY, curPos.Z + moveZ)
-        local nextCF = CFrame.new(nextPos) * rotOnly
-        pcall(function() c:PivotTo(nextCF) end)
+        bv.Velocity = Vector3.new(vx, vy, vz)
 
-        -- RE-ANCHOR moi 5 tick
-        reanchorCounter = reanchorCounter + 1
-        if reanchorCounter >= 5 then
-            reanchorCounter = 0
-            anchorCar(c)
+        ownerRefreshCounter = ownerRefreshCounter + 1
+        if ownerRefreshCounter >= 10 then
+            ownerRefreshCounter = 0
+            pcall(function() claimNetworkOwner(c) end)
         end
 
-        -- FAKE VELOCITY moi 2 tick -> game doc thay
-        fakeVelCounter = fakeVelCounter + 1
-        if fakeVelCounter >= 2 then
-            fakeVelCounter = 0
-            local fakeV = Vector3.new(dir.X * spd, moveY / TICK, dir.Z * spd)
-            setFakeVelocity(c, fakeV)
+        npcRefreshCounter = npcRefreshCounter + 1
+        if npcRefreshCounter >= 3 then
+            npcRefreshCounter = 0
+            for _, d in ipairs(c:GetDescendants()) do
+                if d:IsA("VehicleSeat") and d.Occupant then
+                    local oh = d.Occupant
+                    if oh and oh.Parent and oh.Parent ~= myChar then
+                        pcall(function() claimNetworkOwner(oh.Parent) end)
+                        pcall(function() oh.PlatformStand = true end)
+                        for _, p in ipairs(oh.Parent:GetDescendants()) do
+                            if p:IsA("BasePart") then
+                                pcall(function() p.CanCollide = false end)
+                                pcall(function() p.Massless = true end)
+                            end
+                        end
+                    end
+                end
+            end
         end
 
         task.wait(TICK)
     end
 
-    -- ===== HA XUONG: PivotTo bbox chinh xac =====
+    -- ===== HA XUONG: anchor -> bbox -> PivotTo -> unanchor =====
     car = myCar or findMyCar()
-    if car then
-        setState("ha xuong")
-        local pivotPos = car:GetPivot().Position
-        local params = makeRayParams()
-        local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
-        local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
-
-        if hit then
-            local bbCF, bbSize = car:GetBoundingBox()
-            local bbCenter = bbCF.Position
-            local bbBottomOffset = bbSize.Y / 2
-            local targetCenterY = hit.Position.Y + bbBottomOffset + LAND_OFFSET
-            local offsetPivotToCenterY = bbCenter.Y - pivotPos.Y
-            local targetPivotY = targetCenterY - offsetPivotToCenterY
-
-            local curPivotCF = car:GetPivot()
-            local curPos = curPivotCF.Position
-            local rot = curPivotCF - curPos
-            local finalPos = Vector3.new(target.X, targetPivotY, target.Z)
-            pcall(function() car:PivotTo(CFrame.new(finalPos) * rot) end)
-            task.wait(0.15)
-        else
-            setState("khong thay dat")
-        end
-
-        -- UNANCHOR + collide chassis
-        unanchorCar(car)
-        task.wait(0.1)
-        chassisCollideOn(car)
-
-        -- Fake velocity nho 1 lan de game register landing
-        setFakeVelocity(car, Vector3.new(0, 0, 0))
-    end
+    descendAndLand(car, target, cruiseY, flyMode, bv, bg)
 
     -- NPC: tra lai binh thuong
     for _, d in ipairs(car and car:GetDescendants() or {}) do
@@ -1103,4 +1130,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v19")
+print("[ridego] loaded v20")
