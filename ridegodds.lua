@@ -426,30 +426,59 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.15)
 
-    -- ===== HA XUONG =====
+        -- ===== HA XUONG BANG PIVOTTO =====
     car = myCar or findMyCar()
-    local vs2 = car and getDriveSeat(car)
+    if not car then task.wait(0.2) return reached end
+
+    local vs2 = getDriveSeat(car)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then task.wait(0.2) return reached end
 
+    -- raycast xuong check san
     local floorY = rayFloorY(endPos, 500)
     local hasGround = (floorY ~= nil) and (floorY > -10) and (endPos.Y - floorY < 50)
 
     if hasGround then
-        setCarNoclip(false)
-        local t0 = os.clock()
-        while os.clock() - t0 < 3 and enabled do
-            task.wait(0.1)
-            local hrp3 = root()
-            if not hrp3 then break end
-            local fY = rayFloorY(hrp3.Position, 500)
-            if fY and math.abs(hrp3.Position.Y - fY) < 4 then break end
+        -- HA TU TU BANG PIVOTTO (noclip van ON)
+        local startY = endPos.Y
+        local targetY = floorY + 1.5
+        local dropDist = startY - targetY
+
+        if dropDist > 0.5 then
+            local step = 2   -- ha 2 studs moi buoc
+            local y = startY
+            local dropCount = 0
+            while y > targetY and dropCount < 60 and enabled do
+                y = y - step
+                if y < targetY then y = targetY end
+
+                local carM = myCar or findMyCar()
+                if carM then
+                    local newPos = Vector3.new(endPos.X, y, endPos.Z)
+                    pcall(function() carM:PivotTo(CFrame.new(newPos)) end)
+                end
+                if not h.Sit then forceSeat() end
+
+                dropCount = dropCount + 1
+                task.wait(0.03)
+            end
         end
+
+        -- cho xe dung yen
+        task.wait(0.2)
+
+        -- chi tắt noclip sau khi đã đứng yên trên sàn
+        setCarNoclip(false)
+
+        -- cho roi tu nhien chut xiu de cham san
+        task.wait(0.3)
     else
+        -- khong co san -> giu noclip, khong ha
+        setState("khong co san - giu noclip")
         local hrp3 = root()
         if hrp3 then
             pcall(function()
-                hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 30, 0))
+                hrp3.CFrame = CFrame.new(hrp3.Position + Vector3.new(0, 20, 0))
             end)
         end
     end
@@ -463,7 +492,6 @@ local function flyTo(target)
     task.wait(0.15)
     return reached
 end
-
 -- ============ SPAWN ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
