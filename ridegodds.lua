@@ -1,23 +1,21 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — final
--- Init: doi job -> spawn xe -> seat -> online -> nhan bac don
--- Loop: cho don -> bay pickup -> khach len -> bay drop -> khach xuong -> loop
--- Bay nhanh, khong gioi han thoi gian, chi dung khi toi noi.
--- Noclip ca xe + char khi bay.
+-- RideGo Farm — no anchor + extended void scan
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST     = 180      -- studs/s
-local FLY_Y         = 5        -- cao cach mat dat
-local ARRIVE_DIST   = 12       -- khoang cach tinh la toi
+local STEP_DIST     = 180
+local FLY_Y         = 5
+local ARRIVE_DIST   = 8
 local ORDER_TIMEOUT = 60
 local PICKUP_WAIT   = 8
 local DROP_WAIT     = 8
-local MAX_FLY_TIME  = 999      -- khong gioi han
-local VOID_SEARCH   = 500      -- tam tim bo ben kia void
+local DECEL_DIST    = 200
+local VOID_SCAN_MAX = 5000
+local VOID_SCAN_STEP = 50
+local TICK          = 0.05
 
 -- ============ STATE ============
 local enabled     = false
@@ -74,9 +72,7 @@ if TaxiEvent then
         if type(data) ~= "table" then return end
         if action == "OrderOffer" then
             orderToken = data.Token
-            pcall(function()
-                TaxiEvent:FireServer("AcceptOrder", data.Token)
-            end)
+            pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
         elseif action == "OrderAccepted" then
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
@@ -93,22 +89,16 @@ end
 local function scanCars()
     carList = {}
     if not InitCarData then return carList end
-
     local ok, data = pcall(function() return InitCarData:InvokeServer() end)
     if not ok or type(data) ~= "table" then return carList end
-
     for _, v in pairs(data) do
         if type(v) == "table" and type(v.Name) == "string" and v.Name ~= "" then
             table.insert(carList, v.Name)
         end
     end
-
     local seen, uniq = {}, {}
     for _, n in ipairs(carList) do
-        if not seen[n] then
-            seen[n] = true
-            table.insert(uniq, n)
-        end
+        if not seen[n] then seen[n] = true; table.insert(uniq, n) end
     end
     table.sort(uniq)
     carList = uniq
@@ -135,7 +125,8 @@ local function findMyCar()
 end
 
 -- ============ RAYCAST ============
-local function rayFloorY(fromPos)
+local function rayFloorY(fromPos, maxDist)
+    maxDist = maxDist or 500
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local ignore = {}
@@ -145,12 +136,16 @@ local function rayFloorY(fromPos)
     if car then table.insert(ignore, car) end
     params.FilterDescendantsInstances = ignore
     params.IgnoreWater = true
-    local hit = workspace:Raycast(fromPos + Vector3.new(0, 2, 0), Vector3.new(0, -500, 0), params)
+    local hit = workspace:Raycast(
+        fromPos + Vector3.new(0, 5, 0),
+        Vector3.new(0, -maxDist, 0),
+        params
+    )
     if hit then return hit.Position.Y end
     return nil
 end
 
--- ============ NOCLIP (xe + char) ============
+-- ============ NOCLIP ============
 local carNoclipOn = false
 local noclipHooked = {}
 
@@ -196,9 +191,7 @@ end
 task.spawn(function()
     while true do
         task.wait(0.05)
-        if carNoclipOn then
-            forceNoclip()
-        end
+        if carNoclipOn then forceNoclip() end
     end
 end)
 
@@ -222,15 +215,12 @@ local function forceSeat()
     if not h or not car then return end
     local vs = getDriveSeat(car)
     if not vs then return end
-
     if h.Sit and h.SeatPart == vs then return end
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
         task.wait(0.15)
     end
-
     if vs.Occupant and vs.Occupant ~= h then return end
-
     local hrp = root()
     if hrp then
         pcall(function() hrp.CFrame = CFrame.new(vs.Position + Vector3.new(0, 2, 0)) end)
@@ -278,8 +268,25 @@ local function seatCar(timeout)
     return false
 end
 
+-- ============ VOID SCAN (xa) ============
+local function scanVoidBridge(curPos, dir, curFloorY)
+    -- tim bo ben kia: raycast tu 100 -> 5000 studs
+    -- dieu kien: san > -10 (tren nuoc) VA chenh lech so voi curFloorY < 40
+    for testDist = 100, VOID_SCAN_MAX, VOID_SCAN_STEP do
+        local testPos = curPos + dir * testDist
+        local fY = rayFloorY(testPos, 800)
+        if fY and fY > -10 then
+            -- check do cao hop ly
+            if not curFloorY or math.abs(curFloorY - fY) < 40 then
+                return testDist, fY
+            end
+        end
+    end
+    return nil, nil
+end
+
 -- ============ FLY ============
- local function flyTo(target)
+local function flyTo(target)
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
@@ -287,167 +294,158 @@ end
     setCarNoclip(true)
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
-    -- ANCHOR CA XE - khong xoay, khong roi
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.Anchored = true end)
-        end
-    end
-    task.wait(0.1)
+    local vs = getDriveSeat(car)
+    local attach = vs or root()
+    if not attach then return false end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFly"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 5000
+    bv.Velocity = Vector3.zero
+    bv.Parent = attach
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "RGGyro"
+    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    bg.P = 5000
+    bg.D = 500
+    bg.Parent = attach
 
     local reached = false
-    local DECEL_DIST = 200
-    local ARRIVE = 8
-    local VOID_SCAN = 2000
-    local TICK = 0.05
     local lastVoidCheck = 0
 
     while enabled do
         car = myCar or findMyCar()
         if not car then break end
+        local hrp = root()
+        if not hrp then break end
 
-        local vs = getDriveSeat(car)
-        local curPos = (vs and vs.Position) or (root() and root().Position)
-        if not curPos then break end
+        vs = getDriveSeat(car)
+        if vs and attach ~= vs then
+            attach = vs
+            bv.Parent = vs
+            bg.Parent = vs
+        end
 
+        local curPos = (h.Sit and vs) and vs.Position or hrp.Position
         local delta = target - curPos
         local flat = Vector3.new(delta.X, 0, delta.Z)
         local dist = flat.Magnitude
 
-        if dist < ARRIVE then
+        if dist < ARRIVE_DIST then
             reached = true
+            bv.Velocity = Vector3.zero
+            bv.MaxForce = Vector3.new(0, 0, 0)
             break
         end
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- void check moi 0.2s
-        local voidHandled = false
-        if os.clock() - lastVoidCheck > 0.2 then
+        -- giu xe khong xoay: nhin ve target
+        pcall(function()
+            bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
+        end)
+
+        -- void check moi 0.3s
+        if os.clock() - lastVoidCheck > 0.3 then
             lastVoidCheck = os.clock()
 
-            local curFloorY = rayFloorY(curPos)
-            local aheadFloorY = rayFloorY(curPos + dir * 60)
+            local curFloorY = rayFloorY(curPos, 500)
+            local aheadFloorY = rayFloorY(curPos + dir * 100, 500)
 
-            local isVoid = (curFloorY == nil and aheadFloorY == nil)
-                or (curFloorY and curFloorY < -20)
-                or (aheadFloorY and aheadFloorY < -20)
-                or (curFloorY and curFloorY > -20 and aheadFloorY == nil)
+            local voidHere = (curFloorY == nil) or (curFloorY < -20)
+            local voidAhead = (aheadFloorY == nil) or (aheadFloorY < -20)
 
-            if isVoid then
-                -- tim bo ben kia
-                local jumpDist = 0
-                local jumpFloorY = nil
-                for testDist = 60, VOID_SCAN, 30 do
-                    local fY = rayFloorY(curPos + dir * testDist)
-                    if fY and fY > -5 then
-                        jumpDist = testDist
-                        jumpFloorY = fY
-                        break
-                    end
-                end
+            if voidHere or voidAhead then
+                setState("void - scan bo")
+                -- tam dung BV
+                bv.Velocity = Vector3.zero
+
+                -- scan bo ben kia (100 -> 5000 studs)
+                local jumpDist, jumpY = scanVoidBridge(curPos, dir, curFloorY)
 
                 local dest
-                if jumpFloorY then
+                if jumpDist and jumpY then
                     dest = Vector3.new(
                         curPos.X + dir.X * jumpDist,
-                        jumpFloorY + FLY_Y,
+                        jumpY + FLY_Y,
                         curPos.Z + dir.Z * jumpDist
                     )
-                    setState("void - tele bo " .. jumpDist)
+                    setState("void - qua bo " .. jumpDist)
                 else
-                    -- khong co bo -> tele xa 500 studs ve huong target
-                    dest = Vector3.new(
-                        curPos.X + dir.X * 500,
-                        curPos.Y + 15,
-                        curPos.Z + dir.Z * 500
-                    )
-                    setState("void - tele xa")
+                    -- khong tim thay bo -> tele thang target
+                    dest = Vector3.new(target.X, curPos.Y + 15, target.Z)
+                    setState("void - tele target")
                 end
 
-                pcall(function() car:PivotTo(CFrame.new(dest)) end)
+                -- tele ca xe
+                local carModel = myCar or findMyCar()
+                if carModel then
+                    pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
+                end
+
                 if not h.Sit then forceSeat() end
-                task.wait(0.35)
-                voidHandled = true
+                task.wait(0.4)
+
+                -- reset check
+                lastVoidCheck = os.clock() + 0.5
             end
         end
 
-        if voidHandled then
-            -- tiep tuc loop sau khi tele
+        -- tinh Y
+        local curFloorY2 = rayFloorY(curPos, 500)
+        local targetY = curPos.Y
+        if curFloorY2 and curFloorY2 > -20 then
+            local candidateY = curFloorY2 + FLY_Y
+            if candidateY <= curPos.Y + 15 then
+                targetY = candidateY
+            end
+        end
+
+        -- speed
+        local speed
+        if dist >= DECEL_DIST then
+            speed = STEP_DIST
         else
-            -- bay binh thuong
-            local curFloorY = rayFloorY(curPos)
-            local targetY = curPos.Y
-            if curFloorY and curFloorY > -20 then
-                targetY = curFloorY + FLY_Y
-                if targetY < curPos.Y - 15 then
-                    targetY = curPos.Y
-                end
-            end
-
-            local speed
-            if dist >= DECEL_DIST then
-                speed = STEP_DIST
-            else
-                speed = math.max(STEP_DIST * dist / DECEL_DIST, 6)
-            end
-
-            local step = speed * TICK
-            if step > dist - 2 then step = dist - 2 end
-            if step < 1 then step = 1 end
-
-            local nextPos = Vector3.new(
-                curPos.X + dir.X * step,
-                targetY,
-                curPos.Z + dir.Z * step
-            )
-
-            pcall(function() car:PivotTo(CFrame.new(nextPos)) end)
-            if not h.Sit then forceSeat() end
-            task.wait(TICK)
+            speed = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
+
+        local vx = dir.X * speed
+        local vz = dir.Z * speed
+        local vy = (targetY - curPos.Y) * 5
+        vy = math.clamp(vy, -40, 40)
+
+        bv.Velocity = Vector3.new(vx, vy, vz)
+
+        if not h.Sit then forceSeat() end
+        task.wait(TICK)
     end
 
-    -- UNANCHOR
+    if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
+    task.wait(0.15)
+
+    -- ===== HA XUONG =====
     car = myCar or findMyCar()
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.Anchored = false end)
-            end
-        end
-    end
-    task.wait(0.1)
-
-    -- HA XUONG
     local vs2 = car and getDriveSeat(car)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
+    if not endPos then task.wait(0.2) return reached end
 
-    local hasGround = false
-    local floorY = nil
-    if endPos then
-        floorY = rayFloorY(endPos)
-        if floorY and floorY > -10 then
-            hasGround = true
-        end
-    end
+    local floorY = rayFloorY(endPos, 500)
+    local hasGround = (floorY ~= nil) and (floorY > -10) and (endPos.Y - floorY < 50)
 
     if hasGround then
-        -- co dat -> tat noclip, cho roi
         setCarNoclip(false)
-
         local t0 = os.clock()
         while os.clock() - t0 < 3 and enabled do
             task.wait(0.1)
             local hrp3 = root()
             if not hrp3 then break end
-            local fY = rayFloorY(hrp3.Position)
-            if fY and math.abs(hrp3.Position.Y - fY) < 4 then
-                break
-            end
+            local fY = rayFloorY(hrp3.Position, 500)
+            if fY and math.abs(hrp3.Position.Y - fY) < 4 then break end
         end
     else
-        -- khong co dat -> giu noclip, tele len
         local hrp3 = root()
         if hrp3 then
             pcall(function()
@@ -465,6 +463,7 @@ end
     task.wait(0.15)
     return reached
 end
+
 -- ============ SPAWN ============
 local function spawnAndSeat()
     if not SpawnCarEv then return false end
@@ -490,9 +489,7 @@ local function spawnAndSeat()
         car = findMyCar()
         if car and car:FindFirstChildWhichIsA("BasePart", true) then
             local r = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
-            if r and r.AssemblyLinearVelocity.Magnitude < 5 then
-                break
-            end
+            if r and r.AssemblyLinearVelocity.Magnitude < 5 then break end
         end
         task.wait(0.5)
     end
@@ -501,7 +498,6 @@ local function spawnAndSeat()
         setState("xe chua hien")
         return false
     end
-
     task.wait(1.5)
 
     if seatCar(15) then
@@ -515,19 +511,14 @@ end
 
 -- ============ INIT ============
 local function doInit()
-    -- 1. doi job
     setState("doi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
-    -- 2. spawn xe + seat
     setState("spawn xe")
-    if not spawnAndSeat() then
-        return false
-    end
+    if not spawnAndSeat() then return false end
     myCar = findMyCar()
 
-    -- 3. online
     setState("online")
     fire(TaxiEvent, "GoOnline")
     task.wait(2)
@@ -541,17 +532,13 @@ local function runTrip()
     local h = hum()
     if not h or not h.Sit then
         setState("respawn xe")
-        if not spawnAndSeat() then
-            task.wait(5)
-            return
-        end
+        if not spawnAndSeat() then task.wait(5); return end
     end
     myCar = findMyCar()
 
     setState("cho don")
     orderToken = nil
     pickupPos = nil
-
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
         if pickupPos then break end
@@ -563,16 +550,12 @@ local function runTrip()
         task.wait(0.4)
     end
 
-    if not pickupPos then
-        setState("no pickup")
-        return
-    end
+    if not pickupPos then setState("no pickup"); return end
 
     setState("don khach")
     flyTo(pickupPos)
     task.wait(1)
     forceSeat()
-
     setState("khach len xe")
     task.wait(PICKUP_WAIT)
 
@@ -581,7 +564,6 @@ local function runTrip()
         flyTo(dropPos)
         task.wait(1)
         forceSeat()
-
         setState("khach xuong xe")
         task.wait(DROP_WAIT)
     end
@@ -594,7 +576,6 @@ end
 
 -- ============ LOOP ============
 local loopBusy = false
-
 local function startLoop()
     if loopBusy then return end
     loopBusy = true
@@ -603,16 +584,10 @@ local function startLoop()
             local ok = pcall(doInit)
             initialized = ok
         end
-        if not initialized then
-            loopBusy = false
-            return
-        end
-
+        if not initialized then loopBusy = false return end
         while enabled do
             local ok, err = pcall(runTrip)
-            if not ok then
-                setState("ERR: " .. tostring(err):sub(1, 40))
-            end
+            if not ok then setState("ERR: " .. tostring(err):sub(1, 40)) end
             task.wait(2)
         end
         loopBusy = false
@@ -731,7 +706,6 @@ end
 local function renderCars()
     clearList()
     scroll.CanvasSize = UDim2.new(0, 0, 0, #carList * 38 + 12)
-
     if #carList == 0 then
         local lbl = Instance.new("TextLabel", scroll)
         lbl.Size = UDim2.new(1, -12, 0, 40)
@@ -743,13 +717,10 @@ local function renderCars()
         carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (0)"
         return
     end
-
     for i, name in ipairs(carList) do
         local btn = Instance.new("TextButton", scroll)
         btn.Size = UDim2.new(1, -12, 0, 34)
-        btn.BackgroundColor3 = (name == selectedCar)
-            and Color3.fromRGB(0, 150, 120)
-            or Color3.fromRGB(30, 38, 54)
+        btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
         btn.Text = "  " .. name
         btn.TextColor3 = Color3.fromRGB(220, 230, 240)
         btn.TextSize = 10
@@ -763,7 +734,6 @@ local function renderCars()
             renderCars()
         end)
     end
-
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
 end
 
@@ -821,8 +791,7 @@ end)
 
 local dragging, dStart, dStartPos
 title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-       or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true; dStart = input.Position; dStartPos = rootUI.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then dragging = false end
@@ -830,11 +799,9 @@ title.InputBegan:Connect(function(input)
     end
 end)
 title.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.Touch
-                     or input.UserInputType == Enum.UserInputType.MouseMovement) then
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         local d = input.Position - dStart
-        rootUI.Position = UDim2.new(dStartPos.X.Scale, dStartPos.X.Offset + d.X,
-                                     dStartPos.Y.Scale, dStartPos.Y.Offset + d.Y)
+        rootUI.Position = UDim2.new(dStartPos.X.Scale, dStartPos.X.Offset + d.X, dStartPos.Y.Scale, dStartPos.Y.Offset + d.Y)
     end
 end)
 
