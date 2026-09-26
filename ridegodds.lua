@@ -1,7 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.5
--- Bay UNDER CFrame 270. Toi noi choi 6 stud + bat hold NGAY -> khong rot void.
--- GUI gon: chi toggle + chon xe (tu dong scan).
+-- RideGo Farm — FINAL v25.6
+-- Ascend thang len mat dat. Seat loop manh hon. Giu job khi tat/bat lai.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,6 +9,7 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST         = 270
+local CRUISE_Y          = 18
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 8
@@ -20,12 +20,10 @@ local UNDERGROUND_DEPTH = 120
 local UNDER_STEP_MAX    = 60
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
-local ASCEND_HEIGHT     = 6
-local ASCEND_STEPS      = 3
 
 -- ============ STATE ============
 local enabled     = false
-local initialized = false
+local jobInitialized = false      -- giu qua tat/bat
 local orderToken  = nil
 local pickupPos   = nil
 local dropPos     = nil
@@ -43,12 +41,12 @@ local function resetState()
     pickupPos = nil
     dropPos = nil
     myCar = nil
-    initialized = false
     stats.trips = 0
     stats.earn = 0
     curState = "OFF"
     flying = false
     acceptingOrder = false
+    -- KHONG reset jobInitialized -> giu qua tat/bat
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
@@ -446,24 +444,27 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
+-- Seat loop: phat hien ngoi nham ghe hanh khach + seat lai ghe lai
 task.spawn(function()
     while true do
-        task.wait(0.1)
-        if enabled and not flying then
+        task.wait(0.15)
+        if enabled then
             local h = hum()
             local car = myCar or findMyCar()
             if h and car then
                 local vs = getDriveSeat(car)
                 if vs then
-                    if h.Sit and h.SeatPart and h.SeatPart ~= vs then
-                        setState("sai ghe - tu dong seat lai")
+                    local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
+                    local notSeated = not h.Sit
+                    if wrongSeat then
+                        setState("sai ghe - nhay ra seat lai")
                         pcall(function() h.Sit = false end)
                         task.wait(0.25)
-                        for attempt = 1, 5 do
+                        for attempt = 1, 6 do
                             if forceSeat() then break end
-                            task.wait(0.3)
+                            task.wait(0.25)
                         end
-                    elseif not h.Sit then
+                    elseif notSeated and not flying then
                         forceSeat()
                     end
                 end
@@ -491,18 +492,19 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ ASCEND (len 6 stud, khong quet) ============
-local function ascendAtArrival(car)
+-- ============ ASCEND LEN MAT DAT ============
+local function ascendToGround(car, target, targetFloor)
     if not car then return end
-    setState("choi len 6")
-    local steps = ASCEND_STEPS or 3
-    local stepY = ASCEND_HEIGHT / steps
-    for i = 1, steps do
-        local cp = car:GetPivot()
-        local newPos = Vector3.new(cp.Position.X, cp.Position.Y + stepY, cp.Position.Z)
-        pcall(function() car:PivotTo(CFrame.new(newPos) * (cp - cp.Position)) end)
-        task.wait(0.03)
-    end
+    setState("noi len mat dat")
+
+    local realFloor = floorBelow(target) or targetFloor
+    local upTargetY = realFloor + CRUISE_Y
+
+    local cp = car:GetPivot()
+    local rotOnly = cp - cp.Position
+    local dest = Vector3.new(target.X, upTargetY, target.Z)
+    pcall(function() car:PivotTo(CFrame.new(dest) * rotOnly) end)
+    task.wait(0.1)
 end
 
 -- ============ FLY UNDERGROUND (CFrame-only) ============
@@ -606,11 +608,11 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== CHOI LEN 6 STUD + BAT HOLD NGAY =====
+    -- ===== NOI LEN MAT DAT =====
     car = myCar or findMyCar()
     if car and reached then
-        ascendAtArrival(car)
-        -- Bat hold NGAY (truoc khi detach) -> khong rot void
+        ascendToGround(car, target, targetFloor)
+        -- Bat hold NGAY sau khi len mat dat
         myCar = car
         startHold()
     end
@@ -676,7 +678,7 @@ local function spawnAndSeat()
     return false
 end
 
--- ============ INIT ============
+-- ============ INIT (chi chay 1 lan) ============
 local function doInit()
     setState("doi job")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
@@ -755,11 +757,29 @@ local function startLoop()
     if loopBusy then return end
     loopBusy = true
     task.spawn(function()
-        if not initialized then
+        -- Chi chay doInit 1 lan duy nhat
+        if not jobInitialized then
             local ok = pcall(doInit)
-            initialized = ok
+            jobInitialized = ok
         end
-        if not initialized then loopBusy = false return end
+
+        if not jobInitialized then
+            loopBusy = false
+            setState("init fail")
+            return
+        end
+
+        -- Sau khi init xong, dam bao xe san sang truoc khi cho don
+        local h = hum()
+        if not h or not h.Sit then
+            setState("respawn xe")
+            if not spawnAndSeat() then
+                loopBusy = false
+                setState("respawn fail")
+                return
+            end
+        end
+
         while enabled do
             local ok, err = pcall(runTrip)
             if not ok then setState("ERR: " .. tostring(err):sub(1, 40)) end
@@ -770,7 +790,7 @@ local function startLoop()
     end)
 end
 
--- ============ GUI (gon) ============
+-- ============ GUI ============
 local cg = game:GetService("CoreGui")
 if cg:FindFirstChild("RideGoFarmUI") then cg.RideGoFarmUI:Destroy() end
 
@@ -897,7 +917,6 @@ local function renderCars()
         btn.MouseButton1Click:Connect(function()
             selectedCar = name
             renderCars()
-            -- Tu dong thu gon sau khi chon
             carOpen = false
             carBody.Visible = false
             carBody.Size = UDim2.new(1, -16, 0, 0)
@@ -947,10 +966,7 @@ toggleBtn.MouseButton1Click:Connect(function()
         end
         local c = char()
         if c then fullCollideOn(c) end
-        local h = hum()
-        if h and h.Sit then
-            pcall(function() h.Sit = false end)
-        end
+        -- KHONG set h.Sit = false -> giu nguoi choi trong xe
         paint()
     else
         resetState()
@@ -987,7 +1003,6 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
--- Tu dong scan khi load
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -997,4 +1012,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v25.5")
+print("[ridego] loaded v25.6")
