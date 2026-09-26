@@ -1,6 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26
--- LAND_OFFSET=5. Bo money. Bo BodyGyro (gay kick). BV MaxForce nhe + update thua.
+-- RideGo Farm — FINAL v27
+-- Bay: PivotTo thuan, khong noclip, khong gyro, khong fake velocity.
+-- Under ground: Y co dinh, khong dam gi. Ascend +5 stud.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -20,8 +21,8 @@ local UNDERGROUND_DEPTH = 120
 local UNDER_STEP_MAX    = 60
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
-local HOLD_MAXFORCE     = 1e5      -- giam tu 1e6 -> 1e5
-local HOLD_UPDATE       = 0.15     -- giam tan suat update
+local HOLD_MAXFORCE     = 1e5
+local HOLD_UPDATE       = 0.15
 
 -- ============ STATE ============
 local enabled     = false
@@ -337,7 +338,7 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ HOLD (nhe, khong gyro) ============
+-- ============ HOLD ============
 local function startHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
@@ -356,7 +357,6 @@ local function startHold()
     bv.Parent = vs
     holdBV = bv
 
-    -- Update thua -> it replication -> khong kick
     task.spawn(function()
         while holdBV == bv and bv.Parent do
             bv.Velocity = Vector3.zero
@@ -505,7 +505,6 @@ local function ascendToGround(car, target, targetFloor)
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
 
-    -- Reset rotation ve huong ngang chuan (khong roll, khong pitch)
     local cp = car:GetPivot()
     local lookDir = Vector3.new(target.X - cp.Position.X, 0, target.Z - cp.Position.Z)
     if lookDir.Magnitude < 0.01 then
@@ -519,16 +518,13 @@ local function ascendToGround(car, target, targetFloor)
     task.wait(0.15)
 end
 
--- ============ FLY UNDERGROUND (CFrame-only) ============
--- ============ FLY (BodyVelocity, khong PivotTo) ============
+-- ============ FLY (PivotTo thuan, khong noclip, khong gyro) ============
 local function flyTo(target)
     stopHold()
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
     if not h.Sit then forceSeat(); task.wait(0.1) end
-
-    local myChar = char()
 
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
@@ -538,58 +534,21 @@ local function flyTo(target)
     unanchorCar(car)
     task.wait(0.05)
 
-    -- SetNetworkOwner 1 lan duy nhat
     claimNetworkOwner(car)
     attachNpcFollowers(car)
 
-    -- Noclip xe + player (tat CanCollide)
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.CanCollide = false end)
-        end
-    end
-    if myChar then
-        for _, p in ipairs(myChar:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.CanCollide = false end)
-            end
-        end
-    end
-
-    -- Set Y xuong duoi dat bang BV Y (khong PivotTo)
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        or car.PrimaryPart
-        or car:FindFirstChildWhichIsA("BasePart", true)
-    if not vs then return false end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "RGFly"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 8000
-    bv.Velocity = Vector3.zero
-    bv.Parent = vs
-
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "RGGyro"
-    bg.MaxTorque = Vector3.new(5e4, 5e4, 5e4)  -- nhe, tranh kick
-    bg.P = 3000
-    bg.D = 500
-    bg.Parent = vs
-
     flying = true
 
-    -- Cho BV keo xe xuong underY truoc
-    setState("⬇ under - ha do cao")
-    local descendDeadline = os.clock() + 3
-    while enabled and os.clock() < descendDeadline do
-        local c = myCar or findMyCar()
-        if not c then break end
-        local curP = c:GetPivot().Position
-        local dy = underY - curP.Y
-        if math.abs(dy) < 3 then break end
-        local vy = math.clamp(dy * 5, -200, 200)
-        bv.Velocity = Vector3.new(0, vy, 0)
-        task.wait(0.05)
+    local startPivot = car:GetPivot()
+    local rotOnly = startPivot - startPivot.Position
+
+    -- Ha xuong duoi dat
+    local curPos = startPivot.Position
+    local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
+    for i = 1, UNDER_DESCEND_STEPS do
+        curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
+        pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
+        task.wait(UNDER_STEP_TIME)
     end
     setState("⬇ under - bay")
 
@@ -611,7 +570,6 @@ local function flyTo(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- Toc do decel khi gan
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
@@ -619,32 +577,24 @@ local function flyTo(target)
             spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
 
-        -- BV day theo huong target + giu Y = underY
-        local vx = dir.X * spd
-        local vz = dir.Z * spd
-        local dy = underY - curP.Y
-        local vy = math.clamp(dy * 5, -200, 200)
+        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
 
-        bv.Velocity = Vector3.new(vx, vy, vz)
+        local nextPos = Vector3.new(
+            curP.X + dir.X * step,
+            underY,
+            curP.Z + dir.Z * step
+        )
+        pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
-        -- Gyro quay mat ve huong bay
-        pcall(function()
-            bg.CFrame = CFrame.lookAt(curP, Vector3.new(target.X, curP.Y, target.Z))
-        end)
-
-        if os.clock() - lastNpcRefresh > 0.08 then
+        if os.clock() - lastNpcRefresh > 0.05 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
         end
 
-        task.wait(0.05)
+        task.wait(TICK)
     end
 
-    if bv and bv.Parent then bv:Destroy() end
-    if bg and bg.Parent then bg:Destroy() end
-    task.wait(0.1)
-
-    -- ===== NOI LEN MAT DAT BANG PIVOTTO (1 lan) =====
+    -- ===== NOI LEN MAT DAT =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
@@ -1040,4 +990,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v26")
+print("[ridego] loaded v27")
