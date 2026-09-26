@@ -1,8 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v10
--- Noclip theo PHA: BAT khi bat dau bay, TAT khi cham dat.
--- Cho don: noclip OFF, collide ON, hold Y=0 -> xe dung tren dat.
--- Ep ghe lai: CFrame tuyet doi tren ghe + Sit cung + verify 2 lan.
+-- RideGo Farm — FINAL v11
+-- Bay: noclip TOAN BO (xe + minh + khach trong xe) -> xuyen tuong.
+-- Ha: CHI bat collide cho KHUNG GAM (chassis/frame/wheel/body) -> xe khong bung.
+--     Part op/den/kinh giu noclip -> khong day nhau.
+-- Khach: NPC ngoi trong ghe duoc noclip suot khi bay -> khong ket tuong.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -173,10 +174,25 @@ local function rayFloorY(fromPos, maxDist, ignoreWater)
 end
 
 -- ============ NOCLIP ============
--- Cong tac toan bo: BAT khi bay (xuyen tuong), TAT khi cham dat (va cham san).
 local carNoclipOn = false
 local noclipHooked = {}
 
+-- Ten part khung gam - chi nhung part nay duoc bat collide khi ha
+local KEEP_COLLIDE = {
+    chassis = true, frame = true, base = true,
+    wheel = true, tire = true, tyre = true,
+    body = true, hull = true, floor = true, under = true,
+}
+
+local function isChassisPart(part)
+    local n = part.Name:lower()
+    for key in pairs(KEEP_COLLIDE) do
+        if n:find(key, 1, true) then return true end
+    end
+    return false
+end
+
+-- Tat collide toan bo
 local function walkNoclip(inst)
     if not inst then return end
     if inst:IsA("BasePart") and inst.CanCollide then
@@ -189,6 +205,7 @@ local function walkNoclip(inst)
     end
 end
 
+-- Bat collide toan bo (dung khi tat farm / cho don luc dau)
 local function fullCollideOn(inst)
     if not inst then return end
     if inst:IsA("BasePart") and not inst.CanCollide then
@@ -197,6 +214,24 @@ local function fullCollideOn(inst)
     for _, p in ipairs(inst:GetDescendants()) do
         if p:IsA("BasePart") and not p.CanCollide then
             pcall(function() p.CanCollide = true end)
+        end
+    end
+end
+
+-- CHI bat collide cho khung gam, phan con lai giu noclip
+local function chassisCollideOn(car)
+    if not car then return end
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            if isChassisPart(p) then
+                if not p.CanCollide then
+                    pcall(function() p.CanCollide = true end)
+                end
+            else
+                if p.CanCollide then
+                    pcall(function() p.CanCollide = false end)
+                end
+            end
         end
     end
 end
@@ -221,15 +256,22 @@ local function hookPassengerChars()
     end
 end
 
+-- Tat collide cho NPC dang ngoi trong ghe cua xe
+local function noclipCarOccupants(car)
+    if not car then return end
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") and d.Occupant then
+            local oh = d.Occupant
+            if oh and oh.Parent then walkNoclip(oh.Parent) end
+        end
+    end
+end
+
 local function forceNoclip()
     local car = myCar or findMyCar()
     if car then
         walkNoclip(car)
-        local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        if vs and vs.Occupant then
-            local h = vs.Occupant
-            if h and h.Parent then walkNoclip(h.Parent) end
-        end
+        noclipCarOccupants(car)
     end
     local c = char()
     if c then walkNoclip(c) end
@@ -247,17 +289,10 @@ local function noclipAllOn()
     forceNoclip()
 end
 
--- TAT noclip, bat lai collide toan bo (khi cham dat)
-local function noclipAllOff()
+-- TAT noclip xe: chi khung gam collide, khach + minh collide lai
+local function noclipOffChassisOnly(car)
     carNoclipOn = false
-    local car = myCar or findMyCar()
-    if car then fullCollideOn(car) end
-    local c = char()
-    if c then fullCollideOn(c) end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        local pc = plr.Character
-        if pc then fullCollideOn(pc) end
-    end
+    if car then chassisCollideOn(car) end
 end
 
 Players.PlayerAdded:Connect(function(plr)
@@ -274,6 +309,17 @@ task.spawn(function()
     while true do
         task.wait(0.03)
         if carNoclipOn then forceNoclip() end
+    end
+end)
+
+-- Trong luc bay: khach (NPC/player) dang ngoi trong ghe -> noclip
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if flying and carNoclipOn then
+            local car = myCar or findMyCar()
+            if car then pcall(function() noclipCarOccupants(car) end) end
+        end
     end
 end)
 
@@ -323,7 +369,6 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- Ep ngoi ghe lai: CFrame tuyet doi tren ghe + Sit cung + verify 2 lan.
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -346,7 +391,6 @@ local function forceSeat()
         end
     end
 
-    -- CFrame toi NGAY TREN ghe lai, khong lech sang ghe khac
     local hrp = root()
     if hrp then
         local seatCF = vs.CFrame * CFrame.new(0, 2.5, 0)
@@ -357,7 +401,6 @@ local function forceSeat()
     pcall(function() vs:Sit(h) end)
     task.wait(0.08)
 
-    -- verify lan 1
     if not h.Sit or h.SeatPart ~= vs then
         local hrp2 = root()
         if hrp2 then
@@ -369,7 +412,6 @@ local function forceSeat()
         task.wait(0.08)
     end
 
-    -- verify lan cuoi
     if not h.Sit or h.SeatPart ~= vs then
         pcall(function() h.Sit = true end)
         task.wait(0.05)
@@ -378,7 +420,6 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
--- Seat loop: chi chay khi KHONG bay
 task.spawn(function()
     while true do
         task.wait(0.15)
@@ -437,7 +478,7 @@ local function flyTo(target)
     local car = myCar or findMyCar()
     if not h or not car then return false end
 
-    -- BAT NOCLIP TOAN BO NGAY khi bat dau bay
+    -- BAT NOCLIP TOAN BO NGAY (xe + minh + khach trong xe)
     noclipAllOn()
     flying = true
     if not h.Sit then forceSeat(); task.wait(0.1) end
@@ -557,7 +598,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG: TAT NOCLIP, BAT COLLIDE, roi ha =====
+    -- ===== HA XUONG: CHI BAT COLLIDE CHO KHUNG GAM =====
     car = myCar or findMyCar()
     if not car then flying = false; task.wait(0.2); return reached end
 
@@ -565,10 +606,7 @@ local function flyTo(target)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then flying = false; task.wait(0.2); return reached end
 
-    -- TAT noclip ngay -> bat collide toan bo truoc khi ha
-    noclipAllOff()
-    task.wait(0.05)
-
+    -- raycast phai trung dat (dung truoc khi ha)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local ign = {}
@@ -585,9 +623,14 @@ local function flyTo(target)
         local targetY = hit.Position.Y + LAND_OFFSET
         local landed = Vector3.new(endPos.X, targetY, endPos.Z)
         pcall(function() car:PivotTo(CFrame.new(landed)) end)
-        task.wait(0.2)
+        task.wait(0.15)
+
+        -- SAU KHI HA XONG moi bat collide khung gam
+        noclipOffChassisOnly(car)
+        task.wait(0.1)
     else
         setState("khong thay dat - giu do cao")
+        -- khong ha, giu nguyen tren khong
     end
 
     flying = false
@@ -679,8 +722,8 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-    -- Cho don: noclip OFF, collide ON, hold Y=0
-    noclipAllOff()
+    -- Cho don: chi khung gam collide (xe dung tren dat)
+    noclipOffChassisOnly(myCar)
     startHold()
 
     setState("cho don")
@@ -921,7 +964,10 @@ toggleBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
         resetState()
-        noclipAllOff()
+        local car = myCar or findMyCar()
+        if car then fullCollideOn(car) end
+        local c = char()
+        if c then fullCollideOn(c) end
         local h = hum()
         if h and h.Sit then
             pcall(function() h.Sit = false end)
@@ -972,4 +1018,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v10")
+print("[ridego] loaded v11")
