@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.8
--- Ascend +1 stud (khong anchor). Tat/bat lai = doInit lai tu dau. State co icon.
+-- RideGo Farm — FINAL v25.8.1
+-- Bo money. forceSeat check ghe hien tai + CFrame ve ghe lai + Sit lai.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -89,25 +89,6 @@ local function fire(remote, ...)
 end
 
 local function setState(s) curState = s end
-
-local function getMoney()
-    local ls = lp:FindFirstChild("leaderstats")
-    if ls then
-        for _, name in ipairs({"Cash","Money","Rp","Coin","Coins","Rupiah","Rupiahs"}) do
-            local s = ls:FindFirstChild(name)
-            if s and (s:IsA("IntValue") or s:IsA("NumberValue") or s:IsA("StringValue")) then
-                return s.Value
-            end
-        end
-    end
-    for _, name in ipairs({"Cash","Money","Rp"}) do
-        local s = lp:FindFirstChild(name)
-        if s and (s:IsA("IntValue") or s:IsA("NumberValue")) then
-            return s.Value
-        end
-    end
-    return nil
-end
 
 -- ============ TAXI HOOK ============
 if TaxiEvent then
@@ -389,6 +370,7 @@ end
 -- ============ SEAT ============
 local function getDriveSeat(car)
     if not car then return nil end
+    -- Uu tien ghe co ten drive/driver
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") then
             local n = d.Name:lower()
@@ -397,9 +379,11 @@ local function getDriveSeat(car)
             end
         end
     end
+    -- Fallback: ghe dau tien
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
+-- forceSeat: check ghe dang ngoi, neu sai -> CFrame ve ghe lai + Sit lai
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -407,13 +391,18 @@ local function forceSeat()
     local vs = getDriveSeat(car)
     if not vs then return false end
 
+    -- Da ngoi dung ghe lai
     if h.Sit and h.SeatPart == vs then return true end
 
-    if h.Sit and h.SeatPart ~= vs then
+    -- CHECK ghe dang ngoi: neu ngoi sai ghe hanh khach -> dung day truoc
+    local currentSeat = h.SeatPart
+    if h.Sit and currentSeat and currentSeat ~= vs then
+        -- Ngoi sai ghe -> nha ra
         pcall(function() h.Sit = false end)
         task.wait(0.2)
     end
 
+    -- Ghe lai bi ai khac chiem -> keo ho ra
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
@@ -423,6 +412,7 @@ local function forceSeat()
         if vs.Occupant and vs.Occupant ~= h then return false end
     end
 
+    -- Disable cac ghe khac de engine khong chon nham
     local disabledList = {}
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d ~= vs and not d.Disabled then
@@ -431,6 +421,7 @@ local function forceSeat()
         end
     end
 
+    -- CFrame ve dung tren ghe lai
     local hrp = root()
     if hrp then
         local seatCF = vs.CFrame * CFrame.new(0, 2.5, 0)
@@ -438,9 +429,11 @@ local function forceSeat()
         task.wait(0.08)
     end
 
+    -- Sit lai vao ghe lai
     pcall(function() vs:Sit(h) end)
     task.wait(0.12)
 
+    -- Retry 3 lan
     for i = 1, 3 do
         if h.Sit and h.SeatPart == vs then break end
         local hrpR = root()
@@ -464,6 +457,7 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
+-- Seat loop: phat hien ngoi nham ghe
 task.spawn(function()
     while true do
         task.wait(0.15)
@@ -476,7 +470,7 @@ task.spawn(function()
                     local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
                     local notSeated = not h.Sit
                     if wrongSeat then
-                        setState("⚠ sai ghe - nhay ra seat lai")
+                        setState("⚠ sai ghe - CFrame ve ghe lai")
                         pcall(function() h.Sit = false end)
                         task.wait(0.25)
                         for attempt = 1, 6 do
@@ -514,7 +508,7 @@ end
 -- ============ ASCEND LEN MAT DAT ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
-    setState("⬆ noi len mat dat +1")
+    setState("⬆ noi len mat dat +" .. tostring(LAND_OFFSET))
 
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
@@ -630,7 +624,7 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== NOI LEN MAT DAT +1 STUD =====
+    -- ===== NOI LEN MAT DAT =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
@@ -665,6 +659,20 @@ local function spawnAndSeat()
     local car = findMyCar()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
         setState("◦ ngoi xe co san")
+
+        -- CHECK ngay: neu dang ngoi sai ghe -> CFrame ve ghe lai truoc
+        local h = hum()
+        local vs = getDriveSeat(car)
+        if h and vs and h.Sit and h.SeatPart and h.SeatPart ~= vs then
+            setState("⚠ dang sai ghe - CFrame ve ghe lai")
+            pcall(function() h.Sit = false end)
+            task.wait(0.2)
+            for attempt = 1, 5 do
+                if forceSeat() then break end
+                task.wait(0.3)
+            end
+        end
+
         if seatCar(10) then
             setState("◦ san sang")
             return true
@@ -689,6 +697,19 @@ local function spawnAndSeat()
         return false
     end
     task.wait(1.5)
+
+    -- CHECK ghe truoc khi seat
+    local h = hum()
+    local vs = getDriveSeat(car)
+    if h and vs and h.Sit and h.SeatPart and h.SeatPart ~= vs then
+        setState("⚠ sau spawn sai ghe - CFrame ve ghe lai")
+        pcall(function() h.Sit = false end)
+        task.wait(0.2)
+        for attempt = 1, 5 do
+            if forceSeat() then break end
+            task.wait(0.3)
+        end
+    end
 
     if seatCar(15) then
         setState("◦ san sang")
@@ -786,7 +807,6 @@ local function startLoop()
     if loopBusy then return end
     loopBusy = true
     task.spawn(function()
-        -- LUON chay doInit khi bat dau -> doi job, spawn xe, online lai tu dau
         setState("◦ init...")
         local ok = pcall(doInit)
         initialized = ok
@@ -818,8 +838,8 @@ gui.DisplayOrder = 999
 gui.Parent = cg
 
 local rootUI = Instance.new("Frame", gui)
-rootUI.Size = UDim2.new(0, 270, 0, 168)
-rootUI.Position = UDim2.new(0, 20, 0.5, -84)
+rootUI.Size = UDim2.new(0, 270, 0, 148)
+rootUI.Position = UDim2.new(0, 20, 0.5, -74)
 rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
 rootUI.BorderSizePixel = 0
 rootUI.Active = true
@@ -839,10 +859,10 @@ title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 
 local statLbl = Instance.new("TextLabel", rootUI)
-statLbl.Size = UDim2.new(1, -16, 0, 64)
+statLbl.Size = UDim2.new(1, -16, 0, 44)
 statLbl.Position = UDim2.new(0, 8, 0, 30)
 statLbl.BackgroundTransparency = 1
-statLbl.Text = "trips: 0 | earn: 0\ncash: ...\nstate: ..."
+statLbl.Text = "trips: 0 | earn: 0\nstate: ..."
 statLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
 statLbl.TextSize = 10
 statLbl.Font = Enum.Font.Code
@@ -851,7 +871,7 @@ statLbl.TextYAlignment = Enum.TextYAlignment.Top
 
 local toggleBtn = Instance.new("TextButton", rootUI)
 toggleBtn.Size = UDim2.new(1, -16, 0, 30)
-toggleBtn.Position = UDim2.new(0, 8, 0, 98)
+toggleBtn.Position = UDim2.new(0, 8, 0, 78)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
 toggleBtn.Text = "BAT DAU FARM"
 toggleBtn.TextColor3 = Color3.new(1,1,1)
@@ -861,7 +881,7 @@ Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
 
 local carHeader = Instance.new("TextButton", rootUI)
 carHeader.Size = UDim2.new(1, -16, 0, 26)
-carHeader.Position = UDim2.new(0, 8, 0, 134)
+carHeader.Position = UDim2.new(0, 8, 0, 114)
 carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
 carHeader.Text = "> CHON XE (0)"
 carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
@@ -874,7 +894,7 @@ chp.PaddingLeft = UDim.new(0, 8)
 
 local carBody = Instance.new("Frame", rootUI)
 carBody.Size = UDim2.new(1, -16, 0, 0)
-carBody.Position = UDim2.new(0, 8, 0, 166)
+carBody.Position = UDim2.new(0, 8, 0, 146)
 carBody.BackgroundTransparency = 1
 carBody.Visible = false
 
@@ -937,7 +957,7 @@ local function renderCars()
             carOpen = false
             carBody.Visible = false
             carBody.Size = UDim2.new(1, -16, 0, 0)
-            rootUI.Size = UDim2.new(0, 270, 0, 168)
+            rootUI.Size = UDim2.new(0, 270, 0, 148)
             carHeader.Text = "> CHON XE (" .. #carList .. ")"
         end)
     end
@@ -949,10 +969,10 @@ carHeader.MouseButton1Click:Connect(function()
     carBody.Visible = carOpen
     if carOpen then
         carBody.Size = UDim2.new(1, -16, 0, 190)
-        rootUI.Size = UDim2.new(0, 270, 0, 360)
+        rootUI.Size = UDim2.new(0, 270, 0, 340)
     else
         carBody.Size = UDim2.new(1, -16, 0, 0)
-        rootUI.Size = UDim2.new(0, 270, 0, 168)
+        rootUI.Size = UDim2.new(0, 270, 0, 148)
     end
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
 end)
@@ -995,12 +1015,9 @@ end)
 task.spawn(function()
     while true do
         task.wait(0.5)
-        local cash = getMoney()
-        local cashStr = cash and tostring(cash) or "?"
         statLbl.Text = string.format(
-            "trips: %d | earn: %d\ncash: %s\nstate: %s",
-            stats.trips, stats.earn, cashStr,
-            curState
+            "trips: %d | earn: %d\nstate: %s",
+            stats.trips, stats.earn, curState
         )
     end
 end)
@@ -1030,4 +1047,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v25.8")
+print("[ridego] loaded v25.8.1")
