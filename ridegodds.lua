@@ -1,8 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v27
--- UNDER CFrame: bay duoi dat, ascend dung Y khach (khong chui xuong dat).
--- Speed 200, step 200-500.
--- Don khach doi 3s, tra khach doi 5s, stats cong sau dropoff.
+-- RideGo Farm — FINAL v28
+-- Step 15-40 stud/tick -> 500-1300 stud/s, game doc la di chuyen that -> tinh quang duong.
+-- Fake velocity khop voi step thuc te.
+-- UNDER CFrame: ascend dung Y khach. Don khach doi 3s, tra khach doi 5s.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,15 +17,14 @@ local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 3
 local DROP_WAIT         = 5
 local DECEL_DIST        = 200
-local TICK              = 0.05
+local TICK              = 0.03
 local LAND_OFFSET       = 2
 local UNDERGROUND_DEPTH = 120
-local UNDER_STEP_MIN    = 200
-local UNDER_STEP_MAX    = 500
+local UNDER_STEP_MIN    = 15
+local UNDER_STEP_MAX    = 40
 local UNDER_DESCEND_STEPS = 12
 local UNDER_ASCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
-local MAX_CFRAME_DIST   = 100000
 
 -- ============ STATE ============
 local enabled     = false
@@ -556,7 +555,6 @@ local function descendAndLand(car, target, bv, bg)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.05)
 
-    -- Dung vi tri HIEN TAI cua xe (da ascend len tren khach)
     local pivotPos = car:GetPivot().Position
     local params = makeRayParams()
     local origin = Vector3.new(pivotPos.X, pivotPos.Y + 100, pivotPos.Z)
@@ -635,7 +633,6 @@ local function flyUnderground(target)
 
     local reached = false
     local lastNpcRefresh = 0
-    local fakeVelCounter = 0
 
     while enabled do
         local c = myCar or findMyCar()
@@ -652,11 +649,10 @@ local function flyUnderground(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        local step
+        -- Step 15-40 stud/tick -> 500-1300 stud/s, game doc la chay that
+        local step = UNDER_STEP_MAX
         if dist < UNDER_STEP_MAX then
             step = dist
-        else
-            step = UNDER_STEP_MAX
         end
         if step < UNDER_STEP_MIN and dist > UNDER_STEP_MIN then
             step = UNDER_STEP_MIN
@@ -670,15 +666,12 @@ local function flyUnderground(target)
         local nextCF = CFrame.new(nextPos) * rotOnly
         pcall(function() c:PivotTo(nextCF) end)
 
-        -- Fake velocity
-        fakeVelCounter = fakeVelCounter + 1
-        if fakeVelCounter >= 1 then
-            fakeVelCounter = 0
-            local fakeV = Vector3.new(dir.X * STEP_DIST, 0, dir.Z * STEP_DIST)
-            for _, p in ipairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
-                end
+        -- Fake velocity khop voi step thuc te
+        local realSpeed = step / TICK
+        local fakeV = Vector3.new(dir.X * realSpeed, 0, dir.Z * realSpeed)
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.AssemblyLinearVelocity = fakeV end)
             end
         end
 
@@ -690,12 +683,11 @@ local function flyUnderground(target)
         task.wait(TICK)
     end
 
-    -- ===== ASCEND: noi len tren khach, di chuyen XZ =====
+    -- ===== ASCEND =====
     car = myCar or findMyCar()
     if car and reached then
         setState("under - noi len")
 
-        -- Lay mat dat target (khach co the tren platform/cau cao)
         local realFloor = floorBelow(target) or targetFloor
         local ascendGoalY = math.max(realFloor + CRUISE_Y, target.Y + 30)
 
@@ -1126,4 +1118,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v27")
+print("[ridego] loaded v28")
