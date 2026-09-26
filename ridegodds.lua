@@ -1,10 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v15
--- Bay: NOCLIP toan bo -> xuyen building, khong can leo.
--- Terrain-follow: chi theo mat dat, khong nang vi building.
--- Void: chi quet khi that su co void, CFrame qua bo ben kia, KHONG CFrame toi target.
--- Ha xuong: tat noclip chassis-only, dat bang bbox.
--- Ngoi sai ghe: nhay ra + seat lai.
+-- RideGo Farm — FINAL v15.1
+-- Noclip toan bo khi bay (xe + minh + NPC khach qua weld massless).
+-- Terrain-follow theo mat dat. Void CFrame qua bo ben kia (khong CFrame toi target).
+-- Ha xuong: noclip off chassis-only, dat bang bbox.
+-- NPC server-owned: weld + massless vao ghe -> xuyen tuong theo xe.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -14,11 +13,11 @@ local lp = Players.LocalPlayer
 local STEP_DIST       = 180
 local CRUISE_Y        = 18
 local VOID_LOOKAHEAD  = 90
-local VOID_DROP_MIN   = 400     -- mat dat tut qua 400 stud moi coi la void
+local VOID_DROP_MIN   = 400
 local VOID_SCAN_MIN   = 150
 local VOID_SCAN_MAX   = 100000
 local VOID_SCAN_STEP  = 250
-local MAX_CFRAME_DIST = 5000    -- CFrame xa hon nguong nay -> khong lam, bay tiep
+local MAX_CFRAME_DIST = 5000
 local ARRIVE_DIST     = 8
 local ORDER_TIMEOUT   = 60
 local PICKUP_WAIT     = 8
@@ -166,7 +165,6 @@ local function makeRayParams()
     return params
 end
 
--- Mat dat NGAY DUOI diem (chi tim cai duoi chan)
 local function floorBelow(pos)
     local params = makeRayParams()
     local origin = Vector3.new(pos.X, pos.Y + 4, pos.Z)
@@ -217,7 +215,6 @@ local function fullCollideOn(inst)
     end
 end
 
--- Chi bat collide cho khung gam, phan con lai giu noclip
 local function chassisCollideOn(car)
     if not car then return end
     for _, p in ipairs(car:GetDescendants()) do
@@ -271,6 +268,120 @@ local function forceNoclip()
     hookPassengerChars()
 end
 
+-- ============ NPC WELD ============
+-- NPC la server-owned: tat CanCollide tu client khong du.
+-- Weld + massless toan bo part NPC vao ghe -> NPC thanh phan cung cua assembly xe.
+-- Server khong con physics rieng de day NPC ra khoi tuong.
+
+local npcWelded = setmetatable({}, { __mode = "k" })
+
+local function weldNpcToSeat(npcHum, seat)
+    if not npcHum or not npcHum.Parent or not seat then return end
+    local npcChar = npcHum.Parent
+    if npcWelded[npcChar] then
+        -- refresh massless/nocollide (server co the reset)
+        for _, p in ipairs(npcChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function()
+                    if p.CanCollide then p.CanCollide = false end
+                    if not p.Massless then p.Massless = true end
+                end)
+            end
+        end
+        return
+    end
+
+    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- 1. Tat collide + massless toan bo
+    for _, p in ipairs(npcChar:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function()
+                p.CanCollide = false
+                p.Massless = true
+            end)
+        end
+    end
+
+    -- 2. Xoa weld cu tro tới seat (giu joint noi bo cua Humanoid)
+    for _, d in ipairs(hrp:GetChildren()) do
+        if d:IsA("WeldConstraint") then
+            pcall(function() d:Destroy() end)
+        elseif d:IsA("Weld") or d:IsA("Motor6D") then
+            if d.Part0 == seat or d.Part1 == seat then
+                pcall(function() d:Destroy() end)
+            end
+        end
+    end
+
+    -- 3. Weld HRP vao seat
+    local w = Instance.new("WeldConstraint")
+    w.Name = "RG_NpcWeld"
+    w.Part0 = seat
+    w.Part1 = hrp
+    w.Parent = hrp
+
+    npcWelded[npcChar] = true
+end
+
+local function unweldNpc(npcHum)
+    if not npcHum or not npcHum.Parent then return end
+    local npcChar = npcHum.Parent
+    npcWelded[npcChar] = nil
+    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        for _, d in ipairs(hrp:GetChildren()) do
+            if d:IsA("WeldConstraint") and d.Name == "RG_NpcWeld" then
+                pcall(function() d:Destroy() end)
+            end
+        end
+    end
+    for _, p in ipairs(npcChar:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function()
+                p.CanCollide = true
+                p.Massless = false
+            end)
+        end
+    end
+end
+
+-- Refresh NPC trong xe moi 0.1s khi dang bay
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if flying and carNoclipOn then
+            local car = myCar or findMyCar()
+            if car then
+                for _, d in ipairs(car:GetDescendants()) do
+                    if d:IsA("VehicleSeat") and d.Occupant then
+                        pcall(function() weldNpcToSeat(d.Occupant, d) end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Don dep NPC da xuong xe khi khong bay
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not flying then
+            for c in pairs(npcWelded) do
+                if c and c.Parent then
+                    local h = c:FindFirstChildOfClass("Humanoid")
+                    if not h or not h.Sit then
+                        unweldNpc(h)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ============ NOCLIP ALL ============
 local function noclipAllOn()
     carNoclipOn = true
     local car = myCar or findMyCar()
@@ -279,11 +390,27 @@ local function noclipAllOn()
     if c then hookNoclip(c) end
     hookPassengerChars()
     forceNoclip()
+    -- weld NPC dang ngoi ngay khi bat dau bay
+    if car then
+        for _, d in ipairs(car:GetDescendants()) do
+            if d:IsA("VehicleSeat") and d.Occupant then
+                pcall(function() weldNpcToSeat(d.Occupant, d) end)
+            end
+        end
+    end
 end
 
 local function noclipOffChassisOnly(car)
     carNoclipOn = false
-    if car then chassisCollideOn(car) end
+    if car then
+        chassisCollideOn(car)
+        -- tra NPC ve physics binh thuong
+        for _, d in ipairs(car:GetDescendants()) do
+            if d:IsA("VehicleSeat") and d.Occupant then
+                pcall(function() unweldNpc(d.Occupant) end)
+            end
+        end
+    end
 end
 
 Players.PlayerAdded:Connect(function(plr)
@@ -456,7 +583,6 @@ local function seatCar(timeout)
 end
 
 -- ============ VOID ============
--- Void = mat dat phia truoc tut qua sau HOAC khong co dat
 local function voidAhead(curPos, dir)
     local probeX = curPos.X + dir.X * VOID_LOOKAHEAD
     local probeZ = curPos.Z + dir.Z * VOID_LOOKAHEAD
@@ -468,7 +594,6 @@ local function voidAhead(curPos, dir)
     return false
 end
 
--- Quet xa dan tim bo ben kia. Tra ve (dist, floorY) cua diem dat dau tien.
 local function scanVoidLanding(curPos, dir)
     local params = makeRayParams()
     local dist = VOID_SCAN_MIN
@@ -497,7 +622,6 @@ local function flyTo(target)
     local attach = vs or root()
     if not attach then return false end
 
-    -- BAT NOCLIP TOAN BO khi bat dau bay
     noclipAllOn()
     flying = true
 
@@ -558,7 +682,7 @@ local function flyTo(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- ===== VOID CHECK moi 0.3s (bo qua 0.3s sau khi vua CFrame) =====
+        -- VOID CHECK
         if not voidJustHandled and os.clock() - lastVoidCheck > 0.3 then
             lastVoidCheck = os.clock()
             if voidAhead(curPos, dir) then
@@ -577,9 +701,7 @@ local function flyTo(target)
                     task.wait(TICK)
                     continue
                 else
-                    -- khong co bo <= 5000 stud -> khong CFrame, bay thang qua
                     setState("void - khong bo gan")
-                    -- fall through to normal movement
                 end
             end
         end
@@ -590,7 +712,7 @@ local function flyTo(target)
             end
         end
 
-        -- ===== TERRAIN-FOLLOW (noclip -> khong can leo building) =====
+        -- TERRAIN-FOLLOW
         local floorY = floorBelow(curPos) or (curPos.Y - CRUISE_Y)
         local targetY = floorY + CRUISE_Y
 
@@ -618,10 +740,9 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG =====
+    -- HA XUONG
     car = myCar or findMyCar()
     if car then
-        -- TAT noclip -> chi bat collide cho khung gam (khong bung part op)
         noclipOffChassisOnly(car)
         task.wait(0.1)
 
@@ -1031,4 +1152,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v15")
+print("[ridego] loaded v15.1")
