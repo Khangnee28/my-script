@@ -995,4 +995,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v9"
+print("[ridego] loaded v9")
