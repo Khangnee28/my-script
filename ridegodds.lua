@@ -1,9 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v21
+-- RideGo Farm — FINAL v22
 -- Bay: BodyVelocity (game tinh quang duong).
+-- Void: check MOI TICK + lookahead 260 -> CFrame qua bo TRUOC KHI cham void.
 -- Ha xuong: anchor -> bbox -> PivotTo -> unanchor.
--- NPC: ANCHOR client-side + PivotTo theo ghe moi tick -> khong ket tuong.
---      Server van thay NPC welded voi ghe -> trip hop le.
+-- NPC: anchor client-side + PivotTo theo ghe moi tick.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -12,11 +12,11 @@ local lp = Players.LocalPlayer
 -- ============ CONFIG ============
 local STEP_DIST         = 180
 local CRUISE_Y          = 18
-local VOID_LOOKAHEAD    = 90
-local VOID_DROP_MIN     = 400
-local VOID_SCAN_MIN     = 150
+local VOID_LOOKAHEAD    = 260
+local VOID_DROP_MIN     = 300
+local VOID_SCAN_MIN     = 200
 local VOID_SCAN_MAX     = 100000
-local VOID_SCAN_STEP    = 400
+local VOID_SCAN_STEP    = 300
 local MAX_CFRAME_DIST   = 10000
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
@@ -196,8 +196,6 @@ local function floorBelow(pos)
 end
 
 -- ============ NPC FOLLOWERS ============
--- NPC: anchor client-side + PivotTo theo ghe moi tick.
--- Server van thay NPC welded voi ghe (khong doi server state).
 local npcFollowers = {}
 
 local function attachNpcFollowers(car)
@@ -212,10 +210,8 @@ local function attachNpcFollowers(car)
                 local npcChar = oh.Parent
                 local hrp = npcChar:FindFirstChild("HumanoidRootPart")
                 if hrp then
-                    -- offset tu ghe den HRP tai thoi diem bat dau
                     local offset = d.CFrame:ToObjectSpace(hrp.CFrame)
 
-                    -- ANCHOR toan bo NPC client-side -> khong physics -> khong ket tuong
                     for _, p in ipairs(npcChar:GetDescendants()) do
                         if p:IsA("BasePart") then
                             pcall(function() p.Anchored = true end)
@@ -224,7 +220,6 @@ local function attachNpcFollowers(car)
                         end
                     end
 
-                    -- Tat humanoid state machine
                     pcall(function()
                         oh.PlatformStand = true
                         oh.WalkSpeed = 0
@@ -258,7 +253,6 @@ local function updateNpcFollowers()
             if hrp then
                 local targetCF = f.seat.CFrame * f.offset
                 pcall(function() hrp.CFrame = targetCF end)
-                -- re-anchor moi tick (phong server ghi de)
                 for _, p in ipairs(f.char:GetDescendants()) do
                     if p:IsA("BasePart") and not p.Anchored then
                         pcall(function() p.Anchored = true end)
@@ -517,14 +511,24 @@ local function seatCar(timeout)
 end
 
 -- ============ VOID ============
-local function voidAhead(curPos, dir)
-    local probeX = curPos.X + dir.X * VOID_LOOKAHEAD
-    local probeZ = curPos.Z + dir.Z * VOID_LOOKAHEAD
+local function pointIsVoid(px, py, pz)
     local params = makeRayParams()
-    local origin = Vector3.new(probeX, curPos.Y + 30, probeZ)
+    local origin = Vector3.new(px, py + 30, pz)
     local hit = workspace:Raycast(origin, Vector3.new(0, -VOID_DROP_MIN - 100, 0), params)
     if not hit then return true end
-    if hit.Position.Y < curPos.Y - VOID_DROP_MIN then return true end
+    if hit.Position.Y < py - VOID_DROP_MIN then return true end
+    return false
+end
+
+local function voidOnPath(curPos, dir)
+    for _, frac in ipairs({0.4, 0.7, 1.0}) do
+        local d = VOID_LOOKAHEAD * frac
+        local px = curPos.X + dir.X * d
+        local pz = curPos.Z + dir.Z * d
+        if pointIsVoid(px, curPos.Y, pz) then
+            return true
+        end
+    end
     return false
 end
 
@@ -643,11 +647,8 @@ local function flyTo(target)
     setState("bay: " .. flyMode)
 
     claimNetworkOwner(car)
-
-    -- NPC: anchor + follow (khong dung SetNetworkOwner, dung anchor client-side)
     attachNpcFollowers(car)
 
-    -- Tat collide xe + player
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.CanCollide = false end)
@@ -678,8 +679,6 @@ local function flyTo(target)
     bg.Parent = bv.Parent
 
     local reached = false
-    local lastVoidCheck = 0
-    local voidJustHandled = false
     local ownerRefreshCounter = 0
 
     while enabled do
@@ -697,39 +696,48 @@ local function flyTo(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- VOID
-        if not voidJustHandled and os.clock() - lastVoidCheck > 0.3 then
-            lastVoidCheck = os.clock()
-            if voidAhead(curPos, dir) then
-                setState("void - scan")
-                bv.Velocity = Vector3.zero
-                local landDist, landFloorY = scanVoidLanding(curPos, dir)
-                if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
-                    local landPos = curPos + dir * landDist
-                    local destY
-                    if flyMode == "underground" then
-                        destY = landFloorY - UNDERGROUND_DEPTH
-                    else
-                        destY = landFloorY + cruiseY
-                    end
-                    anchorCar(c)
-                    local dest = Vector3.new(landPos.X, destY, landPos.Z)
-                    local startPivot = c:GetPivot()
-                    local rot = startPivot - startPivot.Position
-                    pcall(function() c:PivotTo(CFrame.new(dest) * rot) end)
-                    task.wait(0.1)
-                    unanchorCar(c)
-                    claimNetworkOwner(c)
-                    setState(string.format("void - CFrame %.0f", landDist))
-                    task.wait(0.3)
-                    voidJustHandled = true
-                    lastVoidCheck = os.clock() + 0.3
-                    continue
-                end
-            end
+        -- ===== VOID CHECK MOI TICK, CHAN TRUOC KHI VAO =====
+        local nextStep = TICK * STEP_DIST * 1.5
+        local probeAheadX = curPos.X + dir.X * math.max(nextStep, 40)
+        local probeAheadZ = curPos.Z + dir.Z * math.max(nextStep, 40)
+
+        local blocked = false
+        if pointIsVoid(probeAheadX, curPos.Y, probeAheadZ) then
+            blocked = true
         end
-        if voidJustHandled and os.clock() - lastVoidCheck > 0.3 then
-            voidJustHandled = false
+        if not blocked then
+            if voidOnPath(curPos, dir) then blocked = true end
+        end
+
+        if blocked then
+            setState("void - quet bo")
+            bv.Velocity = Vector3.zero
+            local landDist, landFloorY = scanVoidLanding(curPos, dir)
+            if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
+                local landPos = curPos + dir * landDist
+                local destY
+                if flyMode == "underground" then
+                    destY = landFloorY - UNDERGROUND_DEPTH
+                else
+                    destY = landFloorY + cruiseY
+                end
+                anchorCar(c)
+                local dest = Vector3.new(landPos.X, destY, landPos.Z)
+                local startPivot = c:GetPivot()
+                local rot = startPivot - startPivot.Position
+                pcall(function() c:PivotTo(CFrame.new(dest) * rot) end)
+                task.wait(0.08)
+                unanchorCar(c)
+                claimNetworkOwner(c)
+                setState(string.format("void - CFrame %.0f", landDist))
+                task.wait(0.3)
+                task.wait(TICK)
+                continue
+            else
+                setState("void - khong bo gan")
+                task.wait(0.1)
+                continue
+            end
         end
 
         -- DO CAO
@@ -758,7 +766,6 @@ local function flyTo(target)
 
         bv.Velocity = Vector3.new(vx, vy, vz)
 
-        -- UPDATE NPC FOLLOWER MOI TICK
         updateNpcFollowers()
 
         ownerRefreshCounter = ownerRefreshCounter + 1
@@ -770,11 +777,9 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== HA XUONG =====
     car = myCar or findMyCar()
     descendAndLand(car, target, cruiseY, flyMode, bv, bg)
 
-    -- NPC: unanchor, tra ve binh thuong
     detachNpcFollowers()
 
     flying = false
@@ -1166,4 +1171,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v21")
+print("[ridego] loaded v22")
