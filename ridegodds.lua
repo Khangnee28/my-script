@@ -1,8 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v28
--- Tele thang vao tam ghe + xich ve phia dau xe (forward, khong len cao).
--- Check sai ghe khi spawn -> nhay ra, tele tam ghe, doi 1s, ep sit.
--- Bo stuck/lêch detection. Toggle rieng cho menu/status.
+-- RideGo Farm — FINAL v28.1
+-- Check ghe CHI khi spawn (1 lan). Watchdog: chet/roi void -> dung tat ca, respawn, offline/online lai.
+-- Tele tam ghe + xich forward. Bo stuck detection.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -23,6 +22,8 @@ local UNDERGROUND_DEPTH   = 200
 local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
+local VOID_Y_THRESHOLD    = -100
+local DEATH_CHECK_INTERVAL = 1
 
 -- ============ TRẠNG THÁI ============
 local enabled     = false
@@ -43,6 +44,8 @@ local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
 local uiVisible   = true
+local deathConn   = nil
+local resetting   = false
 
 local function resetState()
     orderToken = nil
@@ -427,12 +430,10 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- Vi tri tele: tam ghe + xich ve phia dau xe (forward = -Z trong local)
 local function getSeatTeleCF(vs)
     return vs.CFrame * CFrame.new(0, 1, -3)
 end
 
--- forceSeat: tele tam ghe lai + xich ve dau xe -> ep sit
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -467,7 +468,6 @@ local function forceSeat()
         end
     end
 
-    -- Tele tam ghe + xich ve dau xe (forward -Z local)
     local hrp = root()
     if hrp then
         local teleCF = getSeatTeleCF(vs)
@@ -480,7 +480,6 @@ local function forceSeat()
     pcall(function() h.AutoRotate = false end)
     pcall(function() h.Sit = true end)
 
-    -- Retry 3 lan voi cung offset
     for i = 1, 3 do
         if h.Sit and h.SeatPart == vs then break end
         local hrpR = root()
@@ -506,7 +505,7 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
--- Check ngoi sai ghe khi spawn -> nhay ra, tele tam, doi 1s, ep sit
+-- Check sai ghe CHI KHI SPAWN (goi 1 lan tu spawnAndSeat)
 local function checkSeatAtSpawn(car)
     local h = hum()
     if not h or not car then return false end
@@ -516,28 +515,23 @@ local function checkSeatAtSpawn(car)
     if h.Sit and h.SeatPart and h.SeatPart ~= vs then
         setStatus("⚠ Ngồi nhầm ghế — tele về ghế lái")
 
-        -- Nhay ra
         pcall(function() h.Sit = false end)
         task.wait(0.3)
 
-        -- Tele ve tam ghe + xich forward
         local hrp = root()
         if hrp then
             local teleCF = getSeatTeleCF(vs)
             pcall(function() hrp.CFrame = teleCF end)
         end
 
-        -- Doi 1s
         task.wait(1)
 
-        -- Ep sit
         pcall(function() vs:Sit(h) end)
         task.wait(0.2)
         pcall(function() h.Sit = true end)
         pcall(function() h.AutoRotate = false end)
         task.wait(0.2)
 
-        -- Neu van chua dinh -> forceSeat retry
         if not (h.Sit and h.SeatPart == vs) then
             for i = 1, 3 do
                 if forceSeat() then break end
@@ -549,36 +543,6 @@ local function checkSeatAtSpawn(car)
     end
     return true
 end
-
--- Seat loop
-task.spawn(function()
-    while true do
-        task.wait(0.15)
-        if enabled then
-            local h = hum()
-            local car = myCar or findMyCar()
-            if h and car then
-                local vs = getDriveSeat(car)
-                if vs then
-                    local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
-                    local notSeated = not h.Sit
-                    if wrongSeat then
-                        setStatus("⚠ Ngồi sai ghế — nhảy ra ngồi lại")
-                        pcall(function() h.Sit = false end)
-                        task.wait(0.25)
-                        for _ = 1, 6 do
-                            if forceSeat() then break end
-                            task.wait(0.25)
-                        end
-                    elseif notSeated and not flying then
-                        forceSeat()
-                    end
-                    pcall(function() h.AutoRotate = false end)
-                end
-            end
-        end
-    end
-end)
 
 local function seatCar(timeout)
     timeout = timeout or 15
@@ -756,7 +720,7 @@ local function spawnAndSeat()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
         setStatus("◦ Xe đã có sẵn")
 
-        -- CHECK sai ghe truoc khi seat
+        -- Check ghe CHI luc nay
         checkSeatAtSpawn(car)
 
         if seatCar(10) then
@@ -789,7 +753,7 @@ local function spawnAndSeat()
     pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
     task.wait(0.1)
 
-    -- CHECK sai ghe sau spawn
+    -- Check ghe CHI luc nay
     checkSeatAtSpawn(car)
 
     if seatCar(15) then
@@ -818,6 +782,99 @@ local function doInit()
     setStatus("◦ Sẵn sàng nhận đơn")
     return true
 end
+
+-- ============ WATCHDOG (chet / roi void) ============
+local function fullResetAndRespawn()
+    if resetting then return end
+    resetting = true
+    setStatus("⚠ Nhân vật chết/rớt void — reset toàn bộ")
+
+    -- Dừng mọi thứ
+    enabled = false
+    stopHold()
+    detachNpcFollowers()
+    local car = myCar or findMyCar()
+    if car then
+        unanchorCar(car)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = true end)
+                pcall(function() p.Anchored = false end)
+            end
+        end
+    end
+
+    -- Offline truoc
+    fire(TaxiEvent, "GoOffline")
+    task.wait(1)
+
+    -- Doi nhan vat respawn
+    local waitDeadline = os.clock() + 10
+    while os.clock() < waitDeadline do
+        local h = hum()
+        if h and h.Health > 0 then break end
+        task.wait(0.3)
+    end
+    task.wait(0.5)
+
+    -- Reset state & flag
+    resetState()
+    enabled = true
+    farmStartTime = os.time()
+    resetting = false
+
+    -- Chay lai loop
+    startLoop()
+end
+
+local function startDeathWatch()
+    if deathConn then
+        pcall(function() deathConn:Disconnect() end)
+        deathConn = nil
+    end
+
+    local c = char()
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h then
+        deathConn = h.Died:Connect(function()
+            if enabled then
+                setStatus("⚠ Nhân vật chết")
+                task.spawn(fullResetAndRespawn)
+            end
+        end)
+    end
+
+    -- Theo dõi CharacterAdded (respawn)
+    lp.CharacterAdded:Connect(function(newChar)
+        task.wait(0.5)
+        local newH = newChar:FindFirstChildOfClass("Humanoid")
+        if newH then
+            if deathConn then pcall(function() deathConn:Disconnect() end) end
+            deathConn = newH.Died:Connect(function()
+                if enabled then
+                    setStatus("⚠ Nhân vật chết")
+                    task.spawn(fullResetAndRespawn)
+                end
+            end)
+        end
+    end)
+end
+
+-- Watchdog roi void: check Y moi 1s
+task.spawn(function()
+    while true do
+        task.wait(DEATH_CHECK_INTERVAL)
+        if enabled and not resetting then
+            local hrp = root()
+            if hrp and hrp.Position.Y < VOID_Y_THRESHOLD then
+                setStatus("⚠ Rớt void")
+                task.spawn(fullResetAndRespawn)
+            end
+        end
+    end
+end)
+
+startDeathWatch()
 
 -- ============ CHUYẾN ĐI ============
 local function runTrip()
@@ -855,7 +912,6 @@ local function runTrip()
         return
     end
 
-    -- Đón khách
     setStatus("➤ Bay đón khách")
     flyTo(pickupPos)
     task.wait(0.3)
@@ -863,7 +919,6 @@ local function runTrip()
     setStatus("⌛ Đợi khách lên xe (4s)")
     task.wait(PICKUP_WAIT)
 
-    -- Trả khách
     if dropPos then
         setStatus("➤ Bay trả khách")
         flyTo(dropPos)
@@ -961,7 +1016,6 @@ title.TextSize = 13
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 
--- ============ MENU CHÍNH ============
 local mainMenu = Instance.new("Frame", rootUI)
 mainMenu.Size = UDim2.new(1, -20, 0, 106)
 mainMenu.Position = UDim2.new(0, 10, 0, 32)
@@ -991,7 +1045,6 @@ farmBtn.TextSize = 14
 farmBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", farmBtn).CornerRadius = UDim.new(0, 7)
 
--- ============ PANEL STATUS ============
 local statusPanel = Instance.new("Frame", rootUI)
 statusPanel.Size = UDim2.new(1, -20, 0, 106)
 statusPanel.Position = UDim2.new(0, 10, 0, 32)
@@ -1018,7 +1071,6 @@ local earnLbl   = makeStatusLabel(36)
 local carLbl    = makeStatusLabel(54)
 local statusLbl = makeStatusLabel(74)
 
--- ============ PANEL DANH SÁCH XE ============
 local carListPanel = Instance.new("Frame", rootUI)
 carListPanel.Size = UDim2.new(1, -20, 0, 0)
 carListPanel.Position = UDim2.new(0, 10, 0, 32)
@@ -1108,7 +1160,6 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ NÚT TOGGLE RIÊNG ============
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
 toggleBtn.Position = UDim2.new(0, 20, 0.5, 90)
@@ -1144,7 +1195,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ NÚT BẮT ĐẦU/DỪNG FARM ============
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
@@ -1193,7 +1243,6 @@ farmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ CẬP NHẬT STATUS ============
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1208,7 +1257,6 @@ task.spawn(function()
     end
 end)
 
--- ============ KÉO UI ============
 local dragging, dStart, dStartPos
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1225,7 +1273,6 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
--- ============ TỰ QUÉT XE ============
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1236,4 +1283,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v28")
+print("[RideGo] Đã load v28.1")
