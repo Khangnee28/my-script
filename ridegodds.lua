@@ -1,8 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v28.2
--- 2 frame rieng biet: menu chinh + status panel. Ca 2 deu keo duoc.
--- Toggle button draggable. Bat farm -> status hien, menu van con. Tat -> status mat, menu van con.
--- Bo toan bo watchdog.
+-- RideGo Farm — FINAL v29
+-- Bo seat loop. Menu hien ten xe. Status "RideGo Status" mau cam.
+-- Lan 1: doi job+spawn+online. Lan 2+: reset char+spawn+offline/online.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -27,6 +26,7 @@ local UNDER_STEP_TIME     = 0.03
 -- ============ TRẠNG THÁI ============
 local enabled     = false
 local initialized = false
+local hasInitOnce = false        -- chi true sau khi da doi job lan dau
 local orderToken  = nil
 local pickupPos   = nil
 local dropPos     = nil
@@ -756,9 +756,26 @@ local function spawnAndSeat()
     return false
 end
 
--- ============ KHỞI TẠO ============
-local function doInit()
-    setStatus("◦ Đang đổi nghề")
+-- ============ RESET NHÂN VẬT ============
+local function resetCharacter()
+    setStatus("◦ Reset nhân vật")
+    local h = hum()
+    if h then
+        pcall(function() h.Health = 0 end)
+    end
+    -- Doi respawn
+    local deadline = os.clock() + 8
+    while os.clock() < deadline do
+        local newH = hum()
+        if newH and newH.Health > 0 then break end
+        task.wait(0.3)
+    end
+    task.wait(0.5)
+end
+
+-- ============ KHỞI TẠO LẦN ĐẦU ============
+local function doFullInit()
+    setStatus("◦ Lần đầu — đổi nghề")
     fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
     task.wait(3)
 
@@ -770,7 +787,27 @@ local function doInit()
     fire(TaxiEvent, "GoOnline")
     task.wait(2)
 
-    setStatus("◦ Sẵn sàng nhận đơn")
+    hasInitOnce = true
+    return true
+end
+
+-- ============ KHỞI TẠO LẦN 2+ ============
+local function doRestartInit()
+    resetCharacter()
+    task.wait(0.5)
+
+    setStatus("◦ Spawn xe")
+    if not spawnAndSeat() then return false end
+    myCar = findMyCar()
+
+    setStatus("◦ Tắt online")
+    fire(TaxiEvent, "GoOffline")
+    task.wait(1)
+
+    setStatus("◦ Bật lại online")
+    fire(TaxiEvent, "GoOnline")
+    task.wait(2)
+
     return true
 end
 
@@ -848,10 +885,17 @@ local function startLoop()
     if loopBusy then return end
     loopBusy = true
     task.spawn(function()
-        setStatus("◦ Bắt đầu khởi tạo...")
         farmStartTime = os.time()
 
-        local ok = pcall(doInit)
+        local ok
+        if not hasInitOnce then
+            setStatus("◦ Khởi tạo lần đầu...")
+            ok = pcall(doFullInit)
+        else
+            setStatus("◦ Khởi động lại...")
+            ok = pcall(doRestartInit)
+        end
+
         initialized = ok
 
         if not initialized then
@@ -859,6 +903,8 @@ local function startLoop()
             setStatus("⚠ Khởi tạo thất bại")
             return
         end
+
+        setStatus("◦ Sẵn sàng nhận đơn")
 
         while enabled do
             local ok, err = pcall(runTrip)
@@ -881,10 +927,10 @@ gui.DisplayOrder = 999
 gui.Parent = cg
 
 -- ==================================================
--- FRAME 1: MENU CHÍNH (độc lập, luôn hiện)
+-- FRAME 1: MENU CHÍNH
 -- ==================================================
 local menuFrame = Instance.new("Frame", gui)
-menuFrame.Size = UDim2.new(0, 290, 0, 148)
+menuFrame.Size = UDim2.new(0, 290, 0, 168)
 menuFrame.Position = UDim2.new(0, 20, 0.5, -180)
 menuFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
 menuFrame.BackgroundTransparency = 0.15
@@ -918,9 +964,21 @@ menuTitle.TextSize = 13
 menuTitle.Font = Enum.Font.GothamBold
 menuTitle.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Label hiển thị xe đã chọn
+local carNameLbl = Instance.new("TextLabel", menuFrame)
+carNameLbl.Size = UDim2.new(1, -20, 0, 18)
+carNameLbl.Position = UDim2.new(0, 10, 0, 30)
+carNameLbl.BackgroundTransparency = 1
+carNameLbl.Text = "🚗 Xe: (chưa chọn)"
+carNameLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
+carNameLbl.TextSize = 10
+carNameLbl.Font = Enum.Font.GothamMedium
+carNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+carNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+
 local carBtn = Instance.new("TextButton", menuFrame)
 carBtn.Size = UDim2.new(1, -20, 0, 32)
-carBtn.Position = UDim2.new(0, 10, 0, 36)
+carBtn.Position = UDim2.new(0, 10, 0, 54)
 carBtn.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
 carBtn.Text = "🚗 CHỌN XE (0)"
 carBtn.TextColor3 = Color3.fromRGB(255, 200, 80)
@@ -933,7 +991,7 @@ carBtnPad.PaddingLeft = UDim.new(0, 10)
 
 local farmBtn = Instance.new("TextButton", menuFrame)
 farmBtn.Size = UDim2.new(1, -20, 0, 40)
-farmBtn.Position = UDim2.new(0, 10, 0, 76)
+farmBtn.Position = UDim2.new(0, 10, 0, 94)
 farmBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
 farmBtn.Text = "▶ BẮT ĐẦU FARM"
 farmBtn.TextColor3 = Color3.new(1,1,1)
@@ -941,10 +999,9 @@ farmBtn.TextSize = 14
 farmBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", farmBtn).CornerRadius = UDim.new(0, 7)
 
--- Panel danh sách xe (mở rộng menuFrame)
 local carListPanel = Instance.new("Frame", menuFrame)
 carListPanel.Size = UDim2.new(1, -20, 0, 0)
-carListPanel.Position = UDim2.new(0, 10, 0, 122)
+carListPanel.Position = UDim2.new(0, 10, 0, 142)
 carListPanel.BackgroundTransparency = 1
 carListPanel.Visible = false
 
@@ -969,6 +1026,14 @@ sPad.PaddingRight = UDim.new(0, 6)
 sPad.PaddingBottom = UDim.new(0, 6)
 
 local carOpen = false
+
+local function updateCarNameLbl()
+    if selectedCar ~= "" then
+        carNameLbl.Text = "🚗 Xe: " .. selectedCar
+    else
+        carNameLbl.Text = "🚗 Xe: (chưa chọn)"
+    end
+end
 
 local function clearList()
     for _, c in ipairs(scroll:GetChildren()) do
@@ -1005,10 +1070,11 @@ local function renderCars()
         btn.MouseButton1Click:Connect(function()
             selectedCar = name
             renderCars()
+            updateCarNameLbl()
             carOpen = false
             carListPanel.Visible = false
             carListPanel.Size = UDim2.new(1, -20, 0, 0)
-            menuFrame.Size = UDim2.new(0, 290, 0, 148)
+            menuFrame.Size = UDim2.new(0, 290, 0, 168)
             carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
             print("[RideGo] Đã chọn xe: " .. name)
         end)
@@ -1022,15 +1088,15 @@ carBtn.MouseButton1Click:Connect(function()
     carListPanel.Visible = carOpen
     if carOpen then
         carListPanel.Size = UDim2.new(1, -20, 0, 190)
-        menuFrame.Size = UDim2.new(0, 290, 0, 326)
+        menuFrame.Size = UDim2.new(0, 290, 0, 346)
     else
         carListPanel.Size = UDim2.new(1, -20, 0, 0)
-        menuFrame.Size = UDim2.new(0, 290, 0, 148)
+        menuFrame.Size = UDim2.new(0, 290, 0, 168)
     end
 end)
 
 -- ==================================================
--- FRAME 2: STATUS PANEL (độc lập, chỉ hiện khi farm on)
+-- FRAME 2: STATUS PANEL
 -- ==================================================
 local statusFrame = Instance.new("Frame", gui)
 statusFrame.Size = UDim2.new(0, 290, 0, 148)
@@ -1043,7 +1109,7 @@ statusFrame.Visible = false
 Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0, 10)
 
 local statusStroke = Instance.new("UIStroke", statusFrame)
-statusStroke.Color = Color3.fromRGB(140, 40, 255)
+statusStroke.Color = Color3.fromRGB(255, 140, 40)
 statusStroke.Thickness = 2
 
 task.spawn(function()
@@ -1061,8 +1127,8 @@ local statusTitle = Instance.new("TextLabel", statusFrame)
 statusTitle.Size = UDim2.new(1, -20, 0, 24)
 statusTitle.Position = UDim2.new(0, 10, 0, 4)
 statusTitle.BackgroundTransparency = 1
-statusTitle.Text = "TRẠNG THÁI FARM"
-statusTitle.TextColor3 = Color3.fromRGB(200, 140, 255)
+statusTitle.Text = "RideGo Status"
+statusTitle.TextColor3 = Color3.fromRGB(255, 140, 40)
 statusTitle.TextSize = 13
 statusTitle.Font = Enum.Font.GothamBold
 statusTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1088,7 +1154,7 @@ local carLbl    = makeStatusLabel(86)
 local statusLbl = makeStatusLabel(110)
 
 -- ==================================================
--- TOGGLE BUTTON (riêng, draggable, click ẩn/hiện menuFrame)
+-- TOGGLE BUTTON (draggable)
 -- ==================================================
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
@@ -1106,7 +1172,6 @@ local tStroke = Instance.new("UIStroke", toggleBtn)
 tStroke.Color = Color3.fromRGB(255, 140, 40)
 tStroke.Thickness = 2
 
--- Toggle click ẩn/hiện menuFrame
 local menuVisible = true
 toggleBtn.MouseButton1Click:Connect(function()
     menuVisible = not menuVisible
@@ -1146,7 +1211,6 @@ makeDraggable(toggleBtn, toggleBtn)
 -- ==================================================
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
-        -- TẮT FARM — menu vẫn hiện, status ẩn
         enabled = false
         resetState()
         detachNpcFollowers()
@@ -1170,7 +1234,6 @@ farmBtn.MouseButton1Click:Connect(function()
 
         print("[RideGo] Đã DỪNG farm")
     else
-        -- BẬT FARM — menu vẫn hiện, status hiện
         resetState()
         enabled = true
         farmStartTime = os.time()
@@ -1211,7 +1274,8 @@ task.spawn(function()
         selectedCar = carList[1]
     end
     renderCars()
+    updateCarNameLbl()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v28.2")
+print("[RideGo] Đã load v29")
