@@ -1,9 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26
--- UNDER CFrame mac dinh: bay duoi dat, xuyen void, khong dam building.
--- Step 500-1000 stud/tick, speed 220.
--- Don khach doi 3s, tra khach doi 5s.
--- Stats (trip/earn) cong SAU khi tra khach xong.
+-- RideGo Farm — FINAL v27
+-- UNDER CFrame: bay duoi dat, ascend dung Y khach (khong chui xuong dat).
+-- Speed 200, step 200-500.
+-- Don khach doi 3s, tra khach doi 5s, stats cong sau dropoff.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,22 +10,22 @@ local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST         = 220          -- toc do (stud/s)
+local STEP_DIST         = 200
 local CRUISE_Y          = 18
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
-local PICKUP_WAIT       = 3            -- doi don khach 3s
-local DROP_WAIT         = 5            -- doi tra khach 5s
+local PICKUP_WAIT       = 3
+local DROP_WAIT         = 5
 local DECEL_DIST        = 200
 local TICK              = 0.05
 local LAND_OFFSET       = 2
 local UNDERGROUND_DEPTH = 120
-local UNDER_STEP_MIN    = 500          -- step toi thieu
-local UNDER_STEP_MAX    = 1000         -- step toi da (vuot void thang)
+local UNDER_STEP_MIN    = 200
+local UNDER_STEP_MAX    = 500
 local UNDER_DESCEND_STEPS = 12
 local UNDER_ASCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
-local MAX_CFRAME_DIST   = 100000       -- bay qua void dai vo han
+local MAX_CFRAME_DIST   = 100000
 
 -- ============ STATE ============
 local enabled     = false
@@ -111,7 +110,6 @@ if TaxiEvent then
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
             orderToken = data.Token
-            -- Fare luu vao pendingFare, chua cong vao stats
             if type(data.Fare) == "number" then
                 pendingFare = data.Fare
             else
@@ -558,9 +556,10 @@ local function descendAndLand(car, target, bv, bg)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.05)
 
+    -- Dung vi tri HIEN TAI cua xe (da ascend len tren khach)
     local pivotPos = car:GetPivot().Position
     local params = makeRayParams()
-    local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
+    local origin = Vector3.new(pivotPos.X, pivotPos.Y + 100, pivotPos.Z)
     local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
 
     if not hit then
@@ -578,7 +577,7 @@ local function descendAndLand(car, target, bv, bg)
     local curPivotCF = car:GetPivot()
     local curPos = curPivotCF.Position
     local rot = curPivotCF - curPos
-    local finalPos = Vector3.new(target.X, targetPivotY, target.Z)
+    local finalPos = Vector3.new(pivotPos.X, targetPivotY, pivotPos.Z)
     pcall(function() car:PivotTo(CFrame.new(finalPos) * rot) end)
     task.wait(0.15)
 
@@ -623,7 +622,7 @@ local function flyUnderground(target)
     local startPivot = car:GetPivot()
     local rotOnly = startPivot - startPivot.Position
 
-    -- Di xuong duoi dat bang nhieu step nho
+    -- Di xuong duoi dat
     local curPos = startPivot.Position
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
     for i = 1, UNDER_DESCEND_STEPS do
@@ -653,14 +652,12 @@ local function flyUnderground(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- Step 500-1000 stud/tick (luon lon hon void)
         local step
         if dist < UNDER_STEP_MAX then
             step = dist
         else
             step = UNDER_STEP_MAX
         end
-        -- Dam bao toi thieu UNDER_STEP_MIN khi con xa
         if step < UNDER_STEP_MIN and dist > UNDER_STEP_MIN then
             step = UNDER_STEP_MIN
         end
@@ -673,7 +670,7 @@ local function flyUnderground(target)
         local nextCF = CFrame.new(nextPos) * rotOnly
         pcall(function() c:PivotTo(nextCF) end)
 
-        -- Fake velocity cho game doc quang duong
+        -- Fake velocity
         fakeVelCounter = fakeVelCounter + 1
         if fakeVelCounter >= 1 then
             fakeVelCounter = 0
@@ -693,24 +690,35 @@ local function flyUnderground(target)
         task.wait(TICK)
     end
 
-    -- ===== ASCEND =====
+    -- ===== ASCEND: noi len tren khach, di chuyen XZ =====
     car = myCar or findMyCar()
     if car and reached then
         setState("under - noi len")
-        local ascendSteps = UNDER_ASCEND_STEPS
+
+        -- Lay mat dat target (khach co the tren platform/cau cao)
+        local realFloor = floorBelow(target) or targetFloor
+        local ascendGoalY = math.max(realFloor + CRUISE_Y, target.Y + 30)
+
         local curPivot = car:GetPivot()
         local curP = curPivot.Position
         local rot = curPivot - curP
-        local upTargetY = targetFloor + CRUISE_Y
-        local upStepY = (upTargetY - curP.Y) / ascendSteps
 
-        for i = 1, ascendSteps do
-            curP = Vector3.new(curP.X, curP.Y + upStepY, curP.Z)
-            pcall(function() car:PivotTo(CFrame.new(curP) * rot) end)
+        local startX, startZ = curP.X, curP.Z
+        local goalX, goalZ = target.X, target.Z
+        local y0 = curP.Y
+
+        local steps = UNDER_ASCEND_STEPS
+        for i = 1, steps do
+            local t = i / steps
+            local nx = startX + (goalX - startX) * t
+            local nz = startZ + (goalZ - startZ) * t
+            local ny = y0 + (ascendGoalY - y0) * t
+            local cf = CFrame.new(Vector3.new(nx, ny, nz)) * rot
+            pcall(function() car:PivotTo(cf) end)
             task.wait(UNDER_STEP_TIME)
         end
 
-        task.wait(0.1)
+        task.wait(0.15)
 
         descendAndLand(car, target, nil, nil)
     end
@@ -732,7 +740,6 @@ local function flyUnderground(target)
     return reached
 end
 
--- Wrapper: flyTo luon dung underground
 local function flyTo(target)
     return flyUnderground(target)
 end
@@ -827,7 +834,6 @@ local function runTrip()
 
     if not pickupPos then setState("no pickup"); return end
 
-    -- Don khach
     setState("don khach")
     flyTo(pickupPos)
     task.wait(0.5)
@@ -835,7 +841,6 @@ local function runTrip()
     setState("khach len xe - doi 3s")
     task.wait(PICKUP_WAIT)
 
-    -- Tra khach
     if dropPos then
         setState("tra khach")
         flyTo(dropPos)
@@ -844,7 +849,6 @@ local function runTrip()
         setState("khach xuong xe - doi 5s")
         task.wait(DROP_WAIT)
 
-        -- Cong stats SAU khi tra khach xong
         stats.trips = stats.trips + 1
         if pendingFare > 0 then
             stats.earn = stats.earn + pendingFare
@@ -1122,4 +1126,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v26")
+print("[ridego] loaded v27")
