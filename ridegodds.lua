@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v4
--- Noclip giu suot trip. Hold BV giu xe dung yen khi cho khach.
+-- RideGo Farm — FINAL v5
+-- Hold BV giu xe dung yen suot trip. Noclip ON tu khi bat.
 -- Void scan 100 -> 100000. Khong thay bo -> tele target.
 
 local Players = game:GetService("Players")
@@ -168,7 +168,7 @@ local function rayFloorY(fromPos, maxDist)
     return nil
 end
 
--- ============ NOCLIP — BAT CUONG LUC ============
+-- ============ NOCLIP ============
 local carNoclipOn = false
 local noclipHooked = {}
 
@@ -211,13 +211,10 @@ local function setCarNoclip(on)
     if c then hookNoclip(c) end
 end
 
--- noclip watcher — chay 0.03s cho chac
 task.spawn(function()
     while true do
         task.wait(0.03)
-        if carNoclipOn then
-            forceNoclip()
-        end
+        if carNoclipOn then forceNoclip() end
     end
 end)
 
@@ -326,7 +323,7 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ VOID SCAN — 100 -> 100000 ============
+-- ============ VOID SCAN ============
 local function scanVoidBridge(curPos, dir, curFloorY)
     for testDist = VOID_SCAN_MIN, VOID_SCAN_MAX, VOID_SCAN_STEP do
         local testPos = curPos + dir * testDist
@@ -410,7 +407,7 @@ local function flyTo(target)
             local voidAhead = (aheadFloorY == nil) or (aheadFloorY < -20)
 
             if voidHere or voidAhead then
-                setState("void - scan toi 100k")
+                setState("void - scan")
                 bv.Velocity = Vector3.zero
                 local jumpDist, jumpY = scanVoidBridge(curPos, dir, curFloorY)
                 local dest
@@ -465,7 +462,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG - NOCLIP VAN ON =====
+    -- ===== HA XUONG =====
     car = myCar or findMyCar()
     if not car then task.wait(0.2) return reached end
 
@@ -495,7 +492,7 @@ local function flyTo(target)
 
     task.wait(0.15)
 
-    -- HOLD — giu xe dung yen
+    -- HOLD ngay khi ha xuong
     startHold()
 
     local h2 = hum()
@@ -580,8 +577,9 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-    -- BAT NOCLIP TU DAY - khong bao gio tat suot trip
+    -- noclip + hold ngay khi bat dau trip
     setCarNoclip(true)
+    startHold()
 
     setState("cho don")
     orderToken = nil
@@ -615,7 +613,6 @@ local function runTrip()
         task.wait(DROP_WAIT)
     end
 
-    stopHold()
     pickupPos = nil
     dropPos = nil
     orderToken = nil
