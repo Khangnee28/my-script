@@ -1,7 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.3
--- Bay UNDER CFrame. Toi noi choi len tu tu, raycast dinh xe -> dung tran -> ngung.
--- Khong descend, khong dat bbox. Xe nam sat duoi mat dat.
+-- RideGo Farm — FINAL v25.4
+-- Bay UNDER CFrame. Toi noi choi len 6 stud, khong quet tran.
+-- Guard acceptingOrder: chi nhan don khi dang o pha "cho don".
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,7 +9,7 @@ local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST         = 300
+local STEP_DIST         = 270
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 8
@@ -20,10 +20,8 @@ local UNDERGROUND_DEPTH = 120
 local UNDER_STEP_MAX    = 60
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
-local ASCEND_STEP_Y     = 4        -- moi buoc choi len bao nhieu stud
-local ASCEND_STEP_TIME  = 0.03
-local ASCEND_PROBE      = 8        -- quet tran cach dinh xe bao xa
-local ASCEND_MAX_TIME   = 4        -- toi da bao lau choi
+local ASCEND_HEIGHT     = 6
+local ASCEND_STEPS      = 3
 
 -- ============ STATE ============
 local enabled     = false
@@ -38,6 +36,7 @@ local stats = { trips = 0, earn = 0 }
 local curState = "OFF"
 local holdBV = nil
 local flying = false
+local acceptingOrder = false
 
 local function resetState()
     orderToken = nil
@@ -49,6 +48,7 @@ local function resetState()
     stats.earn = 0
     curState = "OFF"
     flying = false
+    acceptingOrder = false
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
@@ -97,6 +97,8 @@ if TaxiEvent then
     TaxiEvent.OnClientEvent:Connect(function(action, data)
         if type(data) ~= "table" then return end
         if action == "OrderOffer" then
+            -- CHI nhan don khi dang o pha cho don
+            if not acceptingOrder then return end
             orderToken = data.Token
             pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
         elseif action == "OrderAccepted" then
@@ -499,41 +501,18 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ ASCEND (choi len tu tu, dung tran) ============
-local function ascendToCeiling(car)
+-- ============ ASCEND (len 6 stud, khong quet) ============
+local function ascendAtArrival(car)
     if not car then return end
-    setState("choi len")
-
-    local t0 = os.clock()
-    while os.clock() - t0 < ASCEND_MAX_TIME do
-        if not enabled then break end
-
-        local curPivot = car:GetPivot()
-        local curPos = curPivot.Position
-        local rot = curPivot - curPos
-
-        -- Quet tu dinh xe len tren
-        local bbSize = car:GetExtentsSize()
-        local topY = curPos.Y + bbSize.Y / 2 + 1
-        local params = makeRayParams()
-        local hit = workspace:Raycast(
-            Vector3.new(curPos.X, topY, curPos.Z),
-            Vector3.new(0, ASCEND_PROBE, 0),
-            params
-        )
-
-        if hit then
-            -- Dung tran -> ngung
-            setState("dung tran")
-            return
-        end
-
-        -- Day len 1 buoc nho
-        local newPos = Vector3.new(curPos.X, curPos.Y + ASCEND_STEP_Y, curPos.Z)
-        pcall(function() car:PivotTo(CFrame.new(newPos) * rot) end)
-        task.wait(ASCEND_STEP_TIME)
+    setState("choi len 6")
+    local steps = ASCEND_STEPS or 3
+    local stepY = ASCEND_HEIGHT / steps
+    for i = 1, steps do
+        local cp = car:GetPivot()
+        local newPos = Vector3.new(cp.Position.X, cp.Position.Y + stepY, cp.Position.Z)
+        pcall(function() car:PivotTo(CFrame.new(newPos) * (cp - cp.Position)) end)
+        task.wait(0.03)
     end
-    setState("het thoi gian choi")
 end
 
 -- ============ FLY UNDERGROUND (CFrame-only) ============
@@ -639,10 +618,10 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== CHOI LEN DUNG TRAN =====
+    -- ===== CHOI LEN 6 STUD =====
     car = myCar or findMyCar()
     if car and reached then
-        ascendToCeiling(car)
+        ascendAtArrival(car)
     end
 
     detachNpcFollowers()
@@ -736,9 +715,13 @@ local function runTrip()
 
     startHold()
 
-    setState("cho don")
+    -- Reset state pha cho don
     orderToken = nil
     pickupPos = nil
+    dropPos = nil
+    acceptingOrder = true
+    setState("cho don")
+
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
         if pickupPos then break end
@@ -748,7 +731,13 @@ local function runTrip()
         task.wait(0.4)
     end
 
-    if not pickupPos then setState("no pickup"); return end
+    -- Nhan don xong -> ngung nhan don moi
+    acceptingOrder = false
+
+    if not pickupPos then
+        setState("no pickup")
+        return
+    end
 
     setState("don khach")
     flyTo(pickupPos)
@@ -1036,4 +1025,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v25.3")
+print("[ridego] loaded v25.4")
