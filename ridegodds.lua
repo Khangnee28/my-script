@@ -1,7 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v3
--- Noclip giu suot trip. Hold BV giu xe dung yen tren san ao khi cho khach.
--- Void scan 100 -> 20000. Khong thay bo -> tele target.
+-- RideGo Farm — FINAL v4
+-- Noclip giu suot trip. Hold BV giu xe dung yen khi cho khach.
+-- Void scan 100 -> 100000. Khong thay bo -> tele target.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -16,8 +16,8 @@ local PICKUP_WAIT    = 8
 local DROP_WAIT      = 8
 local DECEL_DIST     = 200
 local VOID_SCAN_MIN  = 100
-local VOID_SCAN_MAX  = 20000
-local VOID_SCAN_STEP = 100
+local VOID_SCAN_MAX  = 100000
+local VOID_SCAN_STEP = 150
 local TICK           = 0.05
 
 -- ============ STATE ============
@@ -168,7 +168,7 @@ local function rayFloorY(fromPos, maxDist)
     return nil
 end
 
--- ============ NOCLIP ============
+-- ============ NOCLIP — BAT CUONG LUC ============
 local carNoclipOn = false
 local noclipHooked = {}
 
@@ -211,14 +211,17 @@ local function setCarNoclip(on)
     if c then hookNoclip(c) end
 end
 
+-- noclip watcher — chay 0.03s cho chac
 task.spawn(function()
     while true do
-        task.wait(0.05)
-        if carNoclipOn then forceNoclip() end
+        task.wait(0.03)
+        if carNoclipOn then
+            forceNoclip()
+        end
     end
 end)
 
--- ============ HOLD (giu xe dung yen bang BV) ============
+-- ============ HOLD ============
 local function startHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
@@ -238,7 +241,7 @@ local function startHold()
     task.spawn(function()
         while holdBV == bv and bv.Parent do
             bv.Velocity = Vector3.zero
-            task.wait(0.05)
+            task.wait(0.03)
         end
     end)
 end
@@ -323,13 +326,13 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ VOID SCAN ============
+-- ============ VOID SCAN — 100 -> 100000 ============
 local function scanVoidBridge(curPos, dir, curFloorY)
     for testDist = VOID_SCAN_MIN, VOID_SCAN_MAX, VOID_SCAN_STEP do
         local testPos = curPos + dir * testDist
-        local fY = rayFloorY(testPos, 800)
+        local fY = rayFloorY(testPos, 1500)
         if fY and fY > -10 then
-            if not curFloorY or math.abs(curFloorY - fY) < 50 then
+            if not curFloorY or math.abs(curFloorY - fY) < 80 then
                 return testDist, fY
             end
         end
@@ -399,15 +402,15 @@ local function flyTo(target)
             bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
         end)
 
-        if os.clock() - lastVoidCheck > 0.3 then
+        if os.clock() - lastVoidCheck > 0.25 then
             lastVoidCheck = os.clock()
             local curFloorY = rayFloorY(curPos, 500)
-            local aheadFloorY = rayFloorY(curPos + dir * 100, 500)
+            local aheadFloorY = rayFloorY(curPos + dir * 100, 800)
             local voidHere = (curFloorY == nil) or (curFloorY < -20)
             local voidAhead = (aheadFloorY == nil) or (aheadFloorY < -20)
 
             if voidHere or voidAhead then
-                setState("void - scan")
+                setState("void - scan toi 100k")
                 bv.Velocity = Vector3.zero
                 local jumpDist, jumpY = scanVoidBridge(curPos, dir, curFloorY)
                 local dest
@@ -462,7 +465,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG BANG PIVOTTO - KHONG TAT NOCLIP =====
+    -- ===== HA XUONG - NOCLIP VAN ON =====
     car = myCar or findMyCar()
     if not car then task.wait(0.2) return reached end
 
@@ -470,7 +473,7 @@ local function flyTo(target)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then task.wait(0.2) return reached end
 
-    local floorY = rayFloorY(endPos, 800)
+    local floorY = rayFloorY(endPos, 1500)
     local targetY
     if floorY and floorY > -10 then
         targetY = floorY + 2
@@ -480,7 +483,7 @@ local function flyTo(target)
 
     local y = endPos.Y
     local cnt = 0
-    while y > targetY and cnt < 150 and enabled do
+    while y > targetY and cnt < 200 and enabled do
         y = y - 3
         if y < targetY then y = targetY end
         local newPos = Vector3.new(endPos.X, y, endPos.Z)
@@ -492,10 +495,9 @@ local function flyTo(target)
 
     task.wait(0.15)
 
-    -- GIU XE DUNG YEN BANG HOLD BV
+    -- HOLD — giu xe dung yen
     startHold()
 
-    -- force seat cuoi
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
@@ -577,6 +579,9 @@ local function runTrip()
         if not spawnAndSeat() then task.wait(5); return end
     end
     myCar = findMyCar()
+
+    -- BAT NOCLIP TU DAY - khong bao gio tat suot trip
+    setCarNoclip(true)
 
     setState("cho don")
     orderToken = nil
