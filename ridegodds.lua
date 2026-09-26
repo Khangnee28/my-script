@@ -1,6 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26.4
--- Xe luon nam ngang. Hold = BodyPosition + BodyGyro. Bo reconnect, bo tripValid.
+-- RideGo Farm — FINAL v26.5
+-- Nut toggle rieng biet. Menu chinh / status khong co nut an.
+-- Status tu hien khi bat farm, tu an khi tat farm.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -40,6 +41,7 @@ local holdGyro    = nil
 local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
+local menuVisible = true
 
 local function resetState()
     orderToken = nil
@@ -862,6 +864,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 999
 gui.Parent = cg
 
+-- ============ KHUNG CHÍNH (menu + status) ============
 local rootUI = Instance.new("Frame", gui)
 rootUI.Size = UDim2.new(0, 290, 0, 148)
 rootUI.Position = UDim2.new(0, 20, 0.5, -74)
@@ -887,7 +890,7 @@ task.spawn(function()
 end)
 
 local title = Instance.new("TextLabel", rootUI)
-title.Size = UDim2.new(1, -40, 0, 24)
+title.Size = UDim2.new(1, -20, 0, 24)
 title.Position = UDim2.new(0, 10, 0, 4)
 title.BackgroundTransparency = 1
 title.Text = "RIDEGO FARM"
@@ -895,16 +898,6 @@ title.TextColor3 = Color3.fromRGB(255, 140, 40)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
-
-local eyeBtn = Instance.new("TextButton", rootUI)
-eyeBtn.Size = UDim2.new(0, 24, 0, 20)
-eyeBtn.Position = UDim2.new(1, -34, 0, 6)
-eyeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-eyeBtn.Text = "−"
-eyeBtn.TextColor3 = Color3.new(1,1,1)
-eyeBtn.TextSize = 14
-eyeBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", eyeBtn).CornerRadius = UDim.new(0, 4)
 
 -- ============ MENU CHÍNH ============
 local mainMenu = Instance.new("Frame", rootUI)
@@ -991,7 +984,6 @@ sPad.PaddingRight = UDim.new(0, 6)
 sPad.PaddingBottom = UDim.new(0, 6)
 
 local carOpen = false
-local uiHidden = false
 
 local function clearList()
     for _, c in ipairs(scroll:GetChildren()) do
@@ -1054,27 +1046,32 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-eyeBtn.MouseButton1Click:Connect(function()
-    if enabled then return end
+-- ============ NÚT TOGGLE RIÊNG (bật/tắt menu chính) ============
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleBtn.Position = UDim2.new(0, 20, 0.5, 90)  -- dưới rootUI
+toggleBtn.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
+toggleBtn.BackgroundTransparency = 0.15
+toggleBtn.Text = "☰"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 200, 80)
+toggleBtn.TextSize = 20
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.BorderSizePixel = 0
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+local tStroke = Instance.new("UIStroke", toggleBtn)
+tStroke.Color = Color3.fromRGB(255, 140, 40)
+tStroke.Thickness = 1.5
 
-    uiHidden = not uiHidden
-    if uiHidden then
-        mainMenu.Visible = false
-        carListPanel.Visible = false
-        statusPanel.Visible = false
-        rootUI.Size = UDim2.new(0, 60, 0, 32)
-        title.Visible = false
-        eyeBtn.Position = UDim2.new(0, 6, 0, 6)
-        eyeBtn.Text = "+"
-    else
-        rootUI.Size = UDim2.new(0, 290, 0, 148)
-        title.Visible = true
-        eyeBtn.Position = UDim2.new(1, -34, 0, 6)
-        eyeBtn.Text = "−"
-        mainMenu.Visible = true
+toggleBtn.MouseButton1Click:Connect(function()
+    -- Đang farm: nút vô hiệu, status luôn hiện
+    if enabled then
+        return
     end
+    menuVisible = not menuVisible
+    rootUI.Visible = menuVisible
 end)
 
+-- ============ NÚT BẮT ĐẦU/DỪNG FARM ============
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
@@ -1099,7 +1096,8 @@ farmBtn.MouseButton1Click:Connect(function()
         statusPanel.Visible = false
         mainMenu.Visible = true
         rootUI.Size = UDim2.new(0, 290, 0, 148)
-        carBtn.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
+        rootUI.Visible = true
+        menuVisible = true
 
         print("[RideGo] Đã DỪNG farm — reset toàn bộ")
     else
@@ -1113,12 +1111,14 @@ farmBtn.MouseButton1Click:Connect(function()
         carListPanel.Visible = false
         statusPanel.Visible = true
         rootUI.Size = UDim2.new(0, 290, 0, 148)
+        rootUI.Visible = true
 
         print("[RideGo] BẮT ĐẦU farm")
         startLoop()
     end
 end)
 
+-- ============ CẬP NHẬT STATUS ============
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1133,6 +1133,7 @@ task.spawn(function()
     end
 end)
 
+-- ============ KÉO UI ============
 local dragging, dStart, dStartPos
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1149,6 +1150,7 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
+-- ============ TỰ QUÉT XE ============
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1159,4 +1161,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26.4")
+print("[RideGo] Đã load v26.5")
