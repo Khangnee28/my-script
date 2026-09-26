@@ -1,7 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26.3
--- Xe luon nam ngang (flat rotation). BodyGyro ep pitch/roll = 0.
--- Hold = BodyPosition + BodyGyro. Trip chi tinh khi sach.
+-- RideGo Farm — FINAL v26.4
+-- Xe luon nam ngang. Hold = BodyPosition + BodyGyro. Bo reconnect, bo tripValid.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -16,7 +15,6 @@ local ORDER_TIMEOUT       = 60
 local PICKUP_WAIT         = 4
 local DROP_WAIT           = 4
 local ACK_DELAY           = 3
-local RECONNECT_AFTER     = 15
 local DECEL_DIST          = 200
 local TICK                = 0.05
 local UNDERGROUND_DEPTH   = 200
@@ -42,8 +40,6 @@ local holdGyro    = nil
 local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
-local tripValid      = false
-local reconnectHappened = false
 
 local function resetState()
     orderToken = nil
@@ -56,8 +52,6 @@ local function resetState()
     acceptingOrder = false
     initialized = false
     farmStartTime = 0
-    tripValid = false
-    reconnectHappened = false
     holdActive = false
     if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
     if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
@@ -110,7 +104,6 @@ local function formatTime(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
--- Tao CFrame chi co yaw (nam ngang), bo pitch/roll
 local function flatYawCFrame(cf)
     local look = cf.LookVector
     local flat = Vector3.new(look.X, 0, look.Z)
@@ -131,10 +124,6 @@ if TaxiEvent then
             orderToken = data.Token
             pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
         elseif action == "OrderAccepted" then
-            if reconnectHappened then
-                setStatus("⚠ Bỏ đơn cũ sau reconnect")
-                return
-            end
             pickupPos = data.PickupPos
             dropPos   = data.DropPos
             orderToken = data.Token
@@ -143,7 +132,6 @@ if TaxiEvent then
             else
                 pendingFare = 0
             end
-            tripValid = true
         end
     end)
 end
@@ -371,7 +359,7 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ GIỮ XE ĐỨNG YÊN (BodyPosition + BodyGyro flat) ============
+-- ============ GIỮ XE ĐỨNG YÊN ============
 local function startHold()
     if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
     if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
@@ -392,7 +380,6 @@ local function startHold()
     bp.Parent = vs
     holdBP = bp
 
-    -- BodyGyro ep xe NAM NGANG (chi yaw)
     local flatRot = flatYawCFrame(curCF)
 
     local bg = Instance.new("BodyGyro")
@@ -557,7 +544,7 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ NỔI LÊN MẶT ĐẤT (xe luôn nằm ngang) ============
+-- ============ NỔI LÊN MẶT ĐẤT ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
     setStatus("⬆ Nổi lên mặt đất +" .. tostring(LAND_OFFSET) .. " stud")
@@ -565,7 +552,6 @@ local function ascendToGround(car, target, targetFloor)
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
 
-    -- Ep nam ngang (chi yaw)
     local cp = car:GetPivot()
     local flatRot = flatYawCFrame(cp)
 
@@ -611,7 +597,6 @@ local function flyTo(target)
 
     flying = true
 
-    -- Ep rotation nam ngang (chi yaw)
     local startPivot = car:GetPivot()
     local rotOnly = flatYawCFrame(startPivot)
 
@@ -739,7 +724,6 @@ local function spawnAndSeat()
     end
     task.wait(1.5)
 
-    -- Ep xe nam ngang khi vua spawn
     local pivot = car:GetPivot()
     local flatRot = flatYawCFrame(pivot)
     pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
@@ -788,13 +772,9 @@ local function runTrip()
     pickupPos = nil
     dropPos = nil
     pendingFare = 0
-    tripValid = false
-    reconnectHappened = false
     acceptingOrder = true
     setStatus("◦ Đang chờ đơn")
 
-    local waitStart = os.time()
-    local didReconnect = false
     local deadline = os.clock() + ORDER_TIMEOUT
 
     while os.clock() < deadline and enabled do
@@ -802,18 +782,6 @@ local function runTrip()
         if not holdActive then
             startHold()
         end
-
-        if not didReconnect and (os.time() - waitStart) >= RECONNECT_AFTER then
-            setStatus("◦ Chờ lâu — tắt/mở lại online")
-            fire(TaxiEvent, "GoOffline")
-            task.wait(1)
-            fire(TaxiEvent, "GoOnline")
-            didReconnect = true
-            reconnectHappened = true
-            pendingFare = 0
-            tripValid = false
-        end
-
         task.wait(0.4)
     end
 
@@ -839,20 +807,15 @@ local function runTrip()
         setStatus("⌛ Đợi khách xuống xe (4s)")
         task.wait(DROP_WAIT)
 
-        if tripValid then
-            stats.trips = stats.trips + 1
-            if pendingFare > 0 then
-                stats.earn = stats.earn + pendingFare
-            end
-            setStatus("✓ Hoàn thành chuyến — +" .. tostring(pendingFare))
-            task.wait(ACK_DELAY)
-            fire(TaxiEvent, "AckTripComplete")
-            setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
-        else
-            setStatus("⚠ Chuyến không hợp lệ — không tính")
+        stats.trips = stats.trips + 1
+        if pendingFare > 0 then
+            stats.earn = stats.earn + pendingFare
         end
+        setStatus("✓ Hoàn thành chuyến — +" .. tostring(pendingFare))
+        task.wait(ACK_DELAY)
+        fire(TaxiEvent, "AckTripComplete")
+        setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
         pendingFare = 0
-        tripValid = false
     end
 
     pickupPos = nil
@@ -1196,4 +1159,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26.3")
+print("[RideGo] Đã load v26.4")
