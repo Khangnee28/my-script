@@ -520,6 +520,7 @@ local function ascendToGround(car, target, targetFloor)
 end
 
 -- ============ FLY UNDERGROUND (CFrame-only) ============
+-- ============ FLY (BodyVelocity, khong PivotTo) ============
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -537,9 +538,11 @@ local function flyTo(target)
     unanchorCar(car)
     task.wait(0.05)
 
+    -- SetNetworkOwner 1 lan duy nhat
     claimNetworkOwner(car)
     attachNpcFollowers(car)
 
+    -- Noclip xe + player (tat CanCollide)
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.CanCollide = false end)
@@ -553,24 +556,45 @@ local function flyTo(target)
         end
     end
 
+    -- Set Y xuong duoi dat bang BV Y (khong PivotTo)
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+        or car.PrimaryPart
+        or car:FindFirstChildWhichIsA("BasePart", true)
+    if not vs then return false end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGFly"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 8000
+    bv.Velocity = Vector3.zero
+    bv.Parent = vs
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "RGGyro"
+    bg.MaxTorque = Vector3.new(5e4, 5e4, 5e4)  -- nhe, tranh kick
+    bg.P = 3000
+    bg.D = 500
+    bg.Parent = vs
+
     flying = true
 
-    local startPivot = car:GetPivot()
-    local rotOnly = startPivot - startPivot.Position
-
-    local curPos = startPivot.Position
-    local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
-    for i = 1, UNDER_DESCEND_STEPS do
-        curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        local cf = CFrame.new(curPos) * rotOnly
-        pcall(function() car:PivotTo(cf) end)
-        task.wait(UNDER_STEP_TIME)
+    -- Cho BV keo xe xuong underY truoc
+    setState("⬇ under - ha do cao")
+    local descendDeadline = os.clock() + 3
+    while enabled and os.clock() < descendDeadline do
+        local c = myCar or findMyCar()
+        if not c then break end
+        local curP = c:GetPivot().Position
+        local dy = underY - curP.Y
+        if math.abs(dy) < 3 then break end
+        local vy = math.clamp(dy * 5, -200, 200)
+        bv.Velocity = Vector3.new(0, vy, 0)
+        task.wait(0.05)
     end
     setState("⬇ under - bay")
 
     local reached = false
     local lastNpcRefresh = 0
-    local fakeVelCounter = 0
 
     while enabled do
         local c = myCar or findMyCar()
@@ -587,6 +611,7 @@ local function flyTo(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
+        -- Toc do decel khi gan
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
@@ -594,36 +619,32 @@ local function flyTo(target)
             spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
 
-        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+        -- BV day theo huong target + giu Y = underY
+        local vx = dir.X * spd
+        local vz = dir.Z * spd
+        local dy = underY - curP.Y
+        local vy = math.clamp(dy * 5, -200, 200)
 
-        local nextPos = Vector3.new(
-            curP.X + dir.X * step,
-            underY,
-            curP.Z + dir.Z * step
-        )
-        local nextCF = CFrame.new(nextPos) * rotOnly
-        pcall(function() c:PivotTo(nextCF) end)
+        bv.Velocity = Vector3.new(vx, vy, vz)
 
-        fakeVelCounter = fakeVelCounter + 1
-        if fakeVelCounter >= 2 then
-            fakeVelCounter = 0
-            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
-            for _, p in ipairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
-                end
-            end
-        end
+        -- Gyro quay mat ve huong bay
+        pcall(function()
+            bg.CFrame = CFrame.lookAt(curP, Vector3.new(target.X, curP.Y, target.Z))
+        end)
 
-        if os.clock() - lastNpcRefresh > 0.05 then
+        if os.clock() - lastNpcRefresh > 0.08 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
         end
 
-        task.wait(TICK)
+        task.wait(0.05)
     end
 
-    -- ===== NOI LEN MAT DAT =====
+    if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
+    task.wait(0.1)
+
+    -- ===== NOI LEN MAT DAT BANG PIVOTTO (1 lan) =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
