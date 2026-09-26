@@ -1,9 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v15.1
--- Noclip toan bo khi bay (xe + minh + NPC khach qua weld massless).
--- Terrain-follow theo mat dat. Void CFrame qua bo ben kia (khong CFrame toi target).
--- Ha xuong: noclip off chassis-only, dat bang bbox.
--- NPC server-owned: weld + massless vao ghe -> xuyen tuong theo xe.
+-- RideGo Farm — FINAL v16
+-- Bay: ANCHOR + PivotTo -> xuyen tuong tuyet doi (khong phu thuoc network owner).
+-- NPC: weld massless + PlatformStand -> di theo xe.
+-- Ha xuong: unanchor, dat bbox, collide chassis-only -> khong lun.
+-- Ngoi sai ghe: phat hien + nhay ra + seat lai, retry toi khi dung ghe lai.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -173,10 +173,84 @@ local function floorBelow(pos)
     return nil
 end
 
--- ============ NOCLIP ============
-local carNoclipOn = false
-local noclipHooked = {}
+-- ============ NPC WELD ============
+local npcWelded = setmetatable({}, { __mode = "k" })
 
+local function isLocalPlayerHum(oh)
+    if not oh or not oh.Parent then return false end
+    return oh.Parent == char()
+end
+
+local function weldNpcToSeat(npcHum, seat)
+    if not npcHum or not npcHum.Parent or not seat then return end
+    if isLocalPlayerHum(npcHum) then return end
+
+    local npcChar = npcHum.Parent
+    if npcWelded[npcChar] then
+        for _, p in ipairs(npcChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function()
+                    if p.CanCollide then p.CanCollide = false end
+                    if not p.Massless then p.Massless = true end
+                end)
+            end
+        end
+        return
+    end
+
+    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    for _, p in ipairs(npcChar:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function()
+                p.CanCollide = false
+                p.Massless = true
+            end)
+        end
+    end
+
+    for _, d in ipairs(hrp:GetChildren()) do
+        if d:IsA("WeldConstraint") and d.Name ~= "RG_NpcWeld" then
+            pcall(function() d:Destroy() end)
+        end
+    end
+
+    local w = Instance.new("WeldConstraint")
+    w.Name = "RG_NpcWeld"
+    w.Part0 = seat
+    w.Part1 = hrp
+    w.Parent = hrp
+
+    npcWelded[npcChar] = true
+end
+
+local function unweldNpc(npcHum)
+    if not npcHum or not npcHum.Parent then return end
+    if isLocalPlayerHum(npcHum) then return end
+    local npcChar = npcHum.Parent
+    npcWelded[npcChar] = nil
+    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        for _, d in ipairs(hrp:GetChildren()) do
+            if d:IsA("WeldConstraint") and d.Name == "RG_NpcWeld" then
+                pcall(function() d:Destroy() end)
+            end
+        end
+    end
+    for _, p in ipairs(npcChar:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function()
+                p.CanCollide = true
+                p.Massless = false
+            end)
+        end
+    end
+    local h = npcChar:FindFirstChildOfClass("Humanoid")
+    if h then pcall(function() h.PlatformStand = false end) end
+end
+
+-- ============ NOCLIP CHASSIS-ONLY ============
 local KEEP_COLLIDE = {
     chassis = true, frame = true, base = true,
     wheel = true, tire = true, tyre = true,
@@ -189,30 +263,6 @@ local function isChassisPart(part)
         if n:find(key, 1, true) then return true end
     end
     return false
-end
-
-local function walkNoclip(inst)
-    if not inst then return end
-    if inst:IsA("BasePart") and inst.CanCollide then
-        pcall(function() inst.CanCollide = false end)
-    end
-    for _, p in ipairs(inst:GetDescendants()) do
-        if p:IsA("BasePart") and p.CanCollide then
-            pcall(function() p.CanCollide = false end)
-        end
-    end
-end
-
-local function fullCollideOn(inst)
-    if not inst then return end
-    if inst:IsA("BasePart") and not inst.CanCollide then
-        pcall(function() inst.CanCollide = true end)
-    end
-    for _, p in ipairs(inst:GetDescendants()) do
-        if p:IsA("BasePart") and not p.CanCollide then
-            pcall(function() p.CanCollide = true end)
-        end
-    end
 end
 
 local function chassisCollideOn(car)
@@ -232,203 +282,17 @@ local function chassisCollideOn(car)
     end
 end
 
-local function hookNoclip(inst)
-    if not inst or noclipHooked[inst] then return end
-    noclipHooked[inst] = true
-    inst.DescendantAdded:Connect(function(d)
-        if carNoclipOn and d:IsA("BasePart") and d.CanCollide then
-            pcall(function() d.CanCollide = false end)
-        end
-    end)
-end
-
-local function hookPassengerChars()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        local c = plr.Character
-        if c then
-            hookNoclip(c)
-            if carNoclipOn then walkNoclip(c) end
+local function fullCollideOn(inst)
+    if not inst then return end
+    if inst:IsA("BasePart") and not inst.CanCollide then
+        pcall(function() inst.CanCollide = true end)
+    end
+    for _, p in ipairs(inst:GetDescendants()) do
+        if p:IsA("BasePart") and not p.CanCollide then
+            pcall(function() p.CanCollide = true end)
         end
     end
 end
-
-local function forceNoclip()
-    local car = myCar or findMyCar()
-    if car then
-        walkNoclip(car)
-        for _, d in ipairs(car:GetDescendants()) do
-            if d:IsA("VehicleSeat") and d.Occupant then
-                local oh = d.Occupant
-                if oh and oh.Parent then walkNoclip(oh.Parent) end
-            end
-        end
-    end
-    local c = char()
-    if c then walkNoclip(c) end
-    hookPassengerChars()
-end
-
--- ============ NPC WELD ============
--- NPC la server-owned: tat CanCollide tu client khong du.
--- Weld + massless toan bo part NPC vao ghe -> NPC thanh phan cung cua assembly xe.
--- Server khong con physics rieng de day NPC ra khoi tuong.
-
-local npcWelded = setmetatable({}, { __mode = "k" })
-
-local function weldNpcToSeat(npcHum, seat)
-    if not npcHum or not npcHum.Parent or not seat then return end
-    local npcChar = npcHum.Parent
-    if npcWelded[npcChar] then
-        -- refresh massless/nocollide (server co the reset)
-        for _, p in ipairs(npcChar:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function()
-                    if p.CanCollide then p.CanCollide = false end
-                    if not p.Massless then p.Massless = true end
-                end)
-            end
-        end
-        return
-    end
-
-    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- 1. Tat collide + massless toan bo
-    for _, p in ipairs(npcChar:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function()
-                p.CanCollide = false
-                p.Massless = true
-            end)
-        end
-    end
-
-    -- 2. Xoa weld cu tro tới seat (giu joint noi bo cua Humanoid)
-    for _, d in ipairs(hrp:GetChildren()) do
-        if d:IsA("WeldConstraint") then
-            pcall(function() d:Destroy() end)
-        elseif d:IsA("Weld") or d:IsA("Motor6D") then
-            if d.Part0 == seat or d.Part1 == seat then
-                pcall(function() d:Destroy() end)
-            end
-        end
-    end
-
-    -- 3. Weld HRP vao seat
-    local w = Instance.new("WeldConstraint")
-    w.Name = "RG_NpcWeld"
-    w.Part0 = seat
-    w.Part1 = hrp
-    w.Parent = hrp
-
-    npcWelded[npcChar] = true
-end
-
-local function unweldNpc(npcHum)
-    if not npcHum or not npcHum.Parent then return end
-    local npcChar = npcHum.Parent
-    npcWelded[npcChar] = nil
-    local hrp = npcChar:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        for _, d in ipairs(hrp:GetChildren()) do
-            if d:IsA("WeldConstraint") and d.Name == "RG_NpcWeld" then
-                pcall(function() d:Destroy() end)
-            end
-        end
-    end
-    for _, p in ipairs(npcChar:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function()
-                p.CanCollide = true
-                p.Massless = false
-            end)
-        end
-    end
-end
-
--- Refresh NPC trong xe moi 0.1s khi dang bay
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if flying and carNoclipOn then
-            local car = myCar or findMyCar()
-            if car then
-                for _, d in ipairs(car:GetDescendants()) do
-                    if d:IsA("VehicleSeat") and d.Occupant then
-                        pcall(function() weldNpcToSeat(d.Occupant, d) end)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- Don dep NPC da xuong xe khi khong bay
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        if not flying then
-            for c in pairs(npcWelded) do
-                if c and c.Parent then
-                    local h = c:FindFirstChildOfClass("Humanoid")
-                    if not h or not h.Sit then
-                        unweldNpc(h)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ============ NOCLIP ALL ============
-local function noclipAllOn()
-    carNoclipOn = true
-    local car = myCar or findMyCar()
-    if car then hookNoclip(car) end
-    local c = char()
-    if c then hookNoclip(c) end
-    hookPassengerChars()
-    forceNoclip()
-    -- weld NPC dang ngoi ngay khi bat dau bay
-    if car then
-        for _, d in ipairs(car:GetDescendants()) do
-            if d:IsA("VehicleSeat") and d.Occupant then
-                pcall(function() weldNpcToSeat(d.Occupant, d) end)
-            end
-        end
-    end
-end
-
-local function noclipOffChassisOnly(car)
-    carNoclipOn = false
-    if car then
-        chassisCollideOn(car)
-        -- tra NPC ve physics binh thuong
-        for _, d in ipairs(car:GetDescendants()) do
-            if d:IsA("VehicleSeat") and d.Occupant then
-                pcall(function() unweldNpc(d.Occupant) end)
-            end
-        end
-    end
-end
-
-Players.PlayerAdded:Connect(function(plr)
-    plr.CharacterAdded:Connect(function(c)
-        hookNoclip(c)
-        if carNoclipOn then walkNoclip(c) else fullCollideOn(c) end
-    end)
-end)
-Players.PlayerRemoving:Connect(function(plr)
-    noclipHooked[plr] = nil
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(0.03)
-        if carNoclipOn then forceNoclip() end
-    end
-end)
 
 -- ============ HOLD ============
 local function startHold()
@@ -465,6 +329,7 @@ end
 -- ============ SEAT ============
 local function getDriveSeat(car)
     if not car then return nil end
+    -- uu tien ghe co ten drive/driver
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") then
             local n = d.Name:lower()
@@ -473,9 +338,11 @@ local function getDriveSeat(car)
             end
         end
     end
+    -- fallback: ghe co Occupant dau tien khong phai NPC (thuong la ghe lai)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
+-- Ep ngoi ghe lai: disable ghe khac, tele HRP, Sit, verify nhieu lan.
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -485,20 +352,23 @@ local function forceSeat()
 
     if h.Sit and h.SeatPart == vs then return true end
 
+    -- Ngoi SAI ghe -> nhay ra
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
-        task.wait(0.15)
+        task.wait(0.2)
     end
 
+    -- Ghe lai bi ai chiem -> keo ra
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
             pcall(function() occ.Sit = false end)
-            task.wait(0.15)
+            task.wait(0.2)
         end
         if vs.Occupant and vs.Occupant ~= h then return false end
     end
 
+    -- Disable ghe khac
     local disabledList = {}
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d ~= vs and not d.Disabled then
@@ -507,30 +377,32 @@ local function forceSeat()
         end
     end
 
+    -- Tele HRP len ghe lai
     local hrp = root()
     if hrp then
         local seatCF = vs.CFrame * CFrame.new(0, 2.5, 0)
         pcall(function() hrp.CFrame = seatCF end)
-        task.wait(0.06)
+        task.wait(0.08)
     end
 
     pcall(function() vs:Sit(h) end)
-    task.wait(0.1)
+    task.wait(0.12)
 
-    if not h.Sit or h.SeatPart ~= vs then
-        local hrp2 = root()
-        if hrp2 then
-            local seatCF2 = vs.CFrame * CFrame.new(0, 3, 0)
-            pcall(function() hrp2.CFrame = seatCF2 end)
-            task.wait(0.06)
+    -- Retry toi 3 lan
+    for i = 1, 3 do
+        if h.Sit and h.SeatPart == vs then break end
+        local hrpR = root()
+        if hrpR then
+            local seatCFR = vs.CFrame * CFrame.new(0, 3, 0)
+            pcall(function() hrpR.CFrame = seatCFR end)
+            task.wait(0.08)
         end
         pcall(function() vs:Sit(h) end)
-        task.wait(0.1)
-    end
-
-    if not h.Sit or h.SeatPart ~= vs then
-        pcall(function() h.Sit = true end)
-        task.wait(0.06)
+        task.wait(0.12)
+        if not h.Sit then
+            pcall(function() h.Sit = true end)
+            task.wait(0.08)
+        end
     end
 
     for _, d in ipairs(disabledList) do
@@ -540,20 +412,26 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
+-- Seat loop: manh hon - phat hien ngoi sai ghe + tu dong ngoi lai
 task.spawn(function()
     while true do
-        task.wait(0.15)
+        task.wait(0.1)
         if enabled and not flying then
             local h = hum()
             local car = myCar or findMyCar()
             if h and car then
                 local vs = getDriveSeat(car)
                 if vs then
+                    -- Ngoi sai ghe -> nhay ra + seat lai (khong cho user)
                     if h.Sit and h.SeatPart and h.SeatPart ~= vs then
-                        setState("sai ghe - nhay ra")
+                        setState("sai ghe - tu dong seat lai")
                         pcall(function() h.Sit = false end)
                         task.wait(0.25)
-                        forceSeat()
+                        -- retry toi khi dung
+                        for attempt = 1, 5 do
+                            if forceSeat() then break end
+                            task.wait(0.3)
+                        end
                     elseif not h.Sit then
                         forceSeat()
                     end
@@ -610,7 +488,7 @@ local function scanVoidLanding(curPos, dir)
     return nil, nil
 end
 
--- ============ FLY ============
+-- ============ FLY (anchor + PivotTo) ============
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -618,65 +496,68 @@ local function flyTo(target)
     if not h or not car then return false end
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
-    local vs = getDriveSeat(car)
-    local attach = vs or root()
-    if not attach then return false end
+    local myChar = char()
 
-    noclipAllOn()
+    -- SetNetworkOwner cho client (giup anchor de hon)
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") and not p.Anchored then
+            pcall(function() p:SetNetworkOwner(lp) end)
+        end
+    end
+
+    -- Weld NPC + PlatformStand (bo qua chinh minh)
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") and d.Occupant then
+            local oh = d.Occupant
+            if oh and oh.Parent and oh.Parent ~= myChar then
+                pcall(function() weldNpcToSeat(oh, d) end)
+                pcall(function() oh.PlatformStand = true end)
+                pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
+            end
+        end
+    end
+
+    -- Tat collide toan bo
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.CanCollide = false end)
+        end
+    end
+    if myChar then
+        for _, p in ipairs(myChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = false end)
+            end
+        end
+    end
+
+    -- ANCHOR toan bo xe
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") and not p.Anchored then
+            pcall(function() p.Anchored = true end)
+        end
+    end
+
     flying = true
 
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "RGFly"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 5000
-    bv.Velocity = Vector3.zero
-    bv.Parent = attach
-
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "RGGyro"
-    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-    bg.P = 5000
-    bg.D = 500
-    bg.Parent = attach
-
-    local function currentCar()
-        local c = myCar or findMyCar()
-        if not c then return nil end
-        local v = getDriveSeat(c)
-        if v and attach ~= v then
-            attach = v
-            bv.Parent = v
-            bg.Parent = v
-        end
-        return c
-    end
-
-    local function currentPos()
-        local c = currentCar()
-        if not c then return nil end
-        local v = getDriveSeat(c)
-        if h.Sit and v then return v.Position end
-        local r = root()
-        return r and r.Position or nil
-    end
+    local startPivot = car:GetPivot()
+    local rotOnly = startPivot - startPivot.Position
 
     local reached = false
     local lastVoidCheck = 0
     local voidJustHandled = false
+    local reanchorCounter = 0
 
     while enabled do
-        local c = currentCar()
+        local c = myCar or findMyCar()
         if not c then break end
-        local curPos = currentPos()
-        if not curPos then break end
 
+        local curPos = c:GetPivot().Position
         local flat = Vector3.new(target.X - curPos.X, 0, target.Z - curPos.Z)
         local dist = flat.Magnitude
 
         if dist < ARRIVE_DIST then
             reached = true
-            bv.Velocity = Vector3.zero
-            bv.MaxForce = Vector3.new(0, 0, 0)
             break
         end
 
@@ -687,65 +568,62 @@ local function flyTo(target)
             lastVoidCheck = os.clock()
             if voidAhead(curPos, dir) then
                 setState("void - scan")
-                bv.Velocity = Vector3.zero
                 local landDist, landFloorY = scanVoidLanding(curPos, dir)
                 if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
                     local landPos = curPos + dir * landDist
-                    local dest = Vector3.new(landPos.X, landFloorY + CRUISE_Y, landPos.Z)
-                    pcall(function() c:PivotTo(CFrame.new(dest)) end)
+                    local destPos = Vector3.new(landPos.X, landFloorY + CRUISE_Y, landPos.Z)
+                    pcall(function() c:PivotTo(CFrame.new(destPos) * rotOnly) end)
                     setState(string.format("void - CFrame %.0f", landDist))
-                    if not h.Sit then forceSeat() end
-                    task.wait(0.4)
+                    task.wait(0.3)
                     voidJustHandled = true
                     lastVoidCheck = os.clock() + 0.3
-                    task.wait(TICK)
                     continue
-                else
-                    setState("void - khong bo gan")
                 end
             end
         end
-
-        if voidJustHandled then
-            if os.clock() - lastVoidCheck > 0.3 then
-                voidJustHandled = false
-            end
+        if voidJustHandled and os.clock() - lastVoidCheck > 0.3 then
+            voidJustHandled = false
         end
 
-        -- TERRAIN-FOLLOW
+        -- DO CAO
         local floorY = floorBelow(curPos) or (curPos.Y - CRUISE_Y)
         local targetY = floorY + CRUISE_Y
 
-        pcall(function()
-            bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
-        end)
-
+        -- TOC DO
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
         else
             spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
-        local vx = dir.X * spd
-        local vz = dir.Z * spd
 
+        local step = math.min(spd * TICK, dist)
+        local moveX = dir.X * step
+        local moveZ = dir.Z * step
         local dy = targetY - curPos.Y
-        local vy = math.clamp(dy * 4, -60, 60)
+        local moveY = math.clamp(dy * 0.15, -step, step)
 
-        bv.Velocity = Vector3.new(vx, vy, vz)
+        local nextPos = Vector3.new(curPos.X + moveX, curPos.Y + moveY, curPos.Z + moveZ)
+        local nextCF = CFrame.new(nextPos) * rotOnly
+        pcall(function() c:PivotTo(nextCF) end)
+
+        -- Re-anchor moi 5 tick
+        reanchorCounter = reanchorCounter + 1
+        if reanchorCounter >= 5 then
+            reanchorCounter = 0
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") and not p.Anchored then
+                    pcall(function() p.Anchored = true end)
+                end
+            end
+        end
+
         task.wait(TICK)
     end
-
-    if bv and bv.Parent then bv:Destroy() end
-    if bg and bg.Parent then bg:Destroy() end
-    task.wait(0.1)
 
     -- HA XUONG
     car = myCar or findMyCar()
     if car then
-        noclipOffChassisOnly(car)
-        task.wait(0.1)
-
         local pivotPos = car:GetPivot().Position
         local params = makeRayParams()
         local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
@@ -759,19 +637,37 @@ local function flyTo(target)
             local offsetPivotToCenterY = bbCenter.Y - pivotPos.Y
             local targetPivotY = targetCenterY - offsetPivotToCenterY
 
-            local curPivotCF = car:GetPivot()
-            local rotOnly = curPivotCF - curPivotCF.Position
             local newPivotPos = Vector3.new(target.X, targetPivotY, target.Z)
-            local newPivotCF = CFrame.new(newPivotPos) * rotOnly
-            pcall(function() car:PivotTo(newPivotCF) end)
+            pcall(function() car:PivotTo(CFrame.new(newPivotPos) * rotOnly) end)
             task.wait(0.2)
         else
             setState("khong thay dat")
         end
+
+        -- UNANCHOR
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.Anchored = false end)
+            end
+        end
+        task.wait(0.15)
+
+        -- Bat collide chassis-only
+        chassisCollideOn(car)
+    end
+
+    -- Unweld NPC
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") and d.Occupant then
+            local oh = d.Occupant
+            if oh and oh.Parent and oh.Parent ~= myChar then
+                pcall(function() unweldNpc(oh) end)
+                pcall(function() oh.PlatformStand = false end)
+            end
+        end
     end
 
     flying = false
-
     if not h.Sit then forceSeat() end
     task.wait(0.1)
     startHold()
@@ -1099,7 +995,14 @@ toggleBtn.MouseButton1Click:Connect(function()
         enabled = false
         resetState()
         local car = myCar or findMyCar()
-        if car then fullCollideOn(car) end
+        if car then
+            for _, p in ipairs(car:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.Anchored = false end)
+                    pcall(function() p.CanCollide = true end)
+                end
+            end
+        end
         local c = char()
         if c then fullCollideOn(c) end
         local h = hum()
@@ -1152,4 +1055,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v15.1")
+print("[ridego] loaded v16")
