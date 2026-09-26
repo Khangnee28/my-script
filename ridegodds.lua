@@ -1,8 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v12
--- Bay TREN CAO (khong xuyen tuong) -> khach ngoi ghe di theo tu nhien, khong ket.
--- Ha xuong: tinh day model bang bbox, dat chinh xac tren mat dat -> khong lun.
--- Ngoi sai ghe: nhay ra + disable cac ghe khac + ep lai ghe lai.
+-- RideGo Farm — FINAL v13
+-- Bay terrain-follow: sat dat mac dinh, nang vua du khi co vat can, tran chong kick.
+-- Khong noclip -> khach ngoi ghe di theo tu nhien.
+-- Ha xuong bbox: dat chinh xac tren mat dat.
+-- Ngoi sai ghe: nhay ra + disable ghe khac + ep lai.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -10,7 +11,10 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST      = 180
-local FLY_HEIGHT     = 500     -- do cao bay tren dich (tranh moi vat can)
+local CRUISE_Y       = 18
+local OBSTACLE_CLEAR = 15
+local MAX_FLY_Y      = 220
+local SCAN_AHEAD     = 200
 local ARRIVE_DIST    = 8
 local ORDER_TIMEOUT  = 60
 local PICKUP_WAIT    = 8
@@ -207,7 +211,7 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- Ep ngoi ghe lai: disable cac ghe khac tam thoi, tele HRP, Sit, verify 2 lan.
+-- Ep ghe lai: disable ghe khac, tele HRP, Sit, verify 2 lan.
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -215,7 +219,6 @@ local function forceSeat()
     local vs = getDriveSeat(car)
     if not vs then return false end
 
-    -- Da ngoi dung
     if h.Sit and h.SeatPart == vs then return true end
 
     -- Ngoi SAI ghe -> nhay ra truoc
@@ -224,7 +227,7 @@ local function forceSeat()
         task.wait(0.15)
     end
 
-    -- Neu ghe lai bi nguoi khac chiem -> keo ra
+    -- Ghe lai bi ai chiem -> keo ra
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
@@ -234,7 +237,7 @@ local function forceSeat()
         if vs.Occupant and vs.Occupant ~= h then return false end
     end
 
-    -- Disable cac ghe khac -> engine khong the auto-choose ghe hanh khach
+    -- Disable cac ghe khac -> engine khong the auto-choose
     local disabledList = {}
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d ~= vs and not d.Disabled then
@@ -243,7 +246,7 @@ local function forceSeat()
         end
     end
 
-    -- Tele HRP NGAY TREN ghe lai
+    -- Tele HRP ngay tren ghe lai
     local hrp = root()
     if hrp then
         local seatCF = vs.CFrame * CFrame.new(0, 2.5, 0)
@@ -272,7 +275,7 @@ local function forceSeat()
         task.wait(0.06)
     end
 
-    -- Bat lai cac ghe khac
+    -- Bat lai ghe khac
     for _, d in ipairs(disabledList) do
         pcall(function() d.Disabled = false end)
     end
@@ -290,7 +293,6 @@ task.spawn(function()
             if h and car then
                 local vs = getDriveSeat(car)
                 if vs then
-                    -- ngoi sai ghe
                     if h.Sit and h.SeatPart and h.SeatPart ~= vs then
                         setState("sai ghe - nhay ra")
                         pcall(function() h.Sit = false end)
@@ -324,20 +326,34 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ LAY DAY MODEL (bbox) ============
--- Tra ve khoang cach tu pivot xuong day bbox (theo truc Y the gioi)
-local function getPivotToBottom(car)
-    if not car then return 0 end
-    local _, size = car:GetBoundingBox()
-    local bbCF, bbSize = car:GetBoundingBox()
-    local pivotY = car:GetPivot().Position.Y
-    local bbCenterY = bbCF.Position.Y
-    -- day bbox = center - halfHeight
-    local bbBottomY = bbCenterY - bbSize.Y / 2
-    return pivotY - bbBottomY
+-- ============ FLY (terrain-follow) ============
+local function scanFloorAt(pos)
+    local params = makeRayParams()
+    local origin = Vector3.new(pos.X, pos.Y + 500, pos.Z)
+    local hit = workspace:Raycast(origin, Vector3.new(0, -2500, 0), params)
+    if hit then return hit.Position.Y end
+    return nil
 end
 
--- ============ FLY (tren cao) ============
+-- Dinh vat can cao nhat trong khoang SCAN_AHEAD theo huong dir.
+local function scanObstacleAhead(curPos, dir)
+    local params = makeRayParams()
+    local best = nil
+    for _, dist in ipairs({60, 120, SCAN_AHEAD}) do
+        local probe = curPos + dir * dist
+        local origin = Vector3.new(probe.X, curPos.Y + 400, probe.Z)
+        local hit = workspace:Raycast(origin, Vector3.new(0, -2500, 0), params)
+        if hit then
+            local hY = hit.Position.Y
+            local floorHere = scanFloorAt(probe)
+            if floorHere and hY > floorHere + 8 then
+                if not best or hY > best then best = hY end
+            end
+        end
+    end
+    return best
+end
+
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -387,114 +403,83 @@ local function flyTo(target)
         return r and r.Position or nil
     end
 
-    local function faceDir(dir)
-        local p = currentPos()
-        if not p then return end
-        local flat = Vector3.new(dir.X, 0, dir.Z)
-        if flat.Magnitude < 0.01 then return end
+    local reached = false
+    local lastObstacleScan = 0
+    local cachedObstacleTop = nil
+
+    while enabled do
+        if not currentCar() then break end
+        local curPos = currentPos()
+        if not curPos then break end
+
+        local flat = Vector3.new(target.X - curPos.X, 0, target.Z - curPos.Z)
+        local dist = flat.Magnitude
+
+        if dist < ARRIVE_DIST then
+            reached = true
+            bv.Velocity = Vector3.zero
+            bv.MaxForce = Vector3.new(0, 0, 0)
+            break
+        end
+
+        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+
+        local floorY = scanFloorAt(curPos)
+        if not floorY then floorY = curPos.Y - CRUISE_Y end
+
+        -- quet vat can moi 0.15s
+        if os.clock() - lastObstacleScan > 0.15 then
+            lastObstacleScan = os.clock()
+            cachedObstacleTop = scanObstacleAhead(curPos, dir)
+        end
+
+        -- do cao muc tieu
+        local targetY = floorY + CRUISE_Y
+        if cachedObstacleTop then
+            local needY = cachedObstacleTop + OBSTACLE_CLEAR
+            if needY > targetY then targetY = needY end
+        end
+        if targetY > floorY + MAX_FLY_Y then
+            targetY = floorY + MAX_FLY_Y
+        end
+
         pcall(function()
-            bg.CFrame = CFrame.lookAt(p, p + flat.Unit)
+            bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
         end)
-    end
 
-    local ok = true
-
-    -- ===== PHASE 1: BAY LEN =====
-    do
-        local p = currentPos()
-        if not p then ok = false end
-        if ok then
-            local startY = p.Y
-            local highY = math.max(startY, target.Y) + FLY_HEIGHT
-            local goal = Vector3.new(p.X, highY, p.Z)
-            local t0 = os.clock()
-            while enabled and os.clock() - t0 < 15 do
-                if not currentCar() then ok = false; break end
-                local cp = currentPos()
-                if not cp then ok = false; break end
-                local delta = goal - cp
-                if delta.Magnitude < 5 then break end
-                local dir = delta.Unit
-                local spd = math.clamp(delta.Magnitude * 3, 20, STEP_DIST)
-                bv.Velocity = dir * spd
-                task.wait(TICK)
-            end
-            bv.Velocity = Vector3.zero
-            task.wait(0.1)
+        local spd
+        if dist >= DECEL_DIST then
+            spd = STEP_DIST
+        else
+            spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
-    end
+        local vx = dir.X * spd
+        local vz = dir.Z * spd
 
-    -- ===== PHASE 2: CRUISE TREN CAO =====
-    if ok then
-        local p = currentPos()
-        local highY = p and p.Y or (target.Y + FLY_HEIGHT)
-        local goal = Vector3.new(target.X, highY, target.Z)
-        local t0 = os.clock()
-        while enabled and os.clock() - t0 < 90 do
-            if not currentCar() then ok = false; break end
-            local cp = currentPos()
-            if not cp then ok = false; break end
-            local flat = Vector3.new(goal.X - cp.X, 0, goal.Z - cp.Z)
-            local dist = flat.Magnitude
-            if dist < ARRIVE_DIST then break end
-            local dir = flat.Unit
-            faceDir(dir)
-            local spd
-            if dist >= DECEL_DIST then
-                spd = STEP_DIST
-            else
-                spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
-            end
-            bv.Velocity = dir * spd
-            task.wait(TICK)
-        end
-        bv.Velocity = Vector3.zero
-        task.wait(0.1)
-    end
+        local dy = targetY - curPos.Y
+        local vy = math.clamp(dy * 4, -50, 50)
 
-    -- ===== PHASE 3: HA XUONG =====
-    if ok then
-        local p = currentPos()
-        if p then
-            local goal = Vector3.new(target.X, target.Y + 15, target.Z)
-            local t0 = os.clock()
-            while enabled and os.clock() - t0 < 20 do
-                if not currentCar() then break end
-                local cp = currentPos()
-                if not cp then break end
-                local delta = goal - cp
-                if delta.Magnitude < 8 then break end
-                local dir = delta.Unit
-                local spd = math.clamp(delta.Magnitude * 3, 10, STEP_DIST)
-                bv.Velocity = dir * spd
-                task.wait(TICK)
-            end
-            bv.Velocity = Vector3.zero
-        end
+        bv.Velocity = Vector3.new(vx, vy, vz)
+        task.wait(TICK)
     end
 
     if bv and bv.Parent then bv:Destroy() end
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG DAT CHINH XAC (bbox) =====
+    -- ===== HA XUONG BBOX =====
     car = myCar or findMyCar()
     if car then
-        -- Raycast tu tren cao xuong
         local pivotPos = car:GetPivot().Position
         local params = makeRayParams()
         local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
         local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
 
         if hit then
-            -- Tinh day bbox
             local bbCF, bbSize = car:GetBoundingBox()
             local bbCenter = bbCF.Position
-            local bbBottomOffset = bbSize.Y / 2  -- tu center xuong day
-
-            -- Muon day bbox o (hit.Y + LAND_OFFSET)
+            local bbBottomOffset = bbSize.Y / 2
             local targetCenterY = hit.Position.Y + bbBottomOffset + LAND_OFFSET
-            -- Day pivot sao cho center dat targetCenterY
             local offsetPivotToCenterY = bbCenter.Y - pivotPos.Y
             local targetPivotY = targetCenterY - offsetPivotToCenterY
 
@@ -522,7 +507,7 @@ local function flyTo(target)
     end
 
     task.wait(0.15)
-    return true
+    return reached
 end
 
 -- ============ SPAWN ============
@@ -887,4 +872,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v12")
+print("[ridego] loaded v13")
