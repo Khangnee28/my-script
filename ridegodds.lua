@@ -9,15 +9,15 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST         = 250
-local LAND_OFFSET       = 6
+local LAND_OFFSET       = 7
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
-local PICKUP_WAIT       = 2
-local DROP_WAIT         = 2
+local PICKUP_WAIT       = 4
+local DROP_WAIT         = 4
 local DECEL_DIST        = 200
-local TICK              = 0.05
+local TICK              = 0.10
 local UNDERGROUND_DEPTH = 120
-local UNDER_STEP_MAX    = 50
+local UNDER_STEP_MAX    = 70
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
 
