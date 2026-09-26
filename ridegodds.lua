@@ -1,9 +1,8 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v9
--- Noclip: chi tat than xe, GIU va cham khung gam + banh -> khong xuyen san.
--- Ha xuong: bat lai collide truoc, raycast phai trung dat, khong trung thi KHONG ha.
--- Safety net: phat hien xe duoi -20 -> bat collide, khong tele.
--- Chong roi khi cho: giu hold goc (Y=0), khong tele HRP.
+-- RideGo Farm — FINAL v10
+-- Noclip theo PHA: BAT khi bat dau bay, TAT khi cham dat.
+-- Cho don: noclip OFF, collide ON, hold Y=0 -> xe dung tren dat.
+-- Ep ghe lai: CFrame tuyet doi tren ghe + Sit cung + verify 2 lan.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -22,8 +21,6 @@ local VOID_SCAN_MAX  = 100000
 local VOID_SCAN_STEP = 150
 local TICK           = 0.05
 local LAND_OFFSET    = 3
-local SINK_Y         = -20
-local DEBUG_NOCOLLIDE = false  -- bat true de in part mat collide khi ha
 
 -- ============ STATE ============
 local enabled     = false
@@ -37,6 +34,7 @@ local carList     = {}
 local stats = { trips = 0, earn = 0 }
 local curState = "OFF"
 local holdBV = nil
+local flying = false
 
 local function resetState()
     orderToken = nil
@@ -47,6 +45,7 @@ local function resetState()
     stats.trips = 0
     stats.earn = 0
     curState = "OFF"
+    flying = false
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
@@ -174,46 +173,39 @@ local function rayFloorY(fromPos, maxDist, ignoreWater)
 end
 
 -- ============ NOCLIP ============
--- Chi tat CanCollide cho THAN xe (khong vuong tuong ngang).
--- Giu va cham cho KHUNG GAM + BANH (khong xuyen san).
+-- Cong tac toan bo: BAT khi bay (xuyen tuong), TAT khi cham dat (va cham san).
 local carNoclipOn = false
 local noclipHooked = {}
 
-local KEEP_COLLIDE = {
-    chassis = true, frame = true, base = true,
-    wheel = true, tire = true, tyre = true,
-    body = true, hull = true, floor = true, under = true,
-}
-
-local function isChassisPart(part)
-    local n = part.Name:lower()
-    for key in pairs(KEEP_COLLIDE) do
-        if n:find(key, 1, true) then return true end
-    end
-    return false
-end
-
--- keepChassis = true -> giu collide cho khung gam, tat cho than
-local function walkNoclip(inst, keepChassis)
+local function walkNoclip(inst)
     if not inst then return end
-    local function process(p)
-        if not p:IsA("BasePart") then return end
-        if not p.CanCollide then return end
-        if keepChassis and isChassisPart(p) then return end
-        pcall(function() p.CanCollide = false end)
+    if inst:IsA("BasePart") and inst.CanCollide then
+        pcall(function() inst.CanCollide = false end)
     end
-    process(inst)
     for _, p in ipairs(inst:GetDescendants()) do
-        process(p)
+        if p:IsA("BasePart") and p.CanCollide then
+            pcall(function() p.CanCollide = false end)
+        end
     end
 end
 
-local function hookNoclip(inst, keepChassis)
+local function fullCollideOn(inst)
+    if not inst then return end
+    if inst:IsA("BasePart") and not inst.CanCollide then
+        pcall(function() inst.CanCollide = true end)
+    end
+    for _, p in ipairs(inst:GetDescendants()) do
+        if p:IsA("BasePart") and not p.CanCollide then
+            pcall(function() p.CanCollide = true end)
+        end
+    end
+end
+
+local function hookNoclip(inst)
     if not inst or noclipHooked[inst] then return end
     noclipHooked[inst] = true
     inst.DescendantAdded:Connect(function(d)
         if carNoclipOn and d:IsA("BasePart") and d.CanCollide then
-            if keepChassis and isChassisPart(d) then return end
             pcall(function() d.CanCollide = false end)
         end
     end)
@@ -223,8 +215,8 @@ local function hookPassengerChars()
     for _, plr in ipairs(Players:GetPlayers()) do
         local c = plr.Character
         if c then
-            hookNoclip(c, false)
-            walkNoclip(c, false)
+            hookNoclip(c)
+            if carNoclipOn then walkNoclip(c) end
         end
     end
 end
@@ -232,42 +224,46 @@ end
 local function forceNoclip()
     local car = myCar or findMyCar()
     if car then
-        walkNoclip(car, true)
+        walkNoclip(car)
         local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
         if vs and vs.Occupant then
             local h = vs.Occupant
-            if h and h.Parent then walkNoclip(h.Parent, false) end
+            if h and h.Parent then walkNoclip(h.Parent) end
         end
     end
     local c = char()
-    if c then walkNoclip(c, false) end
+    if c then walkNoclip(c) end
     hookPassengerChars()
 end
 
-local function setCarNoclip(on)
-    carNoclipOn = on
-    if not on then return end
+-- BAT noclip toan bo (khi bat dau bay)
+local function noclipAllOn()
+    carNoclipOn = true
     local car = myCar or findMyCar()
-    if car then hookNoclip(car, true) end
+    if car then hookNoclip(car) end
     local c = char()
-    if c then hookNoclip(c, false) end
+    if c then hookNoclip(c) end
     hookPassengerChars()
     forceNoclip()
 end
 
--- bat lai collide TOAN BO xe (dung truoc khi ha)
-local function fullCollideOn(car)
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") and not p.CanCollide then
-            pcall(function() p.CanCollide = true end)
-        end
+-- TAT noclip, bat lai collide toan bo (khi cham dat)
+local function noclipAllOff()
+    carNoclipOn = false
+    local car = myCar or findMyCar()
+    if car then fullCollideOn(car) end
+    local c = char()
+    if c then fullCollideOn(c) end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local pc = plr.Character
+        if pc then fullCollideOn(pc) end
     end
 end
 
 Players.PlayerAdded:Connect(function(plr)
     plr.CharacterAdded:Connect(function(c)
-        if carNoclipOn then hookNoclip(c, false); walkNoclip(c, false) end
+        hookNoclip(c)
+        if carNoclipOn then walkNoclip(c) else fullCollideOn(c) end
     end)
 end)
 Players.PlayerRemoving:Connect(function(plr)
@@ -327,61 +323,73 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
+-- Ep ngoi ghe lai: CFrame tuyet doi tren ghe + Sit cung + verify 2 lan.
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
-    if not h or not car then return end
+    if not h or not car then return false end
     local vs = getDriveSeat(car)
-    if not vs then return end
+    if not vs then return false end
 
-    if h.Sit and h.SeatPart == vs then return end
+    if h.Sit and h.SeatPart == vs then return true end
 
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
-        task.wait(0.12)
+        task.wait(0.1)
     end
 
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
             pcall(function() occ.Sit = false end)
-            task.wait(0.12)
-        end
-        if vs.Occupant and vs.Occupant ~= h then
-            return
+            task.wait(0.1)
         end
     end
 
+    -- CFrame toi NGAY TREN ghe lai, khong lech sang ghe khac
     local hrp = root()
     if hrp then
-        local sitPos = vs.Position + Vector3.new(0, 2.5, 0)
-        pcall(function() hrp.CFrame = CFrame.new(sitPos) end)
-        task.wait(0.06)
+        local seatCF = vs.CFrame * CFrame.new(0, 2.5, 0)
+        pcall(function() hrp.CFrame = seatCF end)
+        task.wait(0.05)
     end
-    pcall(function() vs:Sit(h) end)
-    task.wait(0.1)
 
+    pcall(function() vs:Sit(h) end)
+    task.wait(0.08)
+
+    -- verify lan 1
+    if not h.Sit or h.SeatPart ~= vs then
+        local hrp2 = root()
+        if hrp2 then
+            local seatCF2 = vs.CFrame * CFrame.new(0, 3, 0)
+            pcall(function() hrp2.CFrame = seatCF2 end)
+            task.wait(0.05)
+        end
+        pcall(function() vs:Sit(h) end)
+        task.wait(0.08)
+    end
+
+    -- verify lan cuoi
     if not h.Sit or h.SeatPart ~= vs then
         pcall(function() h.Sit = true end)
-        task.wait(0.08)
-        if h.SeatPart ~= vs then
-            pcall(function() vs:Sit(h) end)
-        end
+        task.wait(0.05)
     end
+
+    return h.Sit and h.SeatPart == vs
 end
 
+-- Seat loop: chi chay khi KHONG bay
 task.spawn(function()
     while true do
-        task.wait(0.1)
-        if enabled and (myCar or findMyCar()) then
+        task.wait(0.15)
+        if enabled and not flying and (myCar or findMyCar()) then
             local h = hum()
             if h then
                 local car = myCar or findMyCar()
                 local vs = getDriveSeat(car)
                 local wrongSeat = h.Sit and vs and h.SeatPart ~= vs
                 local notSeated = not h.Sit
-                local seatTaken = vs and vs.Occupant and vs.Occupant ~= h
-                if wrongSeat or notSeated or seatTaken then
+                if wrongSeat or notSeated then
                     forceSeat()
                 end
             end
@@ -408,29 +416,6 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ SAFETY NET ============
--- Phat hien xe duoi -20 -> bat collide, khong tele len.
-local netArmed = true
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        if not enabled then netArmed = true; continue end
-        if not netArmed then continue end
-        local car = myCar or findMyCar()
-        if car then
-            local vs = getDriveSeat(car)
-            local base = vs and vs.Position or (car.PrimaryPart and car.PrimaryPart.Position)
-            if base and base.Y < SINK_Y then
-                netArmed = false
-                setState("safety net")
-                fullCollideOn(car)
-                task.wait(3)
-                netArmed = true
-            end
-        end
-    end
-end)
-
 -- ============ VOID SCAN ============
 local function scanVoidBridge(curPos, dir, curFloorY)
     for testDist = VOID_SCAN_MIN, VOID_SCAN_MAX, VOID_SCAN_STEP do
@@ -452,12 +437,14 @@ local function flyTo(target)
     local car = myCar or findMyCar()
     if not h or not car then return false end
 
-    setCarNoclip(true)
+    -- BAT NOCLIP TOAN BO NGAY khi bat dau bay
+    noclipAllOn()
+    flying = true
     if not h.Sit then forceSeat(); task.wait(0.1) end
 
     local vs = getDriveSeat(car)
     local attach = vs or root()
-    if not attach then return false end
+    if not attach then flying = false; return false end
 
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
@@ -570,28 +557,18 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG AN TOAN =====
+    -- ===== HA XUONG: TAT NOCLIP, BAT COLLIDE, roi ha =====
     car = myCar or findMyCar()
-    if not car then task.wait(0.2) return reached end
+    if not car then flying = false; task.wait(0.2); return reached end
 
     local vs2 = getDriveSeat(car)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
-    if not endPos then task.wait(0.2) return reached end
+    if not endPos then flying = false; task.wait(0.2); return reached end
 
-    if DEBUG_NOCOLLIDE then
-        print("=== PARTS NO COLLIDE TRUOC KHI HA ===")
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") and not p.CanCollide then
-                print(p:GetFullName(), "| name:", p.Name)
-            end
-        end
-    end
-
-    -- bat lai collide toan bo xe truoc khi ha
-    fullCollideOn(car)
+    -- TAT noclip ngay -> bat collide toan bo truoc khi ha
+    noclipAllOff()
     task.wait(0.05)
 
-    -- raycast tu tren cao, bat buoc phai trung dat
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local ign = {}
@@ -604,20 +581,16 @@ local function flyTo(target)
     local origin = Vector3.new(endPos.X, endPos.Y + 300, endPos.Z)
     local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
 
-    if not hit then
+    if hit then
+        local targetY = hit.Position.Y + LAND_OFFSET
+        local landed = Vector3.new(endPos.X, targetY, endPos.Z)
+        pcall(function() car:PivotTo(CFrame.new(landed)) end)
+        task.wait(0.2)
+    else
         setState("khong thay dat - giu do cao")
-        task.wait(0.3)
-        walkNoclip(car, true)
-        return reached
     end
 
-    local targetY = hit.Position.Y + LAND_OFFSET
-    local landed = Vector3.new(endPos.X, targetY, endPos.Z)
-    pcall(function() car:PivotTo(CFrame.new(landed)) end)
-    task.wait(0.2)
-
-    -- bat lai noclip than (khung van giu collide)
-    walkNoclip(car, true)
+    flying = false
 
     if not h.Sit then forceSeat() end
     task.wait(0.1)
@@ -706,7 +679,8 @@ local function runTrip()
     end
     myCar = findMyCar()
 
-    setCarNoclip(true)
+    -- Cho don: noclip OFF, collide ON, hold Y=0
+    noclipAllOff()
     startHold()
 
     setState("cho don")
@@ -715,6 +689,9 @@ local function runTrip()
     local deadline = os.clock() + ORDER_TIMEOUT
     while os.clock() < deadline and enabled do
         if pickupPos then break end
+        if not holdBV or not holdBV.Parent then
+            startHold()
+        end
         task.wait(0.4)
     end
 
@@ -944,7 +921,7 @@ toggleBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
         resetState()
-        setCarNoclip(false)
+        noclipAllOff()
         local h = hum()
         if h and h.Sit then
             pcall(function() h.Sit = false end)
@@ -995,4 +972,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v9")
+print("[ridego] loaded v10")
