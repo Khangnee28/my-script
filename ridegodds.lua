@@ -1,7 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.4
--- Bay UNDER CFrame. Toi noi choi len 6 stud, khong quet tran.
--- Guard acceptingOrder: chi nhan don khi dang o pha "cho don".
+-- RideGo Farm — FINAL v25.5
+-- Bay UNDER CFrame 270. Toi noi choi 6 stud + bat hold NGAY -> khong rot void.
+-- GUI gon: chi toggle + chon xe (tu dong scan).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -97,7 +97,6 @@ if TaxiEvent then
     TaxiEvent.OnClientEvent:Connect(function(action, data)
         if type(data) ~= "table" then return end
         if action == "OrderOffer" then
-            -- CHI nhan don khi dang o pha cho don
             if not acceptingOrder then return end
             orderToken = data.Token
             pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
@@ -316,15 +315,6 @@ local function claimNetworkOwner(inst)
 end
 
 -- ============ ANCHOR ============
-local function anchorCar(car)
-    if not car then return end
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") and not p.Anchored then
-            pcall(function() p.Anchored = true end)
-        end
-    end
-end
-
 local function unanchorCar(car)
     if not car then return end
     for _, p in ipairs(car:GetDescendants()) do
@@ -358,7 +348,7 @@ local function startHold()
     if not vs then return end
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGHold"
-    bv.MaxForce = Vector3.new(1e6, 0, 1e6)
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
     bv.P = 10000
     bv.Velocity = Vector3.zero
     bv.Parent = vs
@@ -551,7 +541,6 @@ local function flyTo(target)
     local startPivot = car:GetPivot()
     local rotOnly = startPivot - startPivot.Position
 
-    -- Di xuong duoi dat bang nhieu step nho
     local curPos = startPivot.Position
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
     for i = 1, UNDER_DESCEND_STEPS do
@@ -598,7 +587,6 @@ local function flyTo(target)
         local nextCF = CFrame.new(nextPos) * rotOnly
         pcall(function() c:PivotTo(nextCF) end)
 
-        -- Fake velocity
         fakeVelCounter = fakeVelCounter + 1
         if fakeVelCounter >= 2 then
             fakeVelCounter = 0
@@ -618,10 +606,13 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== CHOI LEN 6 STUD =====
+    -- ===== CHOI LEN 6 STUD + BAT HOLD NGAY =====
     car = myCar or findMyCar()
     if car and reached then
         ascendAtArrival(car)
+        -- Bat hold NGAY (truoc khi detach) -> khong rot void
+        myCar = car
+        startHold()
     end
 
     detachNpcFollowers()
@@ -629,7 +620,6 @@ local function flyTo(target)
     flying = false
     if not h.Sit then forceSeat() end
     task.wait(0.1)
-    startHold()
 
     local h2 = hum()
     if not h2 or not h2.Sit then
@@ -715,7 +705,6 @@ local function runTrip()
 
     startHold()
 
-    -- Reset state pha cho don
     orderToken = nil
     pickupPos = nil
     dropPos = nil
@@ -731,7 +720,6 @@ local function runTrip()
         task.wait(0.4)
     end
 
-    -- Nhan don xong -> ngung nhan don moi
     acceptingOrder = false
 
     if not pickupPos then
@@ -782,7 +770,7 @@ local function startLoop()
     end)
 end
 
--- ============ GUI ============
+-- ============ GUI (gon) ============
 local cg = game:GetService("CoreGui")
 if cg:FindFirstChild("RideGoFarmUI") then cg.RideGoFarmUI:Destroy() end
 
@@ -793,7 +781,7 @@ gui.DisplayOrder = 999
 gui.Parent = cg
 
 local rootUI = Instance.new("Frame", gui)
-rootUI.Size = UDim2.new(0, 280, 0, 148)
+rootUI.Size = UDim2.new(0, 260, 0, 148)
 rootUI.Position = UDim2.new(0, 20, 0.5, -74)
 rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
 rootUI.BorderSizePixel = 0
@@ -807,7 +795,7 @@ local title = Instance.new("TextLabel", rootUI)
 title.Size = UDim2.new(1, -16, 0, 24)
 title.Position = UDim2.new(0, 8, 0, 4)
 title.BackgroundTransparency = 1
-title.Text = "RIDEGO FARM — UNDER"
+title.Text = "RIDEGO FARM"
 title.TextColor3 = Color3.fromRGB(255, 140, 40)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
@@ -853,19 +841,9 @@ carBody.Position = UDim2.new(0, 8, 0, 146)
 carBody.BackgroundTransparency = 1
 carBody.Visible = false
 
-local scanBtn = Instance.new("TextButton", carBody)
-scanBtn.Size = UDim2.new(1, 0, 0, 26)
-scanBtn.Position = UDim2.new(0, 0, 0, 0)
-scanBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 90)
-scanBtn.Text = "QUET XE"
-scanBtn.TextColor3 = Color3.new(1,1,1)
-scanBtn.TextSize = 11
-scanBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
-
 local scroll = Instance.new("ScrollingFrame", carBody)
-scroll.Size = UDim2.new(1, 0, 0, 150)
-scroll.Position = UDim2.new(0, 0, 0, 32)
+scroll.Size = UDim2.new(1, 0, 0, 190)
+scroll.Position = UDim2.new(0, 0, 0, 0)
 scroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 4
@@ -919,6 +897,12 @@ local function renderCars()
         btn.MouseButton1Click:Connect(function()
             selectedCar = name
             renderCars()
+            -- Tu dong thu gon sau khi chon
+            carOpen = false
+            carBody.Visible = false
+            carBody.Size = UDim2.new(1, -16, 0, 0)
+            rootUI.Size = UDim2.new(0, 260, 0, 148)
+            carHeader.Text = "> CHON XE (" .. #carList .. ")"
         end)
     end
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
@@ -929,24 +913,12 @@ carHeader.MouseButton1Click:Connect(function()
     carBody.Visible = carOpen
     if carOpen then
         carBody.Size = UDim2.new(1, -16, 0, 190)
-        rootUI.Size = UDim2.new(0, 280, 0, 348)
+        rootUI.Size = UDim2.new(0, 260, 0, 340)
     else
         carBody.Size = UDim2.new(1, -16, 0, 0)
-        rootUI.Size = UDim2.new(0, 280, 0, 148)
+        rootUI.Size = UDim2.new(0, 260, 0, 148)
     end
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
-end)
-
-scanBtn.MouseButton1Click:Connect(function()
-    scanBtn.Text = "dang quet..."
-    task.spawn(function()
-        scanCars()
-        if #carList > 0 and (not selectedCar or selectedCar == "") then
-            selectedCar = carList[1]
-        end
-        renderCars()
-        scanBtn.Text = "QUET XE (" .. #carList .. ")"
-    end)
 end)
 
 local function paint()
@@ -1015,6 +987,7 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
+-- Tu dong scan khi load
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1022,7 +995,6 @@ task.spawn(function()
         selectedCar = carList[1]
     end
     renderCars()
-    scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v25.4")
+print("[ridego] loaded v25.5")
