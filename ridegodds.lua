@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.9
--- LAND_OFFSET=3. Hold khoa vi tri + rotation (BodyGyro). Money scan rong + debug.
+-- RideGo Farm — FINAL v26
+-- LAND_OFFSET=5. Bo money. Bo BodyGyro (gay kick). BV MaxForce nhe + update thua.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,7 +9,7 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST         = 270
-local LAND_OFFSET       = 3
+local LAND_OFFSET       = 5
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 2
@@ -20,6 +20,8 @@ local UNDERGROUND_DEPTH = 120
 local UNDER_STEP_MAX    = 60
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME   = 0.03
+local HOLD_MAXFORCE     = 1e5      -- giam tu 1e6 -> 1e5
+local HOLD_UPDATE       = 0.15     -- giam tan suat update
 
 -- ============ STATE ============
 local enabled     = false
@@ -34,7 +36,6 @@ local carList     = {}
 local stats = { trips = 0, earn = 0 }
 local curState = "◦ OFF"
 local holdBV = nil
-local holdGyro = nil
 local flying = false
 local acceptingOrder = false
 
@@ -51,10 +52,6 @@ local function resetState()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
-    end
-    if holdGyro then
-        pcall(function() holdGyro:Destroy() end)
-        holdGyro = nil
     end
 end
 
@@ -94,80 +91,6 @@ local function fire(remote, ...)
 end
 
 local function setState(s) curState = s end
-
--- ============ MONEY SCAN ============
-local moneyPath = nil
-
-local MONEY_NAMES = {
-    "Cash","Money","Rp","Coin","Coins","Rupiah","Rupiahs",
-    "Duit","Uang","Balance","Wallet","Currency","Bank","Bucks"
-}
-
-local function scanMoneyValue()
-    -- 1. leaderstats
-    local ls = lp:FindFirstChild("leaderstats")
-    if ls then
-        for _, v in ipairs(ls:GetChildren()) do
-            if v:IsA("ValueBase") then
-                moneyPath = ls:GetFullName() .. "." .. v.Name
-                return v
-            end
-        end
-    end
-
-    -- 2. Player direct ValueBase co ten khop
-    for _, v in ipairs(lp:GetChildren()) do
-        if v:IsA("IntValue") or v:IsA("NumberValue") or v:IsA("StringValue") then
-            local n = v.Name:lower()
-            for _, mn in ipairs(MONEY_NAMES) do
-                if n:find(mn:lower(), 1, true) then
-                    moneyPath = lp.Name .. "." .. v.Name
-                    return v
-                end
-            end
-        end
-    end
-
-    -- 3. Tim trong Player/RS theo ten
-    for _, container in ipairs({lp, rs}) do
-        local ok, found = pcall(function() return container:FindFirstChild("Money", true) end)
-        if ok and found and found:IsA("ValueBase") then
-            moneyPath = container.Name .. ".." .. found:GetFullName()
-            return found
-        end
-    end
-
-    return nil
-end
-
-local function getMoney()
-    local v = scanMoneyValue()
-    if v then
-        local ok, val = pcall(function() return v.Value end)
-        if ok then return val end
-    end
-    return nil
-end
-
--- Debug: in het ValueBase cua Player 1 lan sau khi load
-task.spawn(function()
-    task.wait(2)
-    print("=== MONEY DEBUG ===")
-    local ls = lp:FindFirstChild("leaderstats")
-    if ls then
-        for _, v in ipairs(ls:GetChildren()) do
-            print("[leaderstats]", v.Name, v.ClassName, v.Value)
-        end
-    else
-        print("[leaderstats] khong ton tai")
-    end
-    for _, v in ipairs(lp:GetChildren()) do
-        if v:IsA("ValueBase") then
-            print("[Player]", v.Name, v.ClassName, v.Value)
-        end
-    end
-    print("=== END MONEY DEBUG ===")
-end)
 
 -- ============ TAXI HOOK ============
 if TaxiEvent then
@@ -414,51 +337,30 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ HOLD (khoa vi tri + rotation) ============
+-- ============ HOLD (nhe, khong gyro) ============
 local function startHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
-    end
-    if holdGyro then
-        pcall(function() holdGyro:Destroy() end)
-        holdGyro = nil
     end
     local car = myCar or findMyCar()
     if not car then return end
     local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
     if not vs then return end
 
-    -- BodyVelocity giu vi tri
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGHold"
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-    bv.P = 10000
+    bv.MaxForce = Vector3.new(HOLD_MAXFORCE, HOLD_MAXFORCE, HOLD_MAXFORCE)
+    bv.P = 2000
     bv.Velocity = Vector3.zero
     bv.Parent = vs
     holdBV = bv
 
-    -- BodyGyro giu rotation (chong xoay vong)
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "RGHoldGyro"
-    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-    bg.P = 15000
-    bg.D = 800
-    local curCF = vs.CFrame
-    bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
-    bg.Parent = vs
-    holdGyro = bg
-
+    -- Update thua -> it replication -> khong kick
     task.spawn(function()
         while holdBV == bv and bv.Parent do
             bv.Velocity = Vector3.zero
-            task.wait(0.03)
-        end
-    end)
-    task.spawn(function()
-        while holdGyro == bg and bg.Parent do
-            bg.CFrame = CFrame.new(Vector3.zero) * (bg.CFrame - bg.CFrame.Position)
-            task.wait(0.03)
+            task.wait(HOLD_UPDATE)
         end
     end)
 end
@@ -467,10 +369,6 @@ local function stopHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
-    end
-    if holdGyro then
-        pcall(function() holdGyro:Destroy() end)
-        holdGyro = nil
     end
 end
 
@@ -607,10 +505,17 @@ local function ascendToGround(car, target, targetFloor)
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
 
+    -- Reset rotation ve huong ngang chuan (khong roll, khong pitch)
     local cp = car:GetPivot()
-    local rotOnly = cp - cp.Position
+    local lookDir = Vector3.new(target.X - cp.Position.X, 0, target.Z - cp.Position.Z)
+    if lookDir.Magnitude < 0.01 then
+        lookDir = Vector3.new(0, 0, -1)
+    end
+    local yaw = math.atan2(lookDir.X, lookDir.Z)
+    local flatRot = CFrame.Angles(0, yaw, 0)
+
     local dest = Vector3.new(target.X, upTargetY, target.Z)
-    pcall(function() car:PivotTo(CFrame.new(dest) * rotOnly) end)
+    pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
     task.wait(0.15)
 end
 
@@ -718,12 +623,12 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== NOI LEN MAT DAT + LAND_OFFSET STUD =====
+    -- ===== NOI LEN MAT DAT =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
-        startHold()  -- BV + Gyro giu dung yen + khong xoay
+        startHold()
     end
 
     detachNpcFollowers()
@@ -905,8 +810,8 @@ gui.DisplayOrder = 999
 gui.Parent = cg
 
 local rootUI = Instance.new("Frame", gui)
-rootUI.Size = UDim2.new(0, 270, 0, 168)
-rootUI.Position = UDim2.new(0, 20, 0.5, -84)
+rootUI.Size = UDim2.new(0, 270, 0, 148)
+rootUI.Position = UDim2.new(0, 20, 0.5, -74)
 rootUI.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
 rootUI.BorderSizePixel = 0
 rootUI.Active = true
@@ -926,10 +831,10 @@ title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 
 local statLbl = Instance.new("TextLabel", rootUI)
-statLbl.Size = UDim2.new(1, -16, 0, 64)
+statLbl.Size = UDim2.new(1, -16, 0, 44)
 statLbl.Position = UDim2.new(0, 8, 0, 30)
 statLbl.BackgroundTransparency = 1
-statLbl.Text = "trips: 0 | earn: 0\ncash: ...\nstate: ..."
+statLbl.Text = "trips: 0 | earn: 0\nstate: ..."
 statLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
 statLbl.TextSize = 10
 statLbl.Font = Enum.Font.Code
@@ -938,7 +843,7 @@ statLbl.TextYAlignment = Enum.TextYAlignment.Top
 
 local toggleBtn = Instance.new("TextButton", rootUI)
 toggleBtn.Size = UDim2.new(1, -16, 0, 30)
-toggleBtn.Position = UDim2.new(0, 8, 0, 98)
+toggleBtn.Position = UDim2.new(0, 8, 0, 78)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
 toggleBtn.Text = "BAT DAU FARM"
 toggleBtn.TextColor3 = Color3.new(1,1,1)
@@ -948,7 +853,7 @@ Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 7)
 
 local carHeader = Instance.new("TextButton", rootUI)
 carHeader.Size = UDim2.new(1, -16, 0, 26)
-carHeader.Position = UDim2.new(0, 8, 0, 134)
+carHeader.Position = UDim2.new(0, 8, 0, 114)
 carHeader.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
 carHeader.Text = "> CHON XE (0)"
 carHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
@@ -961,7 +866,7 @@ chp.PaddingLeft = UDim.new(0, 8)
 
 local carBody = Instance.new("Frame", rootUI)
 carBody.Size = UDim2.new(1, -16, 0, 0)
-carBody.Position = UDim2.new(0, 8, 0, 166)
+carBody.Position = UDim2.new(0, 8, 0, 146)
 carBody.BackgroundTransparency = 1
 carBody.Visible = false
 
@@ -1024,7 +929,7 @@ local function renderCars()
             carOpen = false
             carBody.Visible = false
             carBody.Size = UDim2.new(1, -16, 0, 0)
-            rootUI.Size = UDim2.new(0, 270, 0, 168)
+            rootUI.Size = UDim2.new(0, 270, 0, 148)
             carHeader.Text = "> CHON XE (" .. #carList .. ")"
         end)
     end
@@ -1036,10 +941,10 @@ carHeader.MouseButton1Click:Connect(function()
     carBody.Visible = carOpen
     if carOpen then
         carBody.Size = UDim2.new(1, -16, 0, 190)
-        rootUI.Size = UDim2.new(0, 270, 0, 360)
+        rootUI.Size = UDim2.new(0, 270, 0, 340)
     else
         carBody.Size = UDim2.new(1, -16, 0, 0)
-        rootUI.Size = UDim2.new(0, 270, 0, 168)
+        rootUI.Size = UDim2.new(0, 270, 0, 148)
     end
     carHeader.Text = (carOpen and "v " or "> ") .. "CHON XE (" .. #carList .. ")"
 end)
@@ -1082,12 +987,9 @@ end)
 task.spawn(function()
     while true do
         task.wait(0.5)
-        local cash = getMoney()
-        local cashStr = cash and tostring(cash) or "?"
         statLbl.Text = string.format(
-            "trips: %d | earn: %d\ncash: %s\nstate: %s",
-            stats.trips, stats.earn, cashStr,
-            curState
+            "trips: %d | earn: %d\nstate: %s",
+            stats.trips, stats.earn, curState
         )
     end
 end)
@@ -1117,4 +1019,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v25.9")
+print("[ridego] loaded v26")
