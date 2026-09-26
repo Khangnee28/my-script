@@ -1,7 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v29.1
--- Bo toan bo check seat. Menu hien ten xe. Status "RideGo Status" mau cam.
--- Lan 1: doi job+spawn+online. Lan 2+: reset char+spawn+offline/online.
+-- RideGo Farm — FINAL v29.2
+-- Bo noclip. Char bam ghe moi tick. Khong check seat.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -534,6 +533,16 @@ local function ascendToGround(car, target, targetFloor)
 
     local dest = Vector3.new(target.X, upTargetY, target.Z)
     pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
+
+    task.wait(0.05)
+    local vs = getDriveSeat(car)
+    local myHRP = root()
+    if vs and myHRP then
+        pcall(function()
+            myHRP.CFrame = vs.CFrame * CFrame.new(0, 1, 0)
+        end)
+    end
+
     task.wait(0.15)
 end
 
@@ -546,8 +555,6 @@ local function flyTo(target)
     if not h.Sit then forceSeat(); task.wait(0.1) end
     pcall(function() h.AutoRotate = false end)
 
-    local myChar = char()
-
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
@@ -558,19 +565,6 @@ local function flyTo(target)
 
     claimNetworkOwner(car)
     attachNpcFollowers(car)
-
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.CanCollide = false end)
-        end
-    end
-    if myChar then
-        for _, p in ipairs(myChar:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.CanCollide = false end)
-            end
-        end
-    end
 
     flying = true
 
@@ -583,6 +577,14 @@ local function flyTo(target)
         curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
         local cf = CFrame.new(curPos) * rotOnly
         pcall(function() car:PivotTo(cf) end)
+
+        -- Ep HRP theo ghe moi buoc
+        local vsNow = getDriveSeat(car)
+        local hrpNow = root()
+        if vsNow and hrpNow then
+            pcall(function() hrpNow.CFrame = vsNow.CFrame * CFrame.new(0, 1, 0) end)
+        end
+
         task.wait(UNDER_STEP_TIME)
     end
     setStatus("⬇ Đang bay dưới lòng đất")
@@ -590,10 +592,16 @@ local function flyTo(target)
     local reached = false
     local lastNpcRefresh = 0
     local fakeVelCounter = 0
+    local myHRP = root()
+    local driveSeatRef = getDriveSeat(car)
 
     while enabled do
         local c = myCar or findMyCar()
         if not c then break end
+
+        if not driveSeatRef or not driveSeatRef.Parent then
+            driveSeatRef = getDriveSeat(c)
+        end
 
         local curP = c:GetPivot().Position
         local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
@@ -622,6 +630,17 @@ local function flyTo(target)
         )
         pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
+        -- EP HRP bam ghe moi tick -> khong rot
+        if driveSeatRef and driveSeatRef.Parent then
+            if myHRP and myHRP.Parent then
+                pcall(function()
+                    myHRP.CFrame = driveSeatRef.CFrame * CFrame.new(0, 1, 0)
+                end)
+            else
+                myHRP = root()
+            end
+        end
+
         fakeVelCounter = fakeVelCounter + 1
         if fakeVelCounter >= 2 then
             fakeVelCounter = 0
@@ -645,6 +664,8 @@ local function flyTo(target)
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
+        forceSeat()
+        task.wait(0.15)
         startHold()
         pcall(function() hum().AutoRotate = false end)
     end
@@ -1234,4 +1255,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v29.1")
+print("[RideGo] Đã load v29.2")
