@@ -1,8 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL
--- Void scan 100 -> 20000 studs. Khong tim thay -> tele thang target.
--- Toi pickup/drop → tat noclip NGAY → ha xuong.
--- Tat farm → reset toan bo state. Bat lai → chay tu dau.
+-- RideGo Farm — FINAL v2
+-- Void scan 100 -> 20000 studs. Toi noi -> tao platform ao -> ha xe -> tat noclip.
+-- Tat farm -> reset. Bat lai -> chay tu dau.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -149,14 +148,19 @@ local function rayFloorY(fromPos, maxDist)
     if c then table.insert(ignore, c) end
     local car = myCar or findMyCar()
     if car then table.insert(ignore, car) end
+    if _G._rgPlatform then table.insert(ignore, _G._rgPlatform) end
     params.FilterDescendantsInstances = ignore
-    params.IgnoreWater = true
+    params.IgnoreWater = false
+
     local hit = workspace:Raycast(
         fromPos + Vector3.new(0, 5, 0),
         Vector3.new(0, -maxDist, 0),
         params
     )
-    if hit then return hit.Position.Y end
+    if hit then
+        if hit.Material == Enum.Material.Water then return nil end
+        return hit.Position.Y
+    end
     return nil
 end
 
@@ -209,6 +213,31 @@ task.spawn(function()
         if carNoclipOn then forceNoclip() end
     end
 end)
+
+-- ============ PLATFORM ============
+local function clearPlatform()
+    if _G._rgPlatform and _G._rgPlatform.Parent then
+        pcall(function() _G._rgPlatform:Destroy() end)
+    end
+    _G._rgPlatform = nil
+end
+
+local function createPlatform(x, y, z)
+    clearPlatform()
+    local p = Instance.new("Part")
+    p.Name = "RGPlatform"
+    p.Size = Vector3.new(40, 4, 40)
+    p.Anchored = true
+    p.CanCollide = true
+    p.CanTouch = false
+    p.CanQuery = true
+    p.Transparency = 1
+    p.Material = Enum.Material.SmoothPlastic
+    p.CFrame = CFrame.new(x, y, z)
+    p.Parent = workspace
+    _G._rgPlatform = p
+    return p
+end
 
 -- ============ SEAT ============
 local function getDriveSeat(car)
@@ -283,7 +312,7 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ VOID SCAN (100 -> 20000) ============
+-- ============ VOID SCAN ============
 local function scanVoidBridge(curPos, dir, curFloorY)
     for testDist = VOID_SCAN_MIN, VOID_SCAN_MAX, VOID_SCAN_STEP do
         local testPos = curPos + dir * testDist
@@ -358,23 +387,17 @@ local function flyTo(target)
             bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
         end)
 
-        -- void check moi 0.3s
         if os.clock() - lastVoidCheck > 0.3 then
             lastVoidCheck = os.clock()
-
             local curFloorY = rayFloorY(curPos, 500)
             local aheadFloorY = rayFloorY(curPos + dir * 100, 500)
-
             local voidHere = (curFloorY == nil) or (curFloorY < -20)
             local voidAhead = (aheadFloorY == nil) or (aheadFloorY < -20)
 
             if voidHere or voidAhead then
                 setState("void - scan")
                 bv.Velocity = Vector3.zero
-
-                -- scan bo ben kia 100 -> 20000
                 local jumpDist, jumpY = scanVoidBridge(curPos, dir, curFloorY)
-
                 local dest
                 if jumpDist and jumpY then
                     dest = Vector3.new(
@@ -384,11 +407,9 @@ local function flyTo(target)
                     )
                     setState("void - qua " .. jumpDist)
                 else
-                    -- khong tim thay bo -> tele thang target
                     dest = Vector3.new(target.X, target.Y + 15, target.Z)
                     setState("void - tele target")
                 end
-
                 local carModel = myCar or findMyCar()
                 if carModel then
                     pcall(function() carModel:PivotTo(CFrame.new(dest)) end)
@@ -399,7 +420,6 @@ local function flyTo(target)
             end
         end
 
-        -- tinh Y
         local curFloorY2 = rayFloorY(curPos, 500)
         local targetY = curPos.Y
         if curFloorY2 and curFloorY2 > -20 then
@@ -430,36 +450,51 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== TAT NOCLIP NGAY LAP TUC =====
+    -- ===== DAT NOI -> TAT NOCLIP + HA XUONG =====
+    car = myCar or findMyCar()
+    if not car then task.wait(0.2) return reached end
+
+    local vs2 = getDriveSeat(car)
+    local endPos = (vs2 and vs2.Position) or (root() and root().Position)
+    if not endPos then task.wait(0.2) return reached end
+
+    -- TAT NOCLIP NGAY LAP TUC
     setCarNoclip(false)
 
-    -- ===== HA XUONG =====
-    car = myCar or findMyCar()
-    local vs2 = car and getDriveSeat(car)
-    local endPos = (vs2 and vs2.Position) or (root() and root().Position)
-    if not endPos then
-        task.wait(0.3)
-        return reached
+    -- raycast tim san
+    local floorY = rayFloorY(endPos, 800)
+    local platformY
+    if floorY and floorY > -10 then
+        platformY = floorY + 2
+    else
+        platformY = endPos.Y - 3
     end
 
-    -- cho roi tu nhien (noclip da tat)
-    local t0 = os.clock()
-    while os.clock() - t0 < 3 and enabled do
-        task.wait(0.1)
-        local hrp3 = root()
-        if not hrp3 then break end
-        local fY = rayFloorY(hrp3.Position, 500)
-        if fY and math.abs(hrp3.Position.Y - fY) < 4 then
-            break
-        end
+    -- TAO PLATFORM AO DUOI XE
+    createPlatform(endPos.X, platformY, endPos.Z)
+    task.wait(0.1)
+
+    -- HA XE XUONG PLATFORM
+    local targetY = platformY + 3
+    local y = endPos.Y
+    local cnt = 0
+    while y > targetY and cnt < 100 and enabled do
+        y = y - 2
+        if y < targetY then y = targetY end
+        local newPos = Vector3.new(endPos.X, y, endPos.Z)
+        pcall(function() car:PivotTo(CFrame.new(newPos)) end)
+        if not h.Sit then forceSeat() end
+        cnt = cnt + 1
+        task.wait(0.03)
     end
 
-    task.wait(0.15)
+    task.wait(0.3)
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
         task.wait(0.2)
     end
+
     task.wait(0.15)
     return reached
 end
@@ -532,6 +567,7 @@ local function runTrip()
     local h = hum()
     if not h or not h.Sit then
         setState("respawn xe")
+        clearPlatform()
         if not spawnAndSeat() then task.wait(5); return end
     end
     myCar = findMyCar()
@@ -559,6 +595,9 @@ local function runTrip()
     setState("khach len xe")
     task.wait(PICKUP_WAIT)
 
+    -- xoa platform truoc khi bay tiep
+    clearPlatform()
+
     if dropPos then
         setState("tra khach")
         flyTo(dropPos)
@@ -567,6 +606,9 @@ local function runTrip()
         setState("khach xuong xe")
         task.wait(DROP_WAIT)
     end
+
+    -- xoa platform sau khi xong
+    clearPlatform()
 
     pickupPos = nil
     dropPos = nil
@@ -772,21 +814,18 @@ local function paint()
     end
 end
 
--- ===== TOGGLE =====
 toggleBtn.MouseButton1Click:Connect(function()
     if enabled then
-        -- TAT: reset toan bo
         enabled = false
         resetState()
         setCarNoclip(false)
-        -- force unseat
+        clearPlatform()
         local h = hum()
         if h and h.Sit then
             pcall(function() h.Sit = false end)
         end
         paint()
     else
-        -- BAT: reset truoc khi chay lai
         resetState()
         enabled = true
         paint()
