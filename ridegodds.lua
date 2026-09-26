@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v29
--- Bo seat loop. Menu hien ten xe. Status "RideGo Status" mau cam.
+-- RideGo Farm — FINAL v29.1
+-- Bo toan bo check seat. Menu hien ten xe. Status "RideGo Status" mau cam.
 -- Lan 1: doi job+spawn+online. Lan 2+: reset char+spawn+offline/online.
 
 local Players = game:GetService("Players")
@@ -26,7 +26,7 @@ local UNDER_STEP_TIME     = 0.03
 -- ============ TRẠNG THÁI ============
 local enabled     = false
 local initialized = false
-local hasInitOnce = false        -- chi true sau khi da doi job lan dau
+local hasInitOnce = false
 local orderToken  = nil
 local pickupPos   = nil
 local dropPos     = nil
@@ -501,44 +501,6 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
-local function checkSeatAtSpawn(car)
-    local h = hum()
-    if not h or not car then return false end
-    local vs = getDriveSeat(car)
-    if not vs then return false end
-
-    if h.Sit and h.SeatPart and h.SeatPart ~= vs then
-        setStatus("⚠ Ngồi nhầm ghế — tele về ghế lái")
-
-        pcall(function() h.Sit = false end)
-        task.wait(0.3)
-
-        local hrp = root()
-        if hrp then
-            local teleCF = getSeatTeleCF(vs)
-            pcall(function() hrp.CFrame = teleCF end)
-        end
-
-        task.wait(1)
-
-        pcall(function() vs:Sit(h) end)
-        task.wait(0.2)
-        pcall(function() h.Sit = true end)
-        pcall(function() h.AutoRotate = false end)
-        task.wait(0.2)
-
-        if not (h.Sit and h.SeatPart == vs) then
-            for i = 1, 3 do
-                if forceSeat() then break end
-                task.wait(0.3)
-            end
-        end
-
-        return h.Sit and h.SeatPart == vs
-    end
-    return true
-end
-
 local function seatCar(timeout)
     timeout = timeout or 15
     local deadline = os.clock() + timeout
@@ -714,7 +676,6 @@ local function spawnAndSeat()
     local car = findMyCar()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
         setStatus("◦ Xe đã có sẵn")
-        checkSeatAtSpawn(car)
         if seatCar(10) then
             setStatus("◦ Sẵn sàng")
             return true
@@ -745,8 +706,6 @@ local function spawnAndSeat()
     pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
     task.wait(0.1)
 
-    checkSeatAtSpawn(car)
-
     if seatCar(15) then
         setStatus("◦ Sẵn sàng")
         task.wait(1)
@@ -763,7 +722,6 @@ local function resetCharacter()
     if h then
         pcall(function() h.Health = 0 end)
     end
-    -- Doi respawn
     local deadline = os.clock() + 8
     while os.clock() < deadline do
         local newH = hum()
@@ -964,7 +922,6 @@ menuTitle.TextSize = 13
 menuTitle.Font = Enum.Font.GothamBold
 menuTitle.TextXAlignment = Enum.TextXAlignment.Left
 
--- Label hiển thị xe đã chọn
 local carNameLbl = Instance.new("TextLabel", menuFrame)
 carNameLbl.Size = UDim2.new(1, -20, 0, 18)
 carNameLbl.Position = UDim2.new(0, 10, 0, 30)
@@ -1154,7 +1111,7 @@ local carLbl    = makeStatusLabel(86)
 local statusLbl = makeStatusLabel(110)
 
 -- ==================================================
--- TOGGLE BUTTON (draggable)
+-- TOGGLE BUTTON
 -- ==================================================
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
@@ -1178,7 +1135,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     menuFrame.Visible = menuVisible
 end)
 
--- Draggable helper
 local function makeDraggable(frame, handle)
     local dragging = false
     local dStart, dStartPos
@@ -1278,4 +1234,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v29")
+print("[RideGo] Đã load v29.1")
