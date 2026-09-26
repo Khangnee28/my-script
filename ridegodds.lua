@@ -1,8 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26.2
--- Hold = BodyPosition + BodyGyro (khong troi, khach van len duoc).
--- Trip chi tinh khi don hoan thanh sach, khong reconnect giua chung.
--- Status panel khoa khi farm on. EyeBtn chi hoat dong khi farm off.
+-- RideGo Farm — FINAL v26.3
+-- Xe luon nam ngang (flat rotation). BodyGyro ep pitch/roll = 0.
+-- Hold = BodyPosition + BodyGyro. Trip chi tinh khi sach.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -111,6 +110,18 @@ local function formatTime(sec)
     return string.format("%02d:%02d:%02d", h, m, s)
 end
 
+-- Tao CFrame chi co yaw (nam ngang), bo pitch/roll
+local function flatYawCFrame(cf)
+    local look = cf.LookVector
+    local flat = Vector3.new(look.X, 0, look.Z)
+    if flat.Magnitude < 0.01 then
+        flat = Vector3.new(0, 0, -1)
+    end
+    flat = flat.Unit
+    local yaw = math.atan2(flat.X, flat.Z)
+    return CFrame.Angles(0, yaw, 0)
+end
+
 -- ============ SỰ KIỆN TAXI ============
 if TaxiEvent then
     TaxiEvent.OnClientEvent:Connect(function(action, data)
@@ -120,7 +131,6 @@ if TaxiEvent then
             orderToken = data.Token
             pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
         elseif action == "OrderAccepted" then
-            -- Bo qua don cu neu vua reconnect
             if reconnectHappened then
                 setStatus("⚠ Bỏ đơn cũ sau reconnect")
                 return
@@ -361,7 +371,7 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ GIỮ XE ĐỨNG YÊN (BodyPosition + BodyGyro) ============
+-- ============ GIỮ XE ĐỨNG YÊN (BodyPosition + BodyGyro flat) ============
 local function startHold()
     if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
     if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
@@ -373,7 +383,6 @@ local function startHold()
 
     local curCF = vs.CFrame
 
-    -- BodyPosition: neo vi tri, response mem -> khach day duoc nhung tu keo ve
     local bp = Instance.new("BodyPosition")
     bp.Name = "RGHoldPos"
     bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
@@ -383,13 +392,15 @@ local function startHold()
     bp.Parent = vs
     holdBP = bp
 
-    -- BodyGyro: khoa rotation
+    -- BodyGyro ep xe NAM NGANG (chi yaw)
+    local flatRot = flatYawCFrame(curCF)
+
     local bg = Instance.new("BodyGyro")
     bg.Name = "RGHoldGyro"
-    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    bg.P = 4000
-    bg.D = 600
-    bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
+    bg.MaxTorque = Vector3.new(3e5, 3e5, 3e5)
+    bg.P = 8000
+    bg.D = 1000
+    bg.CFrame = flatRot
     bg.Parent = vs
     holdGyro = bg
 
@@ -399,7 +410,7 @@ local function startHold()
         while holdActive and holdBP == bp and bp.Parent do
             bp.Position = curCF.Position
             if holdGyro == bg and bg.Parent then
-                bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
+                bg.CFrame = flatRot
             end
             task.wait(0.1)
         end
@@ -546,7 +557,7 @@ local function seatCar(timeout)
     return false
 end
 
--- ============ NỔI LÊN MẶT ĐẤT ============
+-- ============ NỔI LÊN MẶT ĐẤT (xe luôn nằm ngang) ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
     setStatus("⬆ Nổi lên mặt đất +" .. tostring(LAND_OFFSET) .. " stud")
@@ -554,10 +565,12 @@ local function ascendToGround(car, target, targetFloor)
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
 
+    -- Ep nam ngang (chi yaw)
     local cp = car:GetPivot()
-    local rotOnly = cp - cp.Position
+    local flatRot = flatYawCFrame(cp)
+
     local dest = Vector3.new(target.X, upTargetY, target.Z)
-    pcall(function() car:PivotTo(CFrame.new(dest) * rotOnly) end)
+    pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
     task.wait(0.15)
 end
 
@@ -598,8 +611,9 @@ local function flyTo(target)
 
     flying = true
 
+    -- Ep rotation nam ngang (chi yaw)
     local startPivot = car:GetPivot()
-    local rotOnly = startPivot - startPivot.Position
+    local rotOnly = flatYawCFrame(startPivot)
 
     local curPos = startPivot.Position
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
@@ -724,6 +738,12 @@ local function spawnAndSeat()
         return false
     end
     task.wait(1.5)
+
+    -- Ep xe nam ngang khi vua spawn
+    local pivot = car:GetPivot()
+    local flatRot = flatYawCFrame(pivot)
+    pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
+    task.wait(0.1)
 
     if seatCar(15) then
         setStatus("◦ Sẵn sàng")
@@ -1057,7 +1077,6 @@ local function renderCars()
     carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
 end
 
--- ============ NÚT CHỌN XE ============
 carBtn.MouseButton1Click:Connect(function()
     if enabled then return end
     carOpen = not carOpen
@@ -1072,12 +1091,8 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ NÚT ẨN/HIỆN (khóa khi farm on) ============
 eyeBtn.MouseButton1Click:Connect(function()
-    -- Đang farm: khóa nút ẩn/hiện, chỉ tắt farm mới ẩn được status
-    if enabled then
-        return
-    end
+    if enabled then return end
 
     uiHidden = not uiHidden
     if uiHidden then
@@ -1097,7 +1112,6 @@ eyeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ NÚT BẮT ĐẦU/DỪNG ============
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
@@ -1142,7 +1156,6 @@ farmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ CẬP NHẬT STATUS ============
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1157,7 +1170,6 @@ task.spawn(function()
     end
 end)
 
--- ============ KÉO UI ============
 local dragging, dStart, dStartPos
 title.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -1174,7 +1186,6 @@ title.InputChanged:Connect(function(input)
     end
 end)
 
--- ============ TỰ QUÉT XE ============
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1185,4 +1196,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26.2")
+print("[RideGo] Đã load v26.3")
