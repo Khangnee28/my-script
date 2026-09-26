@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v25.8
--- Ascend +1 stud (khong anchor). Tat/bat lai = doInit lai tu dau. State co icon.
+-- RideGo Farm — FINAL v25.9
+-- LAND_OFFSET=3. Hold khoa vi tri + rotation (BodyGyro). Money scan rong + debug.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,7 +9,7 @@ local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local STEP_DIST         = 270
-local LAND_OFFSET       = 1
+local LAND_OFFSET       = 3
 local ARRIVE_DIST       = 8
 local ORDER_TIMEOUT     = 60
 local PICKUP_WAIT       = 2
@@ -34,6 +34,7 @@ local carList     = {}
 local stats = { trips = 0, earn = 0 }
 local curState = "◦ OFF"
 local holdBV = nil
+local holdGyro = nil
 local flying = false
 local acceptingOrder = false
 
@@ -50,6 +51,10 @@ local function resetState()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
+    end
+    if holdGyro then
+        pcall(function() holdGyro:Destroy() end)
+        holdGyro = nil
     end
 end
 
@@ -90,24 +95,79 @@ end
 
 local function setState(s) curState = s end
 
-local function getMoney()
+-- ============ MONEY SCAN ============
+local moneyPath = nil
+
+local MONEY_NAMES = {
+    "Cash","Money","Rp","Coin","Coins","Rupiah","Rupiahs",
+    "Duit","Uang","Balance","Wallet","Currency","Bank","Bucks"
+}
+
+local function scanMoneyValue()
+    -- 1. leaderstats
     local ls = lp:FindFirstChild("leaderstats")
     if ls then
-        for _, name in ipairs({"Cash","Money","Rp","Coin","Coins","Rupiah","Rupiahs"}) do
-            local s = ls:FindFirstChild(name)
-            if s and (s:IsA("IntValue") or s:IsA("NumberValue") or s:IsA("StringValue")) then
-                return s.Value
+        for _, v in ipairs(ls:GetChildren()) do
+            if v:IsA("ValueBase") then
+                moneyPath = ls:GetFullName() .. "." .. v.Name
+                return v
             end
         end
     end
-    for _, name in ipairs({"Cash","Money","Rp"}) do
-        local s = lp:FindFirstChild(name)
-        if s and (s:IsA("IntValue") or s:IsA("NumberValue")) then
-            return s.Value
+
+    -- 2. Player direct ValueBase co ten khop
+    for _, v in ipairs(lp:GetChildren()) do
+        if v:IsA("IntValue") or v:IsA("NumberValue") or v:IsA("StringValue") then
+            local n = v.Name:lower()
+            for _, mn in ipairs(MONEY_NAMES) do
+                if n:find(mn:lower(), 1, true) then
+                    moneyPath = lp.Name .. "." .. v.Name
+                    return v
+                end
+            end
         end
+    end
+
+    -- 3. Tim trong Player/RS theo ten
+    for _, container in ipairs({lp, rs}) do
+        local ok, found = pcall(function() return container:FindFirstChild("Money", true) end)
+        if ok and found and found:IsA("ValueBase") then
+            moneyPath = container.Name .. ".." .. found:GetFullName()
+            return found
+        end
+    end
+
+    return nil
+end
+
+local function getMoney()
+    local v = scanMoneyValue()
+    if v then
+        local ok, val = pcall(function() return v.Value end)
+        if ok then return val end
     end
     return nil
 end
+
+-- Debug: in het ValueBase cua Player 1 lan sau khi load
+task.spawn(function()
+    task.wait(2)
+    print("=== MONEY DEBUG ===")
+    local ls = lp:FindFirstChild("leaderstats")
+    if ls then
+        for _, v in ipairs(ls:GetChildren()) do
+            print("[leaderstats]", v.Name, v.ClassName, v.Value)
+        end
+    else
+        print("[leaderstats] khong ton tai")
+    end
+    for _, v in ipairs(lp:GetChildren()) do
+        if v:IsA("ValueBase") then
+            print("[Player]", v.Name, v.ClassName, v.Value)
+        end
+    end
+    print("=== END MONEY DEBUG ===")
+end)
 
 -- ============ TAXI HOOK ============
 if TaxiEvent then
@@ -354,16 +414,22 @@ local function fullCollideOn(inst)
     end
 end
 
--- ============ HOLD ============
+-- ============ HOLD (khoa vi tri + rotation) ============
 local function startHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
     end
+    if holdGyro then
+        pcall(function() holdGyro:Destroy() end)
+        holdGyro = nil
+    end
     local car = myCar or findMyCar()
     if not car then return end
     local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
     if not vs then return end
+
+    -- BodyVelocity giu vi tri
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGHold"
     bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
@@ -371,9 +437,27 @@ local function startHold()
     bv.Velocity = Vector3.zero
     bv.Parent = vs
     holdBV = bv
+
+    -- BodyGyro giu rotation (chong xoay vong)
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "RGHoldGyro"
+    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    bg.P = 15000
+    bg.D = 800
+    local curCF = vs.CFrame
+    bg.CFrame = CFrame.new(Vector3.zero) * (curCF - curCF.Position)
+    bg.Parent = vs
+    holdGyro = bg
+
     task.spawn(function()
         while holdBV == bv and bv.Parent do
             bv.Velocity = Vector3.zero
+            task.wait(0.03)
+        end
+    end)
+    task.spawn(function()
+        while holdGyro == bg and bg.Parent do
+            bg.CFrame = CFrame.new(Vector3.zero) * (bg.CFrame - bg.CFrame.Position)
             task.wait(0.03)
         end
     end)
@@ -383,6 +467,10 @@ local function stopHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
         holdBV = nil
+    end
+    if holdGyro then
+        pcall(function() holdGyro:Destroy() end)
+        holdGyro = nil
     end
 end
 
@@ -514,7 +602,7 @@ end
 -- ============ ASCEND LEN MAT DAT ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
-    setState("⬆ noi len mat dat +1")
+    setState("⬆ noi len mat dat +" .. tostring(LAND_OFFSET))
 
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
@@ -630,12 +718,12 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    -- ===== NOI LEN MAT DAT +1 STUD =====
+    -- ===== NOI LEN MAT DAT + LAND_OFFSET STUD =====
     car = myCar or findMyCar()
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
-        startHold()
+        startHold()  -- BV + Gyro giu dung yen + khong xoay
     end
 
     detachNpcFollowers()
@@ -786,7 +874,6 @@ local function startLoop()
     if loopBusy then return end
     loopBusy = true
     task.spawn(function()
-        -- LUON chay doInit khi bat dau -> doi job, spawn xe, online lai tu dau
         setState("◦ init...")
         local ok = pcall(doInit)
         initialized = ok
@@ -1030,4 +1117,4 @@ task.spawn(function()
     renderCars()
 end)
 
-print("[ridego] loaded v25.8")
+print("[ridego] loaded v25.9")
