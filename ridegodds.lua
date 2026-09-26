@@ -1,31 +1,39 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v17
--- Bay: BodyVelocity (physics that -> co velocity -> game tinh quang duong).
--- Noclip: CanCollide=false + SetNetworkOwner(lp) cho xe + NPC.
--- NPC: chiem network owner + CanCollide=false + PlatformStand + re-sit moi tick.
--- Ha xuong: dung velocity, raycast, PivotTo bbox, chassis collide.
--- Ngoi sai ghe: tu dong seat lai (retry sau).
+-- RideGo Farm — FINAL v18
+-- Void scan toi 10000 stud -> CFrame qua bo ben kia.
+-- Ha xuong TU TU bang BodyVelocity -> khong snap, khong lun.
+-- Truoc khi bay: quet ban kinh quanh target.
+--   Building thap -> bay ngang.
+--   Building cao -> bay TREN dinh.
+--   Building qua cao -> chui DUOI dat, toi noi chui len.
+-- Ngoi sai ghe: tu dong seat lai.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
 local lp = Players.LocalPlayer
 
 -- ============ CONFIG ============
-local STEP_DIST       = 180
-local CRUISE_Y        = 18
-local VOID_LOOKAHEAD  = 90
-local VOID_DROP_MIN   = 400
-local VOID_SCAN_MIN   = 150
-local VOID_SCAN_MAX   = 100000
-local VOID_SCAN_STEP  = 250
-local MAX_CFRAME_DIST = 5000
-local ARRIVE_DIST     = 8
-local ORDER_TIMEOUT   = 60
-local PICKUP_WAIT     = 8
-local DROP_WAIT       = 8
-local DECEL_DIST      = 200
-local TICK            = 0.05
-local LAND_OFFSET     = 2
+local STEP_DIST        = 180
+local CRUISE_Y         = 18
+local VOID_LOOKAHEAD   = 90
+local VOID_DROP_MIN    = 400
+local VOID_SCAN_MIN    = 150
+local VOID_SCAN_MAX    = 100000
+local VOID_SCAN_STEP   = 400
+local MAX_CFRAME_DIST  = 10000
+local ARRIVE_DIST      = 8
+local ORDER_TIMEOUT    = 60
+local PICKUP_WAIT      = 8
+local DROP_WAIT        = 8
+local DECEL_DIST       = 200
+local TICK             = 0.05
+local LAND_OFFSET      = 2
+local DESCEND_SPEED    = 30        -- toc do ha xuong (stud/s)
+local MAX_GROUND_FLY   = 280       -- building cao hon nguong -> chui duoi dat
+local UNDERGROUND_DEPTH = 120      -- sau bao nhieu duoi mat dat khi chui
+local SURROUND_RADIUS  = 180       -- ban kinh quet quanh target
+local SURROUND_SAMPLES = 16        -- so diem quet vong tron
+local SURROUND_HIGH_MARGIN = 30    -- margin tren dinh building khi bay cao
 
 -- ============ STATE ============
 local enabled     = false
@@ -180,7 +188,6 @@ local function floorBelow(pos)
 end
 
 -- ============ NETWORK OWNER ============
--- Chiem quyen simulate cac part -> noclip moi co tac dung
 local function claimNetworkOwner(inst)
     if not inst then return end
     if inst:IsA("BasePart") and not inst.Anchored then
@@ -193,7 +200,7 @@ local function claimNetworkOwner(inst)
     end
 end
 
--- ============ NOCLIP CHASSIS-ONLY (cho ha xuong) ============
+-- ============ COLLIDE ============
 local KEEP_COLLIDE = {
     chassis = true, frame = true, base = true,
     wheel = true, tire = true, tyre = true,
@@ -213,13 +220,9 @@ local function chassisCollideOn(car)
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             if isChassisPart(p) then
-                if not p.CanCollide then
-                    pcall(function() p.CanCollide = true end)
-                end
+                if not p.CanCollide then pcall(function() p.CanCollide = true end) end
             else
-                if p.CanCollide then
-                    pcall(function() p.CanCollide = false end)
-                end
+                if p.CanCollide then pcall(function() p.CanCollide = false end) end
             end
         end
     end
@@ -420,7 +423,47 @@ local function scanVoidLanding(curPos, dir)
     return nil, nil
 end
 
--- ============ FLY (BodyVelocity + network owner) ============
+-- ============ SURROUND SCAN ============
+-- Quet vong tron quanh target, tra ve dinh building cao nhat.
+-- nil = khong co building cao hon mat dat dang ke.
+local function scanSurroundHeight(targetPos)
+    local params = makeRayParams()
+    local maxTop = nil
+
+    -- quet tam truoc
+    local centerF = floorBelow(targetPos)
+    local centerHit = workspace:Raycast(
+        Vector3.new(targetPos.X, targetPos.Y + 500, targetPos.Z),
+        Vector3.new(0, -2500, 0),
+        params
+    )
+    if centerHit then
+        if not centerF or centerHit.Position.Y > centerF + 5 then
+            maxTop = centerHit.Position.Y
+        end
+    end
+
+    for i = 0, SURROUND_SAMPLES - 1 do
+        local angle = (i / SURROUND_SAMPLES) * math.pi * 2
+        local dx = math.cos(angle) * SURROUND_RADIUS
+        local dz = math.sin(angle) * SURROUND_RADIUS
+        local probe = Vector3.new(targetPos.X + dx, targetPos.Y + 500, targetPos.Z + dz)
+
+        local hit = workspace:Raycast(probe, Vector3.new(0, -2500, 0), params)
+        if hit then
+            local topY = hit.Position.Y
+            local localFloor = floorBelow(Vector3.new(probe.X, targetPos.Y, probe.Z))
+            -- la building neu dinh cao hon mat dat > 5
+            if localFloor and topY > localFloor + 5 then
+                if not maxTop or topY > maxTop then maxTop = topY end
+            end
+        end
+    end
+
+    return maxTop
+end
+
+-- ============ FLY ============
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -430,16 +473,35 @@ local function flyTo(target)
 
     local myChar = char()
 
-    -- 1. GIANH NETWORK OWNER cho xe -> noclip + BodyVelocity moi an
+    -- 1. Quet ban kinh quanh target -> chon mode bay
+    setState("quet vung target")
+    local surroundTop = scanSurroundHeight(target)
+    local targetFloorHere = floorBelow(target) or (target.Y)
+
+    local flyMode = "normal"
+    local cruiseY = CRUISE_Y
+    if surroundTop then
+        local buildingHeight = surroundTop - targetFloorHere
+        if buildingHeight > MAX_GROUND_FLY then
+            -- building qua cao -> chui duoi dat
+            flyMode = "underground"
+            cruiseY = -UNDERGROUND_DEPTH
+        elseif buildingHeight > 30 then
+            -- building cao vua -> bay tren dinh
+            flyMode = "high"
+            cruiseY = buildingHeight + SURROUND_HIGH_MARGIN
+        end
+    end
+    setState("bay: " .. flyMode)
+
+    -- 2. Gianh network owner
     claimNetworkOwner(car)
 
-    -- 2. NPC: gianh owner + tat collide + PlatformStand
-    local npcChars = {}
+    -- 3. NPC: gianh owner + tat collide
     for _, d in ipairs(car:GetDescendants()) do
         if d:IsA("VehicleSeat") and d.Occupant then
             local oh = d.Occupant
             if oh and oh.Parent and oh.Parent ~= myChar then
-                table.insert(npcChars, {hum = oh, seat = d})
                 claimNetworkOwner(oh.Parent)
                 pcall(function() oh.PlatformStand = true end)
                 pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
@@ -453,7 +515,7 @@ local function flyTo(target)
         end
     end
 
-    -- 3. Tat collide cho xe + player
+    -- 4. Tat collide xe + player
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.CanCollide = false end)
@@ -515,7 +577,12 @@ local function flyTo(target)
                 local landDist, landFloorY = scanVoidLanding(curPos, dir)
                 if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
                     local landPos = curPos + dir * landDist
-                    local dest = Vector3.new(landPos.X, landFloorY + CRUISE_Y, landPos.Z)
+                    local destY = landFloorY + cruiseY
+                    -- neu mode underground, giu do cao chui
+                    if flyMode == "underground" then
+                        destY = landFloorY - UNDERGROUND_DEPTH
+                    end
+                    local dest = Vector3.new(landPos.X, destY, landPos.Z)
                     local startPivot = c:GetPivot()
                     local rotOnly = startPivot - startPivot.Position
                     pcall(function() c:PivotTo(CFrame.new(dest) * rotOnly) end)
@@ -531,15 +598,19 @@ local function flyTo(target)
             voidJustHandled = false
         end
 
-        -- DO CAO
-        local floorY = floorBelow(curPos) or (curPos.Y - CRUISE_Y)
-        local targetY = floorY + CRUISE_Y
+        -- DO CAO MUC TIEU
+        local floorY = floorBelow(curPos) or (curPos.Y - cruiseY)
+        local targetY
+        if flyMode == "underground" then
+            targetY = floorY - UNDERGROUND_DEPTH
+        else
+            targetY = floorY + cruiseY
+        end
 
         pcall(function()
             bg.CFrame = CFrame.lookAt(curPos, Vector3.new(target.X, curPos.Y, target.Z))
         end)
 
-        -- TOC DO
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
@@ -553,14 +624,12 @@ local function flyTo(target)
 
         bv.Velocity = Vector3.new(vx, vy, vz)
 
-        -- Refresh network owner moi 10 tick (server co the chiem lai)
         ownerRefreshCounter = ownerRefreshCounter + 1
         if ownerRefreshCounter >= 10 then
             ownerRefreshCounter = 0
             pcall(function() claimNetworkOwner(c) end)
         end
 
-        -- Refresh NPC moi 3 tick: tat collide + PlatformStand + re-sit neu roi
         npcRefreshCounter = npcRefreshCounter + 1
         if npcRefreshCounter >= 3 then
             npcRefreshCounter = 0
@@ -584,15 +653,14 @@ local function flyTo(target)
         task.wait(TICK)
     end
 
-    if bv and bv.Parent then bv:Destroy() end
-    if bg and bg.Parent then bg:Destroy() end
-    task.wait(0.1)
-
-    -- ===== HA XUONG =====
+    -- ===== HA XUONG TU TU (khong PivotTo snap) =====
     car = myCar or findMyCar()
-    if car then
-        local pivotPos = car:GetPivot().Position
+    if car and bv and bv.Parent then
+        setState("ha xuong tu tu")
+
+        -- tinh do cao muc tieu cua xe tren mat dat
         local params = makeRayParams()
+        local pivotPos = car:GetPivot().Position
         local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
         local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
 
@@ -604,21 +672,47 @@ local function flyTo(target)
             local offsetPivotToCenterY = bbCenter.Y - pivotPos.Y
             local targetPivotY = targetCenterY - offsetPivotToCenterY
 
+            -- ha tu tu bang velocity Y am
+            local t0 = os.clock()
+            while enabled and os.clock() - t0 < 12 do
+                local c = myCar or findMyCar()
+                if not c then break end
+                local curY = c:GetPivot().Position.Y
+                if curY <= targetPivotY + 1 then break end
+                -- giam dan khi gan mat dat
+                local remaining = curY - targetPivotY
+                local vy = -math.min(DESCEND_SPEED, math.max(6, remaining * 0.8))
+                bv.Velocity = Vector3.new(0, vy, 0)
+                task.wait(0.05)
+            end
+
+            -- chan hoan toan truoc khi PivotTo chinh xac
+            bv.Velocity = Vector3.zero
+            task.wait(0.15)
+
+            -- dat chinh xac bang PivotTo (chi Y, khong nhay XZ)
             local curPivotCF = car:GetPivot()
-            local rotOnly = curPivotCF - curPivotCF.Position
-            local newPivotPos = Vector3.new(target.X, targetPivotY, target.Z)
-            pcall(function() car:PivotTo(CFrame.new(newPivotPos) * rotOnly) end)
-            task.wait(0.2)
+            local curPos = curPivotCF.Position
+            local rotOnly = curPivotCF - curPos
+            local finalPos = Vector3.new(curPos.X, targetPivotY, curPos.Z)
+            pcall(function() car:PivotTo(CFrame.new(finalPos) * rotOnly) end)
+            task.wait(0.15)
         else
             setState("khong thay dat")
+            bv.Velocity = Vector3.zero
         end
-
-        -- Bat collide chassis-only
-        chassisCollideOn(car)
     end
 
+    if bv and bv.Parent then bv:Destroy() end
+    if bg and bg.Parent then bg:Destroy() end
+    task.wait(0.1)
+
+    -- Bat collide chassis-only
+    car = myCar or findMyCar()
+    if car then chassisCollideOn(car) end
+
     -- NPC: tra lai binh thuong
-    for _, d in ipairs(car:GetDescendants()) do
+    for _, d in ipairs(car and car:GetDescendants() or {}) do
         if d:IsA("VehicleSeat") and d.Occupant then
             local oh = d.Occupant
             if oh and oh.Parent and oh.Parent ~= myChar then
@@ -1020,4 +1114,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v17")
+print("[ridego] loaded v18")
