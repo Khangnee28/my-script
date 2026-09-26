@@ -1,7 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v2
--- Void scan 100 -> 20000 studs. Toi noi -> tao platform ao -> ha xe -> tat noclip.
--- Tat farm -> reset. Bat lai -> chay tu dau.
+-- RideGo Farm — FINAL v3
+-- Noclip giu suot trip. Hold BV giu xe dung yen tren san ao khi cho khach.
+-- Void scan 100 -> 20000. Khong thay bo -> tele target.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -31,6 +31,7 @@ local selectedCar = ""
 local carList     = {}
 local stats = { trips = 0, earn = 0 }
 local curState = "OFF"
+local holdBV = nil
 
 local function resetState()
     orderToken = nil
@@ -41,6 +42,10 @@ local function resetState()
     stats.trips = 0
     stats.earn = 0
     curState = "OFF"
+    if holdBV then
+        pcall(function() holdBV:Destroy() end)
+        holdBV = nil
+    end
 end
 
 -- ============ REMOTES ============
@@ -148,7 +153,6 @@ local function rayFloorY(fromPos, maxDist)
     if c then table.insert(ignore, c) end
     local car = myCar or findMyCar()
     if car then table.insert(ignore, car) end
-    if _G._rgPlatform then table.insert(ignore, _G._rgPlatform) end
     params.FilterDescendantsInstances = ignore
     params.IgnoreWater = false
 
@@ -214,29 +218,36 @@ task.spawn(function()
     end
 end)
 
--- ============ PLATFORM ============
-local function clearPlatform()
-    if _G._rgPlatform and _G._rgPlatform.Parent then
-        pcall(function() _G._rgPlatform:Destroy() end)
+-- ============ HOLD (giu xe dung yen bang BV) ============
+local function startHold()
+    if holdBV then
+        pcall(function() holdBV:Destroy() end)
+        holdBV = nil
     end
-    _G._rgPlatform = nil
+    local car = myCar or findMyCar()
+    if not car then return end
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    if not vs then return end
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "RGHold"
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+    bv.P = 10000
+    bv.Velocity = Vector3.zero
+    bv.Parent = vs
+    holdBV = bv
+    task.spawn(function()
+        while holdBV == bv and bv.Parent do
+            bv.Velocity = Vector3.zero
+            task.wait(0.05)
+        end
+    end)
 end
 
-local function createPlatform(x, y, z)
-    clearPlatform()
-    local p = Instance.new("Part")
-    p.Name = "RGPlatform"
-    p.Size = Vector3.new(40, 4, 40)
-    p.Anchored = true
-    p.CanCollide = true
-    p.CanTouch = false
-    p.CanQuery = true
-    p.Transparency = 1
-    p.Material = Enum.Material.SmoothPlastic
-    p.CFrame = CFrame.new(x, y, z)
-    p.Parent = workspace
-    _G._rgPlatform = p
-    return p
+local function stopHold()
+    if holdBV then
+        pcall(function() holdBV:Destroy() end)
+        holdBV = nil
+    end
 end
 
 -- ============ SEAT ============
@@ -328,6 +339,7 @@ end
 
 -- ============ FLY ============
 local function flyTo(target)
+    stopHold()
     local h = hum()
     local car = myCar or findMyCar()
     if not h or not car then return false end
@@ -450,7 +462,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== DAT NOI -> TAT NOCLIP + HA XUONG =====
+    -- ===== HA XUONG BANG PIVOTTO - KHONG TAT NOCLIP =====
     car = myCar or findMyCar()
     if not car then task.wait(0.2) return reached end
 
@@ -458,28 +470,18 @@ local function flyTo(target)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then task.wait(0.2) return reached end
 
-    -- TAT NOCLIP NGAY LAP TUC
-    setCarNoclip(false)
-
-    -- raycast tim san
     local floorY = rayFloorY(endPos, 800)
-    local platformY
+    local targetY
     if floorY and floorY > -10 then
-        platformY = floorY + 2
+        targetY = floorY + 2
     else
-        platformY = endPos.Y - 3
+        targetY = endPos.Y - 3
     end
 
-    -- TAO PLATFORM AO DUOI XE
-    createPlatform(endPos.X, platformY, endPos.Z)
-    task.wait(0.1)
-
-    -- HA XE XUONG PLATFORM
-    local targetY = platformY + 3
     local y = endPos.Y
     local cnt = 0
-    while y > targetY and cnt < 100 and enabled do
-        y = y - 2
+    while y > targetY and cnt < 150 and enabled do
+        y = y - 3
         if y < targetY then y = targetY end
         local newPos = Vector3.new(endPos.X, y, endPos.Z)
         pcall(function() car:PivotTo(CFrame.new(newPos)) end)
@@ -488,7 +490,12 @@ local function flyTo(target)
         task.wait(0.03)
     end
 
-    task.wait(0.3)
+    task.wait(0.15)
+
+    -- GIU XE DUNG YEN BANG HOLD BV
+    startHold()
+
+    -- force seat cuoi
     local h2 = hum()
     if not h2 or not h2.Sit then
         forceSeat()
@@ -567,7 +574,6 @@ local function runTrip()
     local h = hum()
     if not h or not h.Sit then
         setState("respawn xe")
-        clearPlatform()
         if not spawnAndSeat() then task.wait(5); return end
     end
     myCar = findMyCar()
@@ -595,9 +601,6 @@ local function runTrip()
     setState("khach len xe")
     task.wait(PICKUP_WAIT)
 
-    -- xoa platform truoc khi bay tiep
-    clearPlatform()
-
     if dropPos then
         setState("tra khach")
         flyTo(dropPos)
@@ -607,9 +610,7 @@ local function runTrip()
         task.wait(DROP_WAIT)
     end
 
-    -- xoa platform sau khi xong
-    clearPlatform()
-
+    stopHold()
     pickupPos = nil
     dropPos = nil
     orderToken = nil
@@ -819,7 +820,6 @@ toggleBtn.MouseButton1Click:Connect(function()
         enabled = false
         resetState()
         setCarNoclip(false)
-        clearPlatform()
         local h = hum()
         if h and h.Sit then
             pcall(function() h.Sit = false end)
