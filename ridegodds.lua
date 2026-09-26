@@ -1,8 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v8
--- Giu nguyen co che goc: khong tele, khong watchdog, khong clampToGround.
--- Chi them: noclip phu khach + tu ve ghe lai khi ngoi nham.
--- Chong lun: raycast 1 nhat khi ha xuong (khong chunk loop).
+-- RideGo Farm — FINAL v9
+-- Noclip: chi tat than xe, GIU va cham khung gam + banh -> khong xuyen san.
+-- Ha xuong: bat lai collide truoc, raycast phai trung dat, khong trung thi KHONG ha.
+-- Safety net: phat hien xe duoi -20 -> bat collide, khong tele.
+-- Chong roi khi cho: giu hold goc (Y=0), khong tele HRP.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -21,6 +22,8 @@ local VOID_SCAN_MAX  = 100000
 local VOID_SCAN_STEP = 150
 local TICK           = 0.05
 local LAND_OFFSET    = 3
+local SINK_Y         = -20
+local DEBUG_NOCOLLIDE = false  -- bat true de in part mat collide khi ha
 
 -- ============ STATE ============
 local enabled     = false
@@ -146,7 +149,7 @@ local function findMyCar()
 end
 
 -- ============ RAYCAST ============
-local function rayFloorY(fromPos, maxDist)
+local function rayFloorY(fromPos, maxDist, ignoreWater)
     maxDist = maxDist or 800
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
@@ -156,7 +159,7 @@ local function rayFloorY(fromPos, maxDist)
     local car = myCar or findMyCar()
     if car then table.insert(ignore, car) end
     params.FilterDescendantsInstances = ignore
-    params.IgnoreWater = false
+    params.IgnoreWater = ignoreWater or false
 
     local hit = workspace:Raycast(
         fromPos + Vector3.new(0, 5, 0),
@@ -171,27 +174,46 @@ local function rayFloorY(fromPos, maxDist)
 end
 
 -- ============ NOCLIP ============
--- Phu ca khach ngoi trong xe. Giu nguyen co che goc (tat het CanCollide).
+-- Chi tat CanCollide cho THAN xe (khong vuong tuong ngang).
+-- Giu va cham cho KHUNG GAM + BANH (khong xuyen san).
 local carNoclipOn = false
 local noclipHooked = {}
 
-local function walkNoclip(inst)
-    if not inst then return end
-    if inst:IsA("BasePart") and inst.CanCollide then
-        pcall(function() inst.CanCollide = false end)
+local KEEP_COLLIDE = {
+    chassis = true, frame = true, base = true,
+    wheel = true, tire = true, tyre = true,
+    body = true, hull = true, floor = true, under = true,
+}
+
+local function isChassisPart(part)
+    local n = part.Name:lower()
+    for key in pairs(KEEP_COLLIDE) do
+        if n:find(key, 1, true) then return true end
     end
+    return false
+end
+
+-- keepChassis = true -> giu collide cho khung gam, tat cho than
+local function walkNoclip(inst, keepChassis)
+    if not inst then return end
+    local function process(p)
+        if not p:IsA("BasePart") then return end
+        if not p.CanCollide then return end
+        if keepChassis and isChassisPart(p) then return end
+        pcall(function() p.CanCollide = false end)
+    end
+    process(inst)
     for _, p in ipairs(inst:GetDescendants()) do
-        if p:IsA("BasePart") and p.CanCollide then
-            pcall(function() p.CanCollide = false end)
-        end
+        process(p)
     end
 end
 
-local function hookNoclip(inst)
+local function hookNoclip(inst, keepChassis)
     if not inst or noclipHooked[inst] then return end
     noclipHooked[inst] = true
     inst.DescendantAdded:Connect(function(d)
-        if carNoclipOn and d:IsA("BasePart") then
+        if carNoclipOn and d:IsA("BasePart") and d.CanCollide then
+            if keepChassis and isChassisPart(d) then return end
             pcall(function() d.CanCollide = false end)
         end
     end)
@@ -201,8 +223,8 @@ local function hookPassengerChars()
     for _, plr in ipairs(Players:GetPlayers()) do
         local c = plr.Character
         if c then
-            hookNoclip(c)
-            walkNoclip(c)
+            hookNoclip(c, false)
+            walkNoclip(c, false)
         end
     end
 end
@@ -210,15 +232,15 @@ end
 local function forceNoclip()
     local car = myCar or findMyCar()
     if car then
-        walkNoclip(car)
+        walkNoclip(car, true)
         local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
         if vs and vs.Occupant then
             local h = vs.Occupant
-            if h and h.Parent then walkNoclip(h.Parent) end
+            if h and h.Parent then walkNoclip(h.Parent, false) end
         end
     end
     local c = char()
-    if c then walkNoclip(c) end
+    if c then walkNoclip(c, false) end
     hookPassengerChars()
 end
 
@@ -226,16 +248,26 @@ local function setCarNoclip(on)
     carNoclipOn = on
     if not on then return end
     local car = myCar or findMyCar()
-    if car then hookNoclip(car) end
+    if car then hookNoclip(car, true) end
     local c = char()
-    if c then hookNoclip(c) end
+    if c then hookNoclip(c, false) end
     hookPassengerChars()
     forceNoclip()
 end
 
+-- bat lai collide TOAN BO xe (dung truoc khi ha)
+local function fullCollideOn(car)
+    if not car then return end
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") and not p.CanCollide then
+            pcall(function() p.CanCollide = true end)
+        end
+    end
+end
+
 Players.PlayerAdded:Connect(function(plr)
     plr.CharacterAdded:Connect(function(c)
-        if carNoclipOn then hookNoclip(c); walkNoclip(c) end
+        if carNoclipOn then hookNoclip(c, false); walkNoclip(c, false) end
     end)
 end)
 Players.PlayerRemoving:Connect(function(plr)
@@ -250,7 +282,6 @@ task.spawn(function()
 end)
 
 -- ============ HOLD ============
--- Giu nguyen co che goc: truc Y = 0, chi triet ngang.
 local function startHold()
     if holdBV then
         pcall(function() holdBV:Destroy() end)
@@ -296,7 +327,6 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- Tu ve ghe lai khi ngoi nham / khach chiem ghe.
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -306,13 +336,11 @@ local function forceSeat()
 
     if h.Sit and h.SeatPart == vs then return end
 
-    -- ngoi SAI ghe -> dung day
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
         task.wait(0.12)
     end
 
-    -- ghe lai bi nguoi khac chiem -> keo ho ra
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
@@ -379,6 +407,29 @@ local function seatCar(timeout)
     end
     return false
 end
+
+-- ============ SAFETY NET ============
+-- Phat hien xe duoi -20 -> bat collide, khong tele len.
+local netArmed = true
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if not enabled then netArmed = true; continue end
+        if not netArmed then continue end
+        local car = myCar or findMyCar()
+        if car then
+            local vs = getDriveSeat(car)
+            local base = vs and vs.Position or (car.PrimaryPart and car.PrimaryPart.Position)
+            if base and base.Y < SINK_Y then
+                netArmed = false
+                setState("safety net")
+                fullCollideOn(car)
+                task.wait(3)
+                netArmed = true
+            end
+        end
+    end
+end)
 
 -- ============ VOID SCAN ============
 local function scanVoidBridge(curPos, dir, curFloorY)
@@ -519,7 +570,7 @@ local function flyTo(target)
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.1)
 
-    -- ===== HA XUONG: raycast 1 nhat =====
+    -- ===== HA XUONG AN TOAN =====
     car = myCar or findMyCar()
     if not car then task.wait(0.2) return reached end
 
@@ -527,6 +578,20 @@ local function flyTo(target)
     local endPos = (vs2 and vs2.Position) or (root() and root().Position)
     if not endPos then task.wait(0.2) return reached end
 
+    if DEBUG_NOCOLLIDE then
+        print("=== PARTS NO COLLIDE TRUOC KHI HA ===")
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") and not p.CanCollide then
+                print(p:GetFullName(), "| name:", p.Name)
+            end
+        end
+    end
+
+    -- bat lai collide toan bo xe truoc khi ha
+    fullCollideOn(car)
+    task.wait(0.05)
+
+    -- raycast tu tren cao, bat buoc phai trung dat
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local ign = {}
@@ -534,22 +599,28 @@ local function flyTo(target)
     if cc then table.insert(ign, cc) end
     table.insert(ign, car)
     params.FilterDescendantsInstances = ign
-    params.IgnoreWater = false
+    params.IgnoreWater = true
 
-    local origin = Vector3.new(endPos.X, endPos.Y + 200, endPos.Z)
-    local hit = workspace:Raycast(origin, Vector3.new(0, -2000, 0), params)
+    local origin = Vector3.new(endPos.X, endPos.Y + 300, endPos.Z)
+    local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
 
-    local targetY
-    if hit and hit.Material ~= Enum.Material.Water then
-        targetY = hit.Position.Y + LAND_OFFSET
-    else
-        targetY = endPos.Y - 3
+    if not hit then
+        setState("khong thay dat - giu do cao")
+        task.wait(0.3)
+        walkNoclip(car, true)
+        return reached
     end
 
+    local targetY = hit.Position.Y + LAND_OFFSET
     local landed = Vector3.new(endPos.X, targetY, endPos.Z)
     pcall(function() car:PivotTo(CFrame.new(landed)) end)
-    if not h.Sit then forceSeat() end
     task.wait(0.2)
+
+    -- bat lai noclip than (khung van giu collide)
+    walkNoclip(car, true)
+
+    if not h.Sit then forceSeat() end
+    task.wait(0.1)
 
     startHold()
 
@@ -924,4 +995,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v8")
+print("[ridego] loaded v9"
