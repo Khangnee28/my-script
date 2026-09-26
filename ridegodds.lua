@@ -1,6 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v29.3
--- Bo ep HRP. UNDERGROUND_DEPTH=250. Khong noclip.
+-- RideGo Farm — FINAL v30
+-- Toggle rieng. Menu + Status doc lap, ca 2 keo duoc. Check ghe CHI luc spawn.
+-- Lan 1: doi job+spawn+online. Lan 2+: reset char+spawn+off/on.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,7 +18,7 @@ local DROP_WAIT           = 4
 local ACK_DELAY           = 3
 local DECEL_DIST          = 200
 local TICK                = 0.05
-local UNDERGROUND_DEPTH   = 250
+local UNDERGROUND_DEPTH   = 200
 local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
@@ -426,6 +427,7 @@ local function getDriveSeat(car)
 end
 
 local function getSeatTeleCF(vs)
+    -- Tam ghe + xich ve phia dau xe (forward -Z) 3 stud
     return vs.CFrame * CFrame.new(0, 1, -3)
 end
 
@@ -500,6 +502,46 @@ local function forceSeat()
     return h.Sit and h.SeatPart == vs
 end
 
+-- ============ CHECK GHE KHI SPAWN (1 LAN) ============
+local function checkSeatAtSpawn(car)
+    local h = hum()
+    if not h or not car then return false end
+    local vs = getDriveSeat(car)
+    if not vs then return false end
+
+    -- Ngoi sai ghe -> nhay ra, tele tam ghe + xich forward, doi 1s, ep sit
+    if h.Sit and h.SeatPart and h.SeatPart ~= vs then
+        setStatus("⚠ Ngồi nhầm ghế — tele về ghế lái")
+
+        pcall(function() h.Sit = false end)
+        task.wait(0.3)
+
+        local hrp = root()
+        if hrp then
+            local teleCF = getSeatTeleCF(vs)
+            pcall(function() hrp.CFrame = teleCF end)
+        end
+
+        task.wait(1)
+
+        pcall(function() vs:Sit(h) end)
+        task.wait(0.2)
+        pcall(function() h.Sit = true end)
+        pcall(function() h.AutoRotate = false end)
+        task.wait(0.2)
+
+        if not (h.Sit and h.SeatPart == vs) then
+            for i = 1, 3 do
+                if forceSeat() then break end
+                task.wait(0.3)
+            end
+        end
+
+        return h.Sit and h.SeatPart == vs
+    end
+    return true
+end
+
 local function seatCar(timeout)
     timeout = timeout or 15
     local deadline = os.clock() + timeout
@@ -545,6 +587,8 @@ local function flyTo(target)
     if not h.Sit then forceSeat(); task.wait(0.1) end
     pcall(function() h.AutoRotate = false end)
 
+    local myChar = char()
+
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
@@ -555,6 +599,19 @@ local function flyTo(target)
 
     claimNetworkOwner(car)
     attachNpcFollowers(car)
+
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.CanCollide = false end)
+        end
+    end
+    if myChar then
+        for _, p in ipairs(myChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = false end)
+            end
+        end
+    end
 
     flying = true
 
@@ -629,15 +686,13 @@ local function flyTo(target)
     if car and reached then
         ascendToGround(car, target, targetFloor)
         myCar = car
-        forceSeat()
-        task.wait(0.15)
         startHold()
         pcall(function() hum().AutoRotate = false end)
     end
 
     detachNpcFollowers()
-    flying = false
 
+    flying = false
     if not h.Sit then forceSeat() end
     task.wait(0.1)
 
@@ -662,6 +717,7 @@ local function spawnAndSeat()
     local car = findMyCar()
     if car and car:FindFirstChildWhichIsA("BasePart", true) then
         setStatus("◦ Xe đã có sẵn")
+        checkSeatAtSpawn(car)
         if seatCar(10) then
             setStatus("◦ Sẵn sàng")
             return true
@@ -691,6 +747,8 @@ local function spawnAndSeat()
     local flatRot = flatYawCFrame(pivot)
     pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
     task.wait(0.1)
+
+    checkSeatAtSpawn(car)
 
     if seatCar(15) then
         setStatus("◦ Sẵn sàng")
@@ -823,6 +881,26 @@ local function runTrip()
     task.wait(0.3)
 end
 
+-- ============ STOP MOI THU ============
+local function stopEverything()
+    acceptingOrder = false
+    flying = false
+    stopHold()
+    detachNpcFollowers()
+    local car = myCar or findMyCar()
+    if car then
+        unanchorCar(car)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = true end)
+                pcall(function() p.Anchored = false end)
+            end
+        end
+    end
+    local c = char()
+    if c then fullCollideOn(c) end
+end
+
 -- ============ VÒNG LẶP ============
 local loopBusy = false
 local function startLoop()
@@ -870,7 +948,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 999
 gui.Parent = cg
 
--- FRAME 1: MENU CHÍNH
+-- ============ FRAME 1: MENU CHÍNH ============
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 290, 0, 168)
 menuFrame.Position = UDim2.new(0, 20, 0.5, -180)
@@ -1036,7 +1114,7 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- FRAME 2: STATUS PANEL
+-- ============ FRAME 2: STATUS PANEL ============
 local statusFrame = Instance.new("Frame", gui)
 statusFrame.Size = UDim2.new(0, 290, 0, 148)
 statusFrame.Position = UDim2.new(0, 20, 0.5, 20)
@@ -1092,7 +1170,7 @@ local earnLbl   = makeStatusLabel(68)
 local carLbl    = makeStatusLabel(86)
 local statusLbl = makeStatusLabel(110)
 
--- TOGGLE BUTTON
+-- ============ NÚT TOGGLE RIÊNG ============
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
 toggleBtn.Position = UDim2.new(0, 20, 0.5, 130)
@@ -1115,6 +1193,7 @@ toggleBtn.MouseButton1Click:Connect(function()
     menuFrame.Visible = menuVisible
 end)
 
+-- Draggable
 local function makeDraggable(frame, handle)
     local dragging = false
     local dStart, dStartPos
@@ -1142,32 +1221,23 @@ makeDraggable(menuFrame, menuTitle)
 makeDraggable(statusFrame, statusTitle)
 makeDraggable(toggleBtn, toggleBtn)
 
--- NÚT BẮT ĐẦU/DỪNG FARM
+-- ============ NÚT BẮT ĐẦU/DỪNG FARM ============
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
+        -- DỪNG: stop tất cả, ẩn status, giữ menu
         enabled = false
+        stopEverything()
         resetState()
-        detachNpcFollowers()
-        stopHold()
-        local car = myCar or findMyCar()
-        if car then
-            unanchorCar(car)
-            for _, p in ipairs(car:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.CanCollide = true end)
-                    pcall(function() p.Anchored = false end)
-                end
-            end
-        end
-        local c = char()
-        if c then fullCollideOn(c) end
 
         farmBtn.Text = "▶ BẮT ĐẦU FARM"
         farmBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
         statusFrame.Visible = false
+        menuFrame.Visible = true
+        menuVisible = true
 
-        print("[RideGo] Đã DỪNG farm")
+        print("[RideGo] Đã DỪNG farm — dừng mọi thứ")
     else
+        -- BẮT ĐẦU: reset state, hiện status
         resetState()
         enabled = true
         farmStartTime = os.time()
@@ -1175,13 +1245,15 @@ farmBtn.MouseButton1Click:Connect(function()
         farmBtn.Text = "■ DỪNG FARM"
         farmBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         statusFrame.Visible = true
+        menuFrame.Visible = true
+        menuVisible = true
 
         print("[RideGo] BẮT ĐẦU farm")
         startLoop()
     end
 end)
 
--- CẬP NHẬT STATUS
+-- ============ CẬP NHẬT STATUS ============
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1196,7 +1268,7 @@ task.spawn(function()
     end
 end)
 
--- TỰ QUÉT XE
+-- ============ TỰ QUÉT XE ============
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1208,4 +1280,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v29.3")
+print("[RideGo] Đã load v30")
