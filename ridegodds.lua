@@ -1,11 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v20
--- Bay: BodyVelocity (physics that -> game tinh quang duong).
--- Noclip: SetNetworkOwner + CanCollide=false khi bay.
--- Ha xuong: ANCHOR ngay khi toi -> xe dung yen -> raycast bbox -> PivotTo -> unanchor.
--- Khong bao gio roi san vi anchor truoc khi tat BV.
--- Quet building: GetPartBoundsInBox (nhanh).
--- Ngoi sai ghe: tu dong seat lai.
+-- RideGo Farm — FINAL v21
+-- Bay: BodyVelocity (game tinh quang duong).
+-- Ha xuong: anchor -> bbox -> PivotTo -> unanchor.
+-- NPC: ANCHOR client-side + PivotTo theo ghe moi tick -> khong ket tuong.
+--      Server van thay NPC welded voi ghe -> trip hop le.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -195,6 +193,100 @@ local function floorBelow(pos)
     local hit = workspace:Raycast(origin, Vector3.new(0, -800, 0), params)
     if hit then return hit.Position.Y end
     return nil
+end
+
+-- ============ NPC FOLLOWERS ============
+-- NPC: anchor client-side + PivotTo theo ghe moi tick.
+-- Server van thay NPC welded voi ghe (khong doi server state).
+local npcFollowers = {}
+
+local function attachNpcFollowers(car)
+    npcFollowers = {}
+    local myChar = char()
+    if not car then return end
+
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") and d.Occupant then
+            local oh = d.Occupant
+            if oh and oh.Parent and oh.Parent ~= myChar then
+                local npcChar = oh.Parent
+                local hrp = npcChar:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- offset tu ghe den HRP tai thoi diem bat dau
+                    local offset = d.CFrame:ToObjectSpace(hrp.CFrame)
+
+                    -- ANCHOR toan bo NPC client-side -> khong physics -> khong ket tuong
+                    for _, p in ipairs(npcChar:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            pcall(function() p.Anchored = true end)
+                            pcall(function() p.CanCollide = false end)
+                            pcall(function() p.Massless = true end)
+                        end
+                    end
+
+                    -- Tat humanoid state machine
+                    pcall(function()
+                        oh.PlatformStand = true
+                        oh.WalkSpeed = 0
+                        oh.JumpPower = 0
+                        oh.JumpHeight = 0
+                    end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Running, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Jumping, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Climbing, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
+                    pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
+
+                    table.insert(npcFollowers, {
+                        char = npcChar,
+                        hum = oh,
+                        seat = d,
+                        offset = offset,
+                    })
+                end
+            end
+        end
+    end
+end
+
+local function updateNpcFollowers()
+    for _, f in ipairs(npcFollowers) do
+        if f.char and f.char.Parent and f.seat and f.seat.Parent then
+            local hrp = f.char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local targetCF = f.seat.CFrame * f.offset
+                pcall(function() hrp.CFrame = targetCF end)
+                -- re-anchor moi tick (phong server ghi de)
+                for _, p in ipairs(f.char:GetDescendants()) do
+                    if p:IsA("BasePart") and not p.Anchored then
+                        pcall(function() p.Anchored = true end)
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function detachNpcFollowers()
+    for _, f in ipairs(npcFollowers) do
+        if f.char and f.char.Parent then
+            for _, p in ipairs(f.char:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.Anchored = false end)
+                    pcall(function() p.CanCollide = true end)
+                    pcall(function() p.Massless = false end)
+                end
+            end
+            if f.hum and f.hum.Parent then
+                pcall(function() f.hum.PlatformStand = false end)
+                pcall(function() f.hum.WalkSpeed = 16 end)
+                pcall(function() f.hum.JumpPower = 50 end)
+            end
+        end
+    end
+    npcFollowers = {}
 end
 
 -- ============ NETWORK OWNER ============
@@ -477,27 +569,23 @@ local function scanSurroundHeight(targetPos)
     return maxTop
 end
 
--- ============ DESCEND (anchor + PivotTo) ============
+-- ============ DESCEND ============
 local function descendAndLand(car, target, cruiseY, flyMode, bv, bg)
     if not car then return end
     setState("ha xuong")
 
-    -- 1. Dung BV ngay
     if bv and bv.Parent then
         bv.Velocity = Vector3.zero
         bv.MaxForce = Vector3.new(0, 0, 0)
     end
 
-    -- 2. ANCHOR NGAY -> xe dung yen tren khong, khong the roi
     anchorCar(car)
     task.wait(0.08)
 
-    -- 3. Destroy BV/BG (khong con tac dung)
     if bv and bv.Parent then bv:Destroy() end
     if bg and bg.Parent then bg:Destroy() end
     task.wait(0.05)
 
-    -- 4. Raycast tim dat
     local pivotPos = car:GetPivot().Position
     local params = makeRayParams()
     local origin = Vector3.new(target.X, pivotPos.Y + 100, target.Z)
@@ -505,11 +593,9 @@ local function descendAndLand(car, target, cruiseY, flyMode, bv, bg)
 
     if not hit then
         setState("khong thay dat - giu anchor")
-        -- khong tim thay dat -> giu anchor, khong tut
         return
     end
 
-    -- 5. Tinh bbox -> PivotTo chinh xac
     local bbCF, bbSize = car:GetBoundingBox()
     local bbCenter = bbCF.Position
     local bbBottomOffset = bbSize.Y / 2
@@ -524,13 +610,12 @@ local function descendAndLand(car, target, cruiseY, flyMode, bv, bg)
     pcall(function() car:PivotTo(CFrame.new(finalPos) * rot) end)
     task.wait(0.15)
 
-    -- 6. Unanchor + bat collide chassis-only
     unanchorCar(car)
     task.wait(0.08)
     chassisCollideOn(car)
 end
 
--- ============ FLY (BodyVelocity bay) ============
+-- ============ FLY ============
 local function flyTo(target)
     stopHold()
     local h = hum()
@@ -540,7 +625,6 @@ local function flyTo(target)
 
     local myChar = char()
 
-    -- 1. Quet vung target
     setState("quet vung")
     local surroundTop = scanSurroundHeight(target)
     local targetFloor = floorBelow(target) or target.Y
@@ -558,28 +642,12 @@ local function flyTo(target)
     end
     setState("bay: " .. flyMode)
 
-    -- 2. Claim network owner
     claimNetworkOwner(car)
 
-    -- 3. NPC: claim + tat collide + PlatformStand
-    for _, d in ipairs(car:GetDescendants()) do
-        if d:IsA("VehicleSeat") and d.Occupant then
-            local oh = d.Occupant
-            if oh and oh.Parent and oh.Parent ~= myChar then
-                claimNetworkOwner(oh.Parent)
-                pcall(function() oh.PlatformStand = true end)
-                pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
-                for _, p in ipairs(oh.Parent:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        pcall(function() p.CanCollide = false end)
-                        pcall(function() p.Massless = true end)
-                    end
-                end
-            end
-        end
-    end
+    -- NPC: anchor + follow (khong dung SetNetworkOwner, dung anchor client-side)
+    attachNpcFollowers(car)
 
-    -- 4. Tat collide xe + player
+    -- Tat collide xe + player
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.CanCollide = false end)
@@ -595,7 +663,6 @@ local function flyTo(target)
 
     flying = true
 
-    -- BodyVelocity + BodyGyro (physics that -> game tinh quang duong)
     local bv = Instance.new("BodyVelocity")
     bv.Name = "RGFly"
     bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
@@ -614,7 +681,6 @@ local function flyTo(target)
     local lastVoidCheck = 0
     local voidJustHandled = false
     local ownerRefreshCounter = 0
-    local npcRefreshCounter = 0
 
     while enabled do
         local c = myCar or findMyCar()
@@ -646,7 +712,6 @@ local function flyTo(target)
                     else
                         destY = landFloorY + cruiseY
                     end
-                    -- Anchor tam de PivotTo an toan
                     anchorCar(c)
                     local dest = Vector3.new(landPos.X, destY, landPos.Z)
                     local startPivot = c:GetPivot()
@@ -693,54 +758,24 @@ local function flyTo(target)
 
         bv.Velocity = Vector3.new(vx, vy, vz)
 
+        -- UPDATE NPC FOLLOWER MOI TICK
+        updateNpcFollowers()
+
         ownerRefreshCounter = ownerRefreshCounter + 1
         if ownerRefreshCounter >= 10 then
             ownerRefreshCounter = 0
             pcall(function() claimNetworkOwner(c) end)
         end
 
-        npcRefreshCounter = npcRefreshCounter + 1
-        if npcRefreshCounter >= 3 then
-            npcRefreshCounter = 0
-            for _, d in ipairs(c:GetDescendants()) do
-                if d:IsA("VehicleSeat") and d.Occupant then
-                    local oh = d.Occupant
-                    if oh and oh.Parent and oh.Parent ~= myChar then
-                        pcall(function() claimNetworkOwner(oh.Parent) end)
-                        pcall(function() oh.PlatformStand = true end)
-                        for _, p in ipairs(oh.Parent:GetDescendants()) do
-                            if p:IsA("BasePart") then
-                                pcall(function() p.CanCollide = false end)
-                                pcall(function() p.Massless = true end)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
         task.wait(TICK)
     end
 
-    -- ===== HA XUONG: anchor -> bbox -> PivotTo -> unanchor =====
+    -- ===== HA XUONG =====
     car = myCar or findMyCar()
     descendAndLand(car, target, cruiseY, flyMode, bv, bg)
 
-    -- NPC: tra lai binh thuong
-    for _, d in ipairs(car and car:GetDescendants() or {}) do
-        if d:IsA("VehicleSeat") and d.Occupant then
-            local oh = d.Occupant
-            if oh and oh.Parent and oh.Parent ~= myChar then
-                pcall(function() oh.PlatformStand = false end)
-                for _, p in ipairs(oh.Parent:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        pcall(function() p.CanCollide = true end)
-                        pcall(function() p.Massless = false end)
-                    end
-                end
-            end
-        end
-    end
+    -- NPC: unanchor, tra ve binh thuong
+    detachNpcFollowers()
 
     flying = false
     if not h.Sit then forceSeat() end
@@ -1069,6 +1104,7 @@ toggleBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
         resetState()
+        detachNpcFollowers()
         local car = myCar or findMyCar()
         if car then
             unanchorCar(car)
@@ -1130,4 +1166,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v20")
+print("[ridego] loaded v21")
