@@ -1,8 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v24
--- Nut GUI chuyen che do bay: AUTO / NORMAL / HIGH / UNDERGROUND.
--- Fix crash line 837: pcall wrap toan bo loop + NPC follower.
--- NPC: anchor + weld + RenderStepped refresh.
+-- RideGo Farm — FINAL v25
+-- Mode UNDERGROUND: CFrame-only, Y co dinh duoi dat, khong dam building, khong void.
+-- Mode AUTO/NORMAL/HIGH: BodyVelocity + void scan da huong.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -32,6 +31,10 @@ local SURROUND_RADIUS   = 220
 local SURROUND_HIGH_MARGIN = 30
 local BUILDING_MIN_H    = 8
 local VOID_SCAN_COOLDOWN = 0.8
+local UNDER_STEP_MAX    = 60
+local UNDER_DESCEND_STEPS = 12
+local UNDER_ASCEND_STEPS = 12
+local UNDER_STEP_TIME   = 0.03
 
 -- ============ STATE ============
 local enabled     = false
@@ -206,7 +209,7 @@ local npcRenderConn = nil
 local function safeRefreshNpc()
     for _, f in ipairs(npcFollowers) do
         if not f then continue end
-        local ok, err = pcall(function()
+        pcall(function()
             if not f.char or not f.char.Parent then return end
             if not f.seat or not f.seat.Parent then return end
             if not f.hrp or not f.hrp.Parent then return end
@@ -225,7 +228,6 @@ local function safeRefreshNpc()
                 w.Parent = f.hrp
             end
         end)
-        -- silent
     end
 end
 
@@ -692,8 +694,167 @@ local function descendAndLand(car, target, cruiseY, flyMode, bv, bg)
     chassisCollideOn(car)
 end
 
--- ============ FLY ============
+-- ============ FLY UNDERGROUND (CFrame-only) ============
+local function flyUnderground(target)
+    stopHold()
+    local h = hum()
+    local car = myCar or findMyCar()
+    if not h or not car then return false end
+    if not h.Sit then forceSeat(); task.wait(0.1) end
+
+    local myChar = char()
+
+    local targetFloor = floorBelow(target) or target.Y
+    local underY = targetFloor - UNDERGROUND_DEPTH
+
+    setState("under - chuan bi")
+
+    claimNetworkOwner(car)
+    attachNpcFollowers(car)
+
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.CanCollide = false end)
+        end
+    end
+    if myChar then
+        for _, p in ipairs(myChar:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = false end)
+            end
+        end
+    end
+
+    flying = true
+
+    local startPivot = car:GetPivot()
+    local rotOnly = startPivot - startPivot.Position
+
+    -- Di xuong duoi dat bang nhieu step nho
+    local curPos = startPivot.Position
+    local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
+    for i = 1, UNDER_DESCEND_STEPS do
+        curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
+        local cf = CFrame.new(curPos) * rotOnly
+        pcall(function() car:PivotTo(cf) end)
+        task.wait(UNDER_STEP_TIME)
+    end
+    setState("under - bay")
+
+    local reached = false
+    local lastNpcRefresh = 0
+    local fakeVelCounter = 0
+
+    while enabled do
+        local c = myCar or findMyCar()
+        if not c then break end
+
+        local curP = c:GetPivot().Position
+        local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
+        local dist = flat.Magnitude
+
+        if dist < ARRIVE_DIST then
+            reached = true
+            break
+        end
+
+        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+
+        local spd
+        if dist >= DECEL_DIST then
+            spd = STEP_DIST
+        else
+            spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
+        end
+
+        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+
+        local nextPos = Vector3.new(
+            curP.X + dir.X * step,
+            underY,
+            curP.Z + dir.Z * step
+        )
+        local nextCF = CFrame.new(nextPos) * rotOnly
+        pcall(function() c:PivotTo(nextCF) end)
+
+        -- Fake velocity nhe cho game doc duong di
+        fakeVelCounter = fakeVelCounter + 1
+        if fakeVelCounter >= 2 then
+            fakeVelCounter = 0
+            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
+                end
+            end
+        end
+
+        if os.clock() - lastNpcRefresh > 0.05 then
+            lastNpcRefresh = os.clock()
+            updateNpcFollowers()
+        end
+
+        task.wait(TICK)
+    end
+
+    -- ===== ASCEND: noi len mat dat =====
+    car = myCar or findMyCar()
+    if car and reached then
+        setState("under - noi len")
+        local ascendSteps = UNDER_ASCEND_STEPS
+        local curPivot = car:GetPivot()
+        local curP = curPivot.Position
+        local rot = curPivot - curP
+        local upTargetY = targetFloor + CRUISE_Y
+        local upStepY = (upTargetY - curP.Y) / ascendSteps
+
+        for i = 1, ascendSteps do
+            curP = Vector3.new(curP.X, curP.Y + upStepY, curP.Z)
+            pcall(function() car:PivotTo(CFrame.new(curP) * rot) end)
+            task.wait(UNDER_STEP_TIME)
+        end
+
+        task.wait(0.1)
+
+        descendAndLand(car, target, CRUISE_Y, "normal", nil, nil)
+    end
+
+    detachNpcFollowers()
+
+    flying = false
+    if not h.Sit then forceSeat() end
+    task.wait(0.1)
+    startHold()
+
+    local h2 = hum()
+    if not h2 or not h2.Sit then
+        forceSeat()
+        task.wait(0.2)
+    end
+
+    task.wait(0.15)
+    return reached
+end
+
+-- ============ FLY (BodyVelocity) ============
 local function flyTo(target)
+    -- UNDERGROUND -> ham rieng, khong BodyVelocity
+    if flyModeOverride == "underground" then
+        return flyUnderground(target)
+    end
+
+    -- AUTO: neu scan thay building qua cao -> cung dung underground
+    if flyModeOverride == "auto" then
+        local surroundTop = scanSurroundHeight(target)
+        local targetFloor = floorBelow(target) or target.Y
+        if surroundTop then
+            local buildingH = surroundTop - targetFloor
+            if buildingH > MAX_GROUND_FLY then
+                return flyUnderground(target)
+            end
+        end
+    end
+
     stopHold()
     local h = hum()
     local car = myCar or findMyCar()
@@ -767,7 +928,6 @@ local function flyTo(target)
     local lastVoidScan = 0
 
     while enabled do
-        -- ===== WRAP TOAN BO LOOP BODY TRONG PCALL =====
         local ok, loopErr = pcall(function()
             local c = myCar or findMyCar()
             if not c then return "break" end
@@ -783,7 +943,6 @@ local function flyTo(target)
 
             local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-            -- VOID CHECK MOI TICK
             local nextStep = TICK * STEP_DIST * 1.5
             local probeAheadX = curPos.X + dir.X * math.max(nextStep, 40)
             local probeAheadZ = curPos.Z + dir.Z * math.max(nextStep, 40)
@@ -807,8 +966,6 @@ local function flyTo(target)
                     local destY
                     if flyMode == "underground" then
                         destY = landing.floorY - UNDERGROUND_DEPTH
-                    elseif flyMode == "high" then
-                        destY = landing.floorY + cruiseY
                     else
                         destY = landing.floorY + cruiseY
                     end
@@ -828,7 +985,6 @@ local function flyTo(target)
                 end
             end
 
-            -- DO CAO
             local floorY = floorBelow(curPos) or (curPos.Y - math.abs(cruiseY))
             local targetY
             if flyMode == "underground" then
@@ -869,7 +1025,6 @@ local function flyTo(target)
         elseif loopErr == "break" then
             break
         end
-        -- "continue" va "tick" deu di tiep task.wait
 
         task.wait(TICK)
     end
@@ -1193,7 +1348,7 @@ local modeTexts = {
     auto = "MODE: AUTO",
     normal = "MODE: NORMAL (thap)",
     high = "MODE: HIGH (cao)",
-    underground = "MODE: UNDER (duoi dat)",
+    underground = "MODE: UNDER (CFrame duoi dat)",
 }
 local modeOrder = {"auto", "normal", "high", "underground"}
 local modeColors = {
@@ -1303,4 +1458,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v24")
+print("[ridego] loaded v25")
