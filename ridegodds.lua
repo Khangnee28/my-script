@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v29.2
--- Bo noclip. Char bam ghe moi tick. Khong check seat.
+-- RideGo Farm — FINAL v29.3
+-- Bo ep HRP. UNDERGROUND_DEPTH=250. Khong noclip.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,7 +17,7 @@ local DROP_WAIT           = 4
 local ACK_DELAY           = 3
 local DECEL_DIST          = 200
 local TICK                = 0.05
-local UNDERGROUND_DEPTH   = 200
+local UNDERGROUND_DEPTH   = 250
 local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
@@ -533,16 +533,6 @@ local function ascendToGround(car, target, targetFloor)
 
     local dest = Vector3.new(target.X, upTargetY, target.Z)
     pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
-
-    task.wait(0.05)
-    local vs = getDriveSeat(car)
-    local myHRP = root()
-    if vs and myHRP then
-        pcall(function()
-            myHRP.CFrame = vs.CFrame * CFrame.new(0, 1, 0)
-        end)
-    end
-
     task.wait(0.15)
 end
 
@@ -577,14 +567,6 @@ local function flyTo(target)
         curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
         local cf = CFrame.new(curPos) * rotOnly
         pcall(function() car:PivotTo(cf) end)
-
-        -- Ep HRP theo ghe moi buoc
-        local vsNow = getDriveSeat(car)
-        local hrpNow = root()
-        if vsNow and hrpNow then
-            pcall(function() hrpNow.CFrame = vsNow.CFrame * CFrame.new(0, 1, 0) end)
-        end
-
         task.wait(UNDER_STEP_TIME)
     end
     setStatus("⬇ Đang bay dưới lòng đất")
@@ -592,16 +574,10 @@ local function flyTo(target)
     local reached = false
     local lastNpcRefresh = 0
     local fakeVelCounter = 0
-    local myHRP = root()
-    local driveSeatRef = getDriveSeat(car)
 
     while enabled do
         local c = myCar or findMyCar()
         if not c then break end
-
-        if not driveSeatRef or not driveSeatRef.Parent then
-            driveSeatRef = getDriveSeat(c)
-        end
 
         local curP = c:GetPivot().Position
         local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
@@ -629,17 +605,6 @@ local function flyTo(target)
             curP.Z + dir.Z * step
         )
         pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
-
-        -- EP HRP bam ghe moi tick -> khong rot
-        if driveSeatRef and driveSeatRef.Parent then
-            if myHRP and myHRP.Parent then
-                pcall(function()
-                    myHRP.CFrame = driveSeatRef.CFrame * CFrame.new(0, 1, 0)
-                end)
-            else
-                myHRP = root()
-            end
-        end
 
         fakeVelCounter = fakeVelCounter + 1
         if fakeVelCounter >= 2 then
@@ -905,9 +870,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 999
 gui.Parent = cg
 
--- ==================================================
 -- FRAME 1: MENU CHÍNH
--- ==================================================
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 290, 0, 168)
 menuFrame.Position = UDim2.new(0, 20, 0.5, -180)
@@ -1073,9 +1036,7 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================================================
 -- FRAME 2: STATUS PANEL
--- ==================================================
 local statusFrame = Instance.new("Frame", gui)
 statusFrame.Size = UDim2.new(0, 290, 0, 148)
 statusFrame.Position = UDim2.new(0, 20, 0.5, 20)
@@ -1131,9 +1092,7 @@ local earnLbl   = makeStatusLabel(68)
 local carLbl    = makeStatusLabel(86)
 local statusLbl = makeStatusLabel(110)
 
--- ==================================================
 -- TOGGLE BUTTON
--- ==================================================
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
 toggleBtn.Position = UDim2.new(0, 20, 0.5, 130)
@@ -1183,9 +1142,7 @@ makeDraggable(menuFrame, menuTitle)
 makeDraggable(statusFrame, statusTitle)
 makeDraggable(toggleBtn, toggleBtn)
 
--- ==================================================
 -- NÚT BẮT ĐẦU/DỪNG FARM
--- ==================================================
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
@@ -1224,9 +1181,7 @@ farmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================================================
 -- CẬP NHẬT STATUS
--- ==================================================
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1241,9 +1196,7 @@ task.spawn(function()
     end
 end)
 
--- ==================================================
 -- TỰ QUÉT XE
--- ==================================================
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1255,4 +1208,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v29.2")
+print("[RideGo] Đã load v29.3")
