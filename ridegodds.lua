@@ -1,9 +1,9 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v22
--- Bay: BodyVelocity (game tinh quang duong).
--- Void: check MOI TICK + lookahead 260 -> CFrame qua bo TRUOC KHI cham void.
--- Ha xuong: anchor -> bbox -> PivotTo -> unanchor.
--- NPC: anchor client-side + PivotTo theo ghe moi tick.
+-- RideGo Farm — FINAL v23
+-- Void: quet 11 huong (thang + cheo ±80°). Uu tien goc nho + dist nho.
+--       Khong tim thay bo nao -> BAY TIEP (khong dung im).
+-- Bay: BodyVelocity. Ha xuong: anchor -> bbox -> PivotTo -> unanchor.
+-- NPC: anchor client-side + PivotTo theo ghe.
 
 local Players = game:GetService("Players")
 local rs = game:GetService("ReplicatedStorage")
@@ -30,6 +30,7 @@ local UNDERGROUND_DEPTH = 120
 local SURROUND_RADIUS   = 220
 local SURROUND_HIGH_MARGIN = 30
 local BUILDING_MIN_H    = 8
+local VOID_SCAN_COOLDOWN = 0.8
 
 -- ============ STATE ============
 local enabled     = false
@@ -532,20 +533,48 @@ local function voidOnPath(curPos, dir)
     return false
 end
 
-local function scanVoidLanding(curPos, dir)
+-- Quet 11 huong: thang + cheo ±15/30/45/60/80 do.
+-- Tra ve {dist, floorY, dir, deg, score} hoac nil.
+local function scanVoidLandingMulti(curPos, dir)
     local params = makeRayParams()
-    local dist = VOID_SCAN_MIN
-    while dist <= VOID_SCAN_MAX do
-        local probeX = curPos.X + dir.X * dist
-        local probeZ = curPos.Z + dir.Z * dist
-        local origin = Vector3.new(probeX, curPos.Y + 500, probeZ)
-        local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
-        if hit and hit.Position.Y > -50 then
-            return dist, hit.Position.Y
+    local angles = {0, 15, -15, 30, -30, 45, -45, 60, -60, 80, -80}
+    local best = nil
+
+    for _, deg in ipairs(angles) do
+        local rad = math.rad(deg)
+        local cosA, sinA = math.cos(rad), math.sin(rad)
+        local nd = Vector3.new(
+            dir.X * cosA - dir.Z * sinA,
+            0,
+            dir.X * sinA + dir.Z * cosA
+        )
+        if nd.Magnitude > 0.01 then
+            nd = nd.Unit
+            local dist = VOID_SCAN_MIN
+            while dist <= VOID_SCAN_MAX do
+                local px = curPos.X + nd.X * dist
+                local pz = curPos.Z + nd.Z * dist
+                local origin = Vector3.new(px, curPos.Y + 500, pz)
+                local hit = workspace:Raycast(origin, Vector3.new(0, -3000, 0), params)
+                if hit and hit.Position.Y > -50 then
+                    -- score: uu tien goc nho (thang) + dist nho
+                    local score = dist + math.abs(deg) * 15
+                    if not best or score < best.score then
+                        best = {
+                            dist = dist,
+                            floorY = hit.Position.Y,
+                            dir = nd,
+                            deg = deg,
+                            score = score,
+                        }
+                    end
+                    break
+                end
+                dist = dist + VOID_SCAN_STEP
+            end
         end
-        dist = dist + VOID_SCAN_STEP
     end
-    return nil, nil
+    return best
 end
 
 -- ============ SURROUND SCAN ============
@@ -680,6 +709,7 @@ local function flyTo(target)
 
     local reached = false
     local ownerRefreshCounter = 0
+    local lastVoidScan = 0
 
     while enabled do
         local c = myCar or findMyCar()
@@ -696,7 +726,7 @@ local function flyTo(target)
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- ===== VOID CHECK MOI TICK, CHAN TRUOC KHI VAO =====
+        -- ===== VOID CHECK MOI TICK =====
         local nextStep = TICK * STEP_DIST * 1.5
         local probeAheadX = curPos.X + dir.X * math.max(nextStep, 40)
         local probeAheadZ = curPos.Z + dir.Z * math.max(nextStep, 40)
@@ -709,17 +739,19 @@ local function flyTo(target)
             if voidOnPath(curPos, dir) then blocked = true end
         end
 
-        if blocked then
-            setState("void - quet bo")
+        if blocked and os.clock() - lastVoidScan > VOID_SCAN_COOLDOWN then
+            lastVoidScan = os.clock()
+            setState("void - quet da huong")
             bv.Velocity = Vector3.zero
-            local landDist, landFloorY = scanVoidLanding(curPos, dir)
-            if landDist and landFloorY and landDist <= MAX_CFRAME_DIST then
-                local landPos = curPos + dir * landDist
+
+            local landing = scanVoidLandingMulti(curPos, dir)
+            if landing and landing.dist <= MAX_CFRAME_DIST then
+                local landPos = curPos + landing.dir * landing.dist
                 local destY
                 if flyMode == "underground" then
-                    destY = landFloorY - UNDERGROUND_DEPTH
+                    destY = landing.floorY - UNDERGROUND_DEPTH
                 else
-                    destY = landFloorY + cruiseY
+                    destY = landing.floorY + cruiseY
                 end
                 anchorCar(c)
                 local dest = Vector3.new(landPos.X, destY, landPos.Z)
@@ -729,14 +761,14 @@ local function flyTo(target)
                 task.wait(0.08)
                 unanchorCar(c)
                 claimNetworkOwner(c)
-                setState(string.format("void - CFrame %.0f", landDist))
+                setState(string.format("void-CFrame%.0f/%d°", landing.dist, landing.deg))
                 task.wait(0.3)
                 task.wait(TICK)
                 continue
             else
-                setState("void - khong bo gan")
-                task.wait(0.1)
-                continue
+                setState("void - bay tiep")
+                -- khong tim thay bo -> bay tiep (5-10s tren void OK)
+                -- fall through -> bay binh thuong
             end
         end
 
@@ -1171,4 +1203,4 @@ task.spawn(function()
     scanBtn.Text = "QUET XE (" .. #carList .. ")"
 end)
 
-print("[ridego] loaded v22")
+print("[ridego] loaded v23")
