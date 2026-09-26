@@ -196,8 +196,9 @@ local function floorBelow(pos)
     return nil
 end
 
--- ============ NPC FOLLOWERS ============
+-- ============ NPC FOLLOWERS (3 lop) ============
 local npcFollowers = {}
+local npcRenderConn = nil
 
 local function attachNpcFollowers(car)
     npcFollowers = {}
@@ -213,19 +214,32 @@ local function attachNpcFollowers(car)
                 if hrp then
                     local offset = d.CFrame:ToObjectSpace(hrp.CFrame)
 
+                    -- LOP 1: tat physics + anchor
                     for _, p in ipairs(npcChar:GetDescendants()) do
                         if p:IsA("BasePart") then
                             pcall(function() p.Anchored = true end)
                             pcall(function() p.CanCollide = false end)
                             pcall(function() p.Massless = true end)
+                            pcall(function() p:SetNetworkOwner(lp) end)
                         end
                     end
 
+                    -- LOP 2: weld cung HRP vao ghe
+                    local existing = hrp:FindFirstChild("RG_NpcWeld")
+                    if existing then pcall(function() existing:Destroy() end) end
+                    local w = Instance.new("WeldConstraint")
+                    w.Name = "RG_NpcWeld"
+                    w.Part0 = d
+                    w.Part1 = hrp
+                    w.Parent = hrp
+
+                    -- LOP 3: tat humanoid state machine
                     pcall(function()
                         oh.PlatformStand = true
                         oh.WalkSpeed = 0
                         oh.JumpPower = 0
                         oh.JumpHeight = 0
+                        oh.AutoRotate = false
                     end)
                     pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Running, false) end)
                     pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false) end)
@@ -233,6 +247,7 @@ local function attachNpcFollowers(car)
                     pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Climbing, false) end)
                     pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false) end)
                     pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
+                    pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end)
                     pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
 
                     table.insert(npcFollowers, {
@@ -240,33 +255,54 @@ local function attachNpcFollowers(car)
                         hum = oh,
                         seat = d,
                         offset = offset,
+                        hrp = hrp,
                     })
                 end
             end
         end
     end
-end
 
-local function updateNpcFollowers()
-    for _, f in ipairs(npcFollowers) do
-        if f.char and f.char.Parent and f.seat and f.seat.Parent then
-            local hrp = f.char:FindFirstChild("HumanoidRootPart")
-            if hrp then
+    -- LOP bonus: RenderStepped loop -> refresh o 60+Hz (cao hon Heartbeat)
+    if npcRenderConn then
+        pcall(function() npcRenderConn:Disconnect() end)
+        npcRenderConn = nil
+    end
+    local RunService = game:GetService("RunService")
+    npcRenderConn = RunService.RenderStepped:Connect(function()
+        for _, f in ipairs(npcFollowers) do
+            if f.char and f.char.Parent and f.seat and f.seat.Parent and f.hrp and f.hrp.Parent then
+                -- Re-anchor neu server ghi de
+                if not f.hrp.Anchored then
+                    pcall(function() f.hrp.Anchored = true end)
+                end
+                -- Re-set CFrame theo ghe
                 local targetCF = f.seat.CFrame * f.offset
-                pcall(function() hrp.CFrame = targetCF end)
-                for _, p in ipairs(f.char:GetDescendants()) do
-                    if p:IsA("BasePart") and not p.Anchored then
-                        pcall(function() p.Anchored = true end)
-                    end
+                pcall(function() f.hrp.CFrame = targetCF end)
+                -- Re-weld neu weld bi pha
+                if not f.hrp:FindFirstChild("RG_NpcWeld") then
+                    local w = Instance.new("WeldConstraint")
+                    w.Name = "RG_NpcWeld"
+                    w.Part0 = f.seat
+                    w.Part1 = f.hrp
+                    w.Parent = f.hrp
                 end
             end
         end
-    end
+    end)
 end
 
 local function detachNpcFollowers()
+    if npcRenderConn then
+        pcall(function() npcRenderConn:Disconnect() end)
+        npcRenderConn = nil
+    end
     for _, f in ipairs(npcFollowers) do
         if f.char and f.char.Parent then
+            local hrp = f.char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local w = hrp:FindFirstChild("RG_NpcWeld")
+                if w then pcall(function() w:Destroy() end) end
+            end
             for _, p in ipairs(f.char:GetDescendants()) do
                 if p:IsA("BasePart") then
                     pcall(function() p.Anchored = false end)
@@ -278,12 +314,12 @@ local function detachNpcFollowers()
                 pcall(function() f.hum.PlatformStand = false end)
                 pcall(function() f.hum.WalkSpeed = 16 end)
                 pcall(function() f.hum.JumpPower = 50 end)
+                pcall(function() f.hum.AutoRotate = true end)
             end
         end
     end
     npcFollowers = {}
 end
-
 -- ============ NETWORK OWNER ============
 local function claimNetworkOwner(inst)
     if not inst then return end
