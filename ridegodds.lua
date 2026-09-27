@@ -1,7 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v26.5
--- Giu nguyen logic bay v26.4. Tele tam ghe + xich forward + ep sit ngay.
--- Lan 1: doi job+spawn+online. Lan 2+: reset char+spawn+off/on. Tat farm: reset char.
+-- RideGo Farm — FINAL v26.6
+-- forceSeat kieu v26.4 (tele tam ghe +1 Y). Da bo eyeBtn.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -426,11 +425,6 @@ local function getDriveSeat(car)
     return car:FindFirstChildWhichIsA("VehicleSeat", true)
 end
 
--- Tele tam ghe + xich 1 chut ve phia dau xe (forward = -Z local)
-local function getSeatTeleCF(vs)
-    return vs.CFrame
-end
-
 local function forceSeat()
     local h = hum()
     local car = myCar or findMyCar()
@@ -445,14 +439,14 @@ local function forceSeat()
 
     if h.Sit and h.SeatPart ~= vs then
         pcall(function() h.Sit = false end)
-        task.wait(0.15)
+        task.wait(0.2)
     end
 
     if vs.Occupant and vs.Occupant ~= h then
         local occ = vs.Occupant
         if occ and occ:IsA("Humanoid") then
             pcall(function() occ.Sit = false end)
-            task.wait(0.15)
+            task.wait(0.2)
         end
         if vs.Occupant and vs.Occupant ~= h then return false end
     end
@@ -465,31 +459,32 @@ local function forceSeat()
         end
     end
 
-    -- Tele tam ghe + xich forward + ep sit NGAY
     local hrp = root()
     if hrp then
-        local teleCF = getSeatTeleCF(vs)
-        pcall(function() hrp.CFrame = teleCF end)
+        local centerCF = vs.CFrame * CFrame.new(0, 1, 0)
+        pcall(function() hrp.CFrame = centerCF end)
+        task.wait(0.05)
     end
 
-    -- Ep sit ngay lap tuc, khong cho
     pcall(function() vs:Sit(h) end)
-    pcall(function() h.Sit = true end)
+    task.wait(0.12)
     pcall(function() h.AutoRotate = false end)
+    pcall(function() h.Sit = true end)
 
-    task.wait(0.08)
-
-    -- Retry neu chua dinh
     for i = 1, 3 do
         if h.Sit and h.SeatPart == vs then break end
         local hrpR = root()
         if hrpR then
-            local cf = getSeatTeleCF(vs)
+            local cf = vs.CFrame * CFrame.new(0, 1, 0)
             pcall(function() hrpR.CFrame = cf end)
+            task.wait(0.06)
         end
         pcall(function() vs:Sit(h) end)
-        pcall(function() h.Sit = true end)
-        task.wait(0.08)
+        task.wait(0.1)
+        if not h.Sit then
+            pcall(function() h.Sit = true end)
+            task.wait(0.06)
+        end
     end
 
     for _, d in ipairs(disabledList) do
@@ -938,7 +933,7 @@ task.spawn(function()
 end)
 
 local title = Instance.new("TextLabel", rootUI)
-title.Size = UDim2.new(1, -40, 0, 24)
+title.Size = UDim2.new(1, -20, 0, 24)
 title.Position = UDim2.new(0, 10, 0, 4)
 title.BackgroundTransparency = 1
 title.Text = "RIDEGO FARM"
@@ -946,16 +941,6 @@ title.TextColor3 = Color3.fromRGB(255, 140, 40)
 title.TextSize = 13
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
-
-local eyeBtn = Instance.new("TextButton", rootUI)
-eyeBtn.Size = UDim2.new(0, 24, 0, 20)
-eyeBtn.Position = UDim2.new(1, -34, 0, 6)
-eyeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-eyeBtn.Text = "−"
-eyeBtn.TextColor3 = Color3.new(1,1,1)
-eyeBtn.TextSize = 14
-eyeBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", eyeBtn).CornerRadius = UDim.new(0, 4)
 
 -- ============ MENU CHÍNH ============
 local mainMenu = Instance.new("Frame", rootUI)
@@ -1042,7 +1027,6 @@ sPad.PaddingRight = UDim.new(0, 6)
 sPad.PaddingBottom = UDim.new(0, 6)
 
 local carOpen = false
-local uiHidden = false
 
 local function clearList()
     for _, c in ipairs(scroll:GetChildren()) do
@@ -1105,27 +1089,6 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-eyeBtn.MouseButton1Click:Connect(function()
-    if enabled then return end
-
-    uiHidden = not uiHidden
-    if uiHidden then
-        mainMenu.Visible = false
-        carListPanel.Visible = false
-        statusPanel.Visible = false
-        rootUI.Size = UDim2.new(0, 60, 0, 32)
-        title.Visible = false
-        eyeBtn.Position = UDim2.new(0, 6, 0, 6)
-        eyeBtn.Text = "+"
-    else
-        rootUI.Size = UDim2.new(0, 290, 0, 148)
-        title.Visible = true
-        eyeBtn.Position = UDim2.new(1, -34, 0, 6)
-        eyeBtn.Text = "−"
-        mainMenu.Visible = true
-    end
-end)
-
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         -- DUNG FARM: stop moi thu + reset char
@@ -1156,7 +1119,6 @@ farmBtn.MouseButton1Click:Connect(function()
 
         print("[RideGo] Đã DỪNG farm — dừng mọi thứ + reset char")
 
-        -- Reset char
         task.spawn(function()
             resetCharacter()
         end)
@@ -1217,4 +1179,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v26.5")
+print("[RideGo] Đã load v26.6")
