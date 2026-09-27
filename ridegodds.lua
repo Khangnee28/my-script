@@ -13,7 +13,7 @@ local LAND_OFFSET         = 8
 local ARRIVE_DIST         = 8
 local ORDER_TIMEOUT       = 60
 local PICKUP_WAIT         = 4
-local DROP_WAIT           = 4
+local DROP_WAIT           = 5
 local ACK_DELAY           = 3
 local DECEL_DIST          = 200
 local TICK                = 0.05
@@ -104,6 +104,20 @@ local function formatTime(sec)
     local m = math.floor((sec % 3600) / 60)
     local s = math.floor(sec % 60)
     return string.format("%02d:%02d:%02d", h, m, s)
+end
+
+local function formatMoney(n)
+    local s = tostring(math.floor(n or 0))
+    local out = ""
+    local len = #s
+    for i = 1, len do
+        out = out .. s:sub(i, i)
+        local remain = len - i
+        if remain > 0 and remain % 3 == 0 then
+            out = out .. " "
+        end
+    end
+    return out
 end
 
 local function flatYawCFrame(cf)
@@ -851,7 +865,7 @@ local function runTrip()
         if pendingFare > 0 then
             stats.earn = stats.earn + pendingFare
         end
-        setStatus("✓ Hoàn thành chuyến — +" .. tostring(pendingFare))
+        setStatus("✓ Hoàn thành chuyến — +" .. formatMoney(pendingFare))
         task.wait(ACK_DELAY)
         fire(TaxiEvent, "AckTripComplete")
         setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
@@ -1248,7 +1262,7 @@ task.spawn(function()
             local sec = os.time() - farmStartTime
             timeLbl.Text   = "⏱ Thời gian: " .. formatTime(sec)
             tripsLbl.Text  = "🚕 Chuyến: " .. tostring(stats.trips)
-            earnLbl.Text   = "💰 Kiếm: Rp " .. tostring(stats.earn)
+            earnLbl.Text   = "💰 Kiếm: Rp " .. formatMoney(stats.earn)
             carLbl.Text    = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
             statusLbl.Text = "📍 " .. curStatus
         end
@@ -1269,4 +1283,3 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v27")
