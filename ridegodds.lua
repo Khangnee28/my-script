@@ -1,7 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v27.2
--- Bo watchdog online. Moi 5 chuyen -> tat/mo lai online.
--- Format tien co dau cach. Doi khach xuong 5s.
+-- RideGo Farm — FINAL v27.4
+-- State theo trinh tu don/tra khach. Milestone 10 chuyen tat/mo lai online.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,7 +21,7 @@ local UNDERGROUND_DEPTH   = 200
 local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
-local TRIP_MILESTONE      = 5
+local TRIP_MILESTONE      = 10
 
 -- ============ TRẠNG THÁI ============
 local enabled     = false
@@ -65,7 +64,6 @@ end
 
 local function setStatus(s)
     curStatus = s
-    print("[RideGo] " .. s)
 end
 
 -- ============ REMOTES ============
@@ -567,7 +565,6 @@ end
 -- ============ NỔI LÊN MẶT ĐẤT ============
 local function ascendToGround(car, target, targetFloor)
     if not car then return end
-    setStatus("⬆ Nổi lên mặt đất +" .. tostring(LAND_OFFSET) .. " stud")
 
     local realFloor = floorBelow(target) or targetFloor
     local upTargetY = realFloor + LAND_OFFSET
@@ -581,7 +578,8 @@ local function ascendToGround(car, target, targetFloor)
 end
 
 -- ============ BAY DƯỚI LÒNG ĐẤT ============
-local function flyTo(target)
+local function flyTo(target, flyingLabel)
+    flyingLabel = flyingLabel or "bay"
     stopHold()
     local h = hum()
     local car = myCar or findMyCar()
@@ -594,7 +592,7 @@ local function flyTo(target)
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
-    setStatus("⬇ Chuẩn bị bay dưới lòng đất")
+    setStatus("◦ Chuẩn bị")
 
     unanchorCar(car)
     task.wait(0.05)
@@ -628,7 +626,7 @@ local function flyTo(target)
         pcall(function() car:PivotTo(cf) end)
         task.wait(UNDER_STEP_TIME)
     end
-    setStatus("⬇ Đang bay dưới lòng đất")
+    setStatus("◦ " .. flyingLabel)
 
     local reached = false
     local lastNpcRefresh = 0
@@ -831,7 +829,7 @@ local function runTrip()
     dropPos = nil
     pendingFare = 0
     acceptingOrder = true
-    setStatus("◦ Đang chờ đơn")
+    setStatus("◦ Chờ đơn")
 
     local deadline = os.clock() + ORDER_TIMEOUT
 
@@ -850,17 +848,15 @@ local function runTrip()
         return
     end
 
-    setStatus("➤ Bay đón khách")
-    flyTo(pickupPos)
-    task.wait(0.3)
+    flyTo(pickupPos, "đón khách")
+    setStatus("◦ Đã tới")
     forceSeat()
     setStatus("⌛ Đợi khách lên xe (4s)")
     task.wait(PICKUP_WAIT)
 
     if dropPos then
-        setStatus("➤ Bay trả khách")
-        flyTo(dropPos)
-        task.wait(0.3)
+        flyTo(dropPos, "đưa khách tới nơi")
+        setStatus("◦ Đã tới")
         forceSeat()
         setStatus("⌛ Đợi khách xuống xe (5s)")
         task.wait(DROP_WAIT)
@@ -869,13 +865,12 @@ local function runTrip()
         if pendingFare > 0 then
             stats.earn = stats.earn + pendingFare
         end
-        setStatus("✓ Hoàn thành chuyến — +" .. formatMoney(pendingFare))
+        setStatus("✓ Hoàn thành + Rp " .. formatMoney(pendingFare))
         task.wait(ACK_DELAY)
         fire(TaxiEvent, "AckTripComplete")
-        setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
+        setStatus("✓ Đã báo hoàn thành — chờ đơn mới")
         pendingFare = 0
 
-        -- Moi 5 chuyen -> tat/mo lai online
         if stats.trips > 0 and stats.trips % TRIP_MILESTONE == 0 and stats.trips ~= lastMilestone then
             lastMilestone = stats.trips
             setStatus("◦ Đủ " .. TRIP_MILESTONE .. " chuyến — tắt/mở lại online")
@@ -903,10 +898,8 @@ local function startLoop()
 
         local ok
         if not hasInitOnce then
-            setStatus("◦ Khởi tạo lần đầu...")
             ok = pcall(doFullInit)
         else
-            setStatus("◦ Khởi động lại...")
             ok = pcall(doRestartInit)
         end
 
@@ -938,9 +931,7 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 999
 gui.Parent = cg
 
--- ==========================================
 -- FRAME 1: MENU CHÍNH
--- ==========================================
 local menuFrame = Instance.new("Frame", gui)
 menuFrame.Size = UDim2.new(0, 290, 0, 176)
 menuFrame.Position = UDim2.new(0, 20, 0.5, -180)
@@ -1087,7 +1078,6 @@ local function renderCars()
             carListPanel.Size = UDim2.new(1, -20, 0, 0)
             menuFrame.Size = UDim2.new(0, 290, 0, 176)
             carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
-            print("[RideGo] Đã chọn xe: " .. name)
         end)
     end
     carBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
@@ -1106,9 +1096,7 @@ carBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==========================================
 -- FRAME 2: STATUS PANEL
--- ==========================================
 local statusFrame = Instance.new("Frame", gui)
 statusFrame.Size = UDim2.new(0, 290, 0, 148)
 statusFrame.Position = UDim2.new(0, 20, 0.5, 20)
@@ -1164,9 +1152,7 @@ local earnLbl   = makeStatusLabel(68)
 local carLbl    = makeStatusLabel(86)
 local statusLbl = makeStatusLabel(110)
 
--- ==========================================
 -- TOGGLE BUTTON
--- ==========================================
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.new(0, 44, 0, 44)
 toggleBtn.Position = UDim2.new(0, 20, 0.5, 130)
@@ -1188,9 +1174,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     menuFrame.Visible = menuVisible
 end)
 
--- ==========================================
--- DRAGGABLE
--- ==========================================
 local function makeDraggable(frame, handle)
     local dragging = false
     local dStart, dStartPos
@@ -1218,9 +1201,6 @@ makeDraggable(menuFrame, menuTitle)
 makeDraggable(statusFrame, statusTitle)
 makeDraggable(toggleBtn, toggleBtn)
 
--- ==========================================
--- NÚT BẮT ĐẦU/DỪNG FARM
--- ==========================================
 farmBtn.MouseButton1Click:Connect(function()
     if enabled then
         enabled = false
@@ -1246,8 +1226,6 @@ farmBtn.MouseButton1Click:Connect(function()
         farmBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 140)
         statusFrame.Visible = false
 
-        print("[RideGo] Đã DỪNG farm — dừng mọi thứ + reset char")
-
         task.spawn(function()
             resetCharacter()
         end)
@@ -1260,14 +1238,10 @@ farmBtn.MouseButton1Click:Connect(function()
         farmBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
         statusFrame.Visible = true
 
-        print("[RideGo] BẮT ĐẦU farm")
         startLoop()
     end
 end)
 
--- ==========================================
--- CẬP NHẬT STATUS
--- ==========================================
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -1282,9 +1256,6 @@ task.spawn(function()
     end
 end)
 
--- ==========================================
--- TỰ QUÉT XE
--- ==========================================
 task.spawn(function()
     task.wait(1)
     scanCars()
@@ -1293,7 +1264,4 @@ task.spawn(function()
     end
     renderCars()
     updateCarNameLbl()
-    print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
-
-print("[RideGo] Đã load v27.2")
