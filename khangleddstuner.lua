@@ -2307,14 +2307,52 @@ end)
     end
 
     local function ascendToGround(car, target, targetFloor)
-        if not car then return end
-        local realFloor = floorBelow(target) or targetFloor
-        local upTargetY = realFloor + LAND_OFFSET
-        local cp = car:GetPivot(); local flatRot = flatYawCFrame(cp)
-        local dest = Vector3.new(target.X, upTargetY, target.Z)
-        pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
-        task.wait(0.15)
+    if not car then return end
+    local realFloor = floorBelow(target) or targetFloor
+    local upTargetY = realFloor + LAND_OFFSET
+    local cp = car:GetPivot()
+    local flatRot = flatYawCFrame(cp)
+    local dest = Vector3.new(target.X, upTargetY, target.Z)
+
+    -- Bật CanCollide cho XE trước khi pivot (tránh rớt xuyên đất)
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.CanCollide = true end)
+        end
     end
+
+    -- Bật CanCollide cho CHAR trước khi pivot (tránh rớt void)
+    local c = char()
+    if c then
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = true end)
+            end
+        end
+    end
+
+    -- PivotTo lên mặt đất
+    pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
+    task.wait(0.35)
+
+    -- Force sit lại để đảm bảo char dính vào xe (weld có thể lỏng sau PivotTo)
+    local h = hum()
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    if h and vs then
+        pcall(function() vs:Sit(h) end)
+        task.wait(0.1)
+        pcall(function() h.Sit = true end)
+        pcall(function() h.AutoRotate = false end)
+        task.wait(0.1)
+    end
+
+    -- Đảm bảo mọi seat khác không bị disabled
+    for _, s in ipairs(car:GetDescendants()) do
+        if s:IsA("VehicleSeat") then
+            pcall(function() s.Disabled = false end)
+        end
+    end
+end
 
     local function flyTo(target, flyingLabel)
         flyingLabel = flyingLabel or "bay"
@@ -2375,15 +2413,30 @@ end)
             if os.clock() - lastNpcRefresh > 0.05 then lastNpcRefresh = os.clock(); updateNpcFollowers() end
             task.wait(TICK)
         end
-        if timedOut then flying = false; detachNpcFollowers(); setRgStatus("⚠ Bay quá 30s — hủy"); return false end
-        if not enabled then flying = false; detachNpcFollowers(); return false end
-        car = myCar or findMyCar()
-        if car and reached then
-            ascendToGround(car, target, targetFloor)
-            myCar = car; startHold()
-            pcall(function() hum().AutoRotate = false end)
-        end
-        detachNpcFollowers()
+        if timedOut then
+    flying = false
+    detachNpcFollowers()
+    setRgStatus("⚠ Bay quá 30s — hủy")
+    return false
+end
+
+-- LUON chồi lên trước khi check enabled
+car = myCar or findMyCar()
+if car and reached then
+    ascendToGround(car, target, targetFloor)
+    myCar = car
+    startHold()
+    pcall(function() hum().AutoRotate = false end)
+end
+
+-- Sau khi đã chồi lên an toàn mới check enabled
+if not enabled then
+    flying = false
+    detachNpcFollowers()
+    return false
+end
+
+detachNpcFollowers()
         flying = false
         if not h.Sit then forceSeat() end
         task.wait(0.1)
@@ -2446,8 +2499,9 @@ end)
         return true
     end
     local function doRestartInit()
-        resetCharacter(); task.wait(0.5)
-        if not enabled then return false end
+    
+ task.wait(0.5)
+    if not enabled then return false end
         setRgStatus("◦ Spawn xe")
         if not spawnAndSeat() then return false end
         myCar = findMyCar()
@@ -2457,27 +2511,44 @@ end)
         return true
     end
     local function recoverFromTimeout()
-        acceptingOrder = false; flying = false
-        detachNpcFollowers(); stopHold()
-        local car = myCar or findMyCar()
-        if car then
-            unanchorCar(car)
-            for _, p in ipairs(car:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.CanCollide = true end)
-                    pcall(function() p.Anchored = false end)
+    acceptingOrder = false; flying = false
+    detachNpcFollowers(); stopHold()
+    local car = myCar or findMyCar()
+    if car then
+        unanchorCar(car)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = true end)
+                pcall(function() p.Anchored = false end)
+            end
+        end
+        -- Tele xe lên mặt đất thay vì reset char
+        local h = hum()
+        local c = char()
+        if h and c then
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local floorY = floorBelow(hrp.Position) or (hrp.Position.Y + 10)
+                local dest = Vector3.new(hrp.Position.X, floorY + LAND_OFFSET, hrp.Position.Z)
+                pcall(function() car:PivotTo(CFrame.new(dest)) end)
+                task.wait(0.3)
+                local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+                if vs then
+                    pcall(function() vs:Sit(h) end)
+                    task.wait(0.15)
+                    pcall(function() h.Sit = true end)
                 end
             end
         end
-        local c = char(); if c then fullCollideOn(c) end
-        resetRidegoState()
-        resetCharacter()
-        if not enabled then return end
-        farmStartTime = os.time()
-        fire(TaxiEvent, "GoOffline"); task.wait(1)
-        fire(TaxiEvent, "GoOnline"); task.wait(1)
-        setRgStatus("◦ Đã khôi phục — chờ đơn")
     end
+    local c = char(); if c then fullCollideOn(c) end
+    resetRidegoState()
+    if not enabled then return end
+    farmStartTime = os.time()
+    fire(TaxiEvent, "GoOffline"); task.wait(1)
+    fire(TaxiEvent, "GoOnline"); task.wait(1)
+    setRgStatus("◦ Đã khôi phục — chờ đơn")
+end
 
     local function runTrip()
         local h = hum()
