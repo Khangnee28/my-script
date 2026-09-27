@@ -2623,15 +2623,31 @@ end)
     end)
 
     task.spawn(function()
-        task.wait(2)
-        pcall(scanCars)
-        if #carList > 0 and (not selectedCar or selectedCar == "") then
+    task.wait(2)
+    pcall(scanCars)
+    -- uu tien doc xe da luu
+    local savedCar = ""
+    if readfile and isfile and isfile("ridegoCar.txt") then
+        local ok, v = pcall(readfile, "ridegoCar.txt")
+        if ok and v and v ~= "" then savedCar = v:gsub("[\r\n%s]+$", "") end
+    end
+    if savedCar ~= "" and #carList > 0 then
+        local found = false
+        for _, n in ipairs(carList) do
+            if n == savedCar then found = true; break end
+        end
+        if found then
+            selectedCar = savedCar; ridegoSelectedCar = savedCar
+        elseif not selectedCar or selectedCar == "" then
             selectedCar = carList[1]; ridegoSelectedCar = selectedCar
         end
-        renderRidegoCars()
-        if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)") end
-        if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)") end
-    end)
+    elseif #carList > 0 and (not selectedCar or selectedCar == "") then
+        selectedCar = carList[1]; ridegoSelectedCar = selectedCar
+    end
+    renderRidegoCars()
+    if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)") end
+    if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)") end
+end)
 
     local function stopRidego(forceClose)
         enabled = false
