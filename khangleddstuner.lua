@@ -2738,7 +2738,7 @@ addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 
 -- ============================================================
--- AUTO REJOIN + POST-TELEPORT: 10s → CHƠI bước 1 → CHƠI bước 2 → 15s → farm
+-- AUTO REJOIN v2: multi-detection nut CHƠI
 -- ============================================================
 local _autoRejoin = false
 if readfile and isfile and isfile("autoRejoin.txt") then
@@ -2795,84 +2795,104 @@ task.spawn(function()
     end
     if not wasRejoin then return end
 
-    -- ========== WAIT 10s: cho menu chinh load UI ==========
-    task.wait(10)
-
-    local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then
-        for _ = 1, 30 do
-            task.wait(1)
-            pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            if pg then break end
-        end
-    end
-    if not pg then return end
-
-    -- ========== HELPER ==========
-    local PLAY_TEXTS = { "CHƠI", "PLAY", "Chơi", "Play", "CHOI", "VÀO GAME", "BẮT ĐẦU" }
-    local function textMatch(s)
-        if not s or s == "" then return false end
-        for _, t in ipairs(PLAY_TEXTS) do
-            if s == t or s:find(t, 1, true) then return true end
-        end
-        return false
-    end
-
-    -- tim nut PLAY tren toan bo PlayerGui (khong chi homeFrame)
-    -- loc theo vung: neu truyen `frame`, chi tim trong frame do
-    local function findPlayButton(frame)
-        local root = frame or pg
-        -- uu tien TextButton co Text = CHƠI
-        for _, d in ipairs(root:GetDescendants()) do
-            if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 0 then
-                if textMatch(d.Text) then return d end
-                for _, c in ipairs(d:GetDescendants()) do
-                    if c:IsA("TextLabel") and c.Visible and textMatch(c.Text) then
-                        return d
-                    end
-                end
-            end
-        end
-        -- fallback: ImageButton co TextLabel con
-        for _, d in ipairs(root:GetDescendants()) do
-            if d:IsA("ImageButton") and d.Visible and d.AbsoluteSize.X > 0 then
-                for _, c in ipairs(d:GetDescendants()) do
-                    if c:IsA("TextLabel") and c.Visible and textMatch(c.Text) then
-                        return d
-                    end
-                end
-            end
-        end
-        return nil
-    end
-
-    local function clickAt(btn)
+    -- ========== HELPER: click nut ==========
+    local function clickBtn(btn)
         if not btn then return false end
         local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
         local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-        -- uu tien firesignal truoc (chuan nhat)
         if pcall(function() firesignal(btn.MouseButton1Click) end) then return true end
         if pcall(function() firesignal(btn.Activated) end) then return true end
-        -- fallback touchpress
         if pcall(function()
             touchpress(x, y); task.wait(0.2); touchrelease(x, y)
         end) then return true end
         return false
     end
 
-    -- ========== BUOC 1: tim + bam CHƠI menu chinh ==========
-    -- retry 40 lan, moi lan 1s
+    -- ========== HELPER: tim nut CHƠI (multi-detect) ==========
+    -- Match theo 3 lop: text chinh xac -> text pattern -> (size + position + color)
+    local function findPlayBtn()
+        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if not pg then return nil end
+
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+
+        -- Pattern text (Unicode friendly)
+        local function textIsPlay(s)
+            if not s or s == "" then return false end
+            local u = s:upper()
+            return u == "CHƠI" or u == "CHOI"
+                or u == "PLAY" or u == "START"
+                or u:find("CHƠI") or u:find("PLAY")
+                or u:find("CHOI") or u:find("BẮT ĐẦU")
+        end
+
+        -- Lop 1: TextButton co Text khop
+        for _, d in ipairs(pg:GetDescendants()) do
+            if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then
+                if textIsPlay(d.Text) then return d end
+            end
+        end
+
+        -- Lop 2: Button co TextLabel con khop
+        for _, d in ipairs(pg:GetDescendants()) do
+            if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible and d.AbsoluteSize.X > 40 then
+                for _, c in ipairs(d:GetDescendants()) do
+                    if c:IsA("TextLabel") and c.Visible and textIsPlay(c.Text) then
+                        return d
+                    end
+                end
+            end
+        end
+
+        -- Lop 3: fallback - nut to, giua man hinh, background xanh la
+        local best, bestScore = nil, 0
+        for _, d in ipairs(pg:GetDescendants()) do
+            if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible then
+                local sz = d.AbsoluteSize
+                local ap = d.AbsolutePosition
+                if sz.X > 150 and sz.Y > 40 then
+                    local cx = ap.X + sz.X / 2
+                    local cy = ap.Y + sz.Y / 2
+                    local inCenterX = cx > vp.X * 0.25 and cx < vp.X * 0.75
+                    local inBottomY = cy > vp.Y * 0.45 and cy < vp.Y * 0.92
+                    if inCenterX and inBottomY then
+                        local score = 1
+                        -- uu tien background xanh la (nut CHƠI)
+                        if d.BackgroundColor3.G > 0.5 and d.BackgroundColor3.R < 0.5 then
+                            score = score + 5
+                        end
+                        -- uu tien co text label con
+                        for _, c in ipairs(d:GetDescendants()) do
+                            if c:IsA("TextLabel") and c.Text ~= "" then
+                                score = score + 3
+                                break
+                            end
+                        end
+                        if score > bestScore then bestScore = score; best = d end
+                    end
+                end
+            end
+        end
+        if best and bestScore >= 4 then return best end
+        return nil
+    end
+
+    -- ========== WAIT 15s: cho UI menu chinh load ==========
+    task.wait(15)
+
+    -- ========== BUOC 1: click nut CHƠI menu chinh ==========
     local btn1 = nil
-    for i = 1, 40 do
-        btn1 = findPlayButton(nil)  -- search ca PlayerGui
+    local t0 = os.clock()
+    while os.clock() - t0 < 30 do
+        btn1 = findPlayBtn()
         if btn1 then break end
         task.wait(1)
     end
 
     if btn1 then
-        clickAt(btn1)
-        task.wait(0.5)
-        -- click lan 2 phong button miss
+        clickBtn(btn1)
+        task.wait(1)
+        -- click lan 2
         pcall(function()
             local x = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
             local y = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
@@ -2880,32 +2900,20 @@ task.spawn(function()
         end)
     end
 
-    -- ========== BUOC 2: doi menu doi (2-15s), tim + bam CHƠI lan 2 ==========
-    task.wait(3)  -- cho menu doi hien
+    -- ========== BUOC 2: doi menu doi, click nut CHƠI lan 2 ==========
+    task.wait(4)
 
     local btn2 = nil
-    -- retry 40 lan
-    for i = 1, 40 do
-        btn2 = findPlayButton(nil)
-        -- phan biet: nut 1 da bi an / nut 2 moi xuat hien
-        -- neu khac nut 1 thi lay
-        if btn2 and btn2 ~= btn1 then break end
-        -- neu giong nut 1 thi co the nut 1 chua an, thu tiep
-        if btn2 == btn1 then
-            -- nut 1 co the van hien, doi them
-            task.wait(1)
-            local tryAgain = findPlayButton(nil)
-            if tryAgain and tryAgain ~= btn1 then
-                btn2 = tryAgain
-                break
-            end
-        end
+    local t1 = os.clock()
+    while os.clock() - t1 < 30 do
+        local b = findPlayBtn()
+        if b and b ~= btn1 then btn2 = b; break end
         task.wait(1)
     end
 
-    if btn2 and btn2 ~= btn1 then
-        clickAt(btn2)
-        task.wait(0.5)
+    if btn2 then
+        clickBtn(btn2)
+        task.wait(1)
         pcall(function()
             local x = btn2.AbsolutePosition.X + btn2.AbsoluteSize.X / 2
             local y = btn2.AbsolutePosition.Y + btn2.AbsoluteSize.Y / 2
@@ -2913,13 +2921,12 @@ task.spawn(function()
         end)
     end
 
-    -- xoa marker
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
     -- ========== BUOC 3: WAIT 15s cho vao game + load map ==========
     task.wait(15)
 
-    -- ========== BUOC 4: doc state farm ==========
+    -- ========== BUOC 4: doc state ==========
     local officeFlag, ridegoFlag = false, false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
@@ -2930,7 +2937,7 @@ task.spawn(function()
         if ok and v == "1" then ridegoFlag = true end
     end
 
-    -- ========== BUOC 5: doi map san sang roi moi bat farm ==========
+    -- ========== BUOC 5: doi map san sang + restore xe + bat farm ==========
     if ridegoFlag then
         local rs = game:GetService("ReplicatedStorage")
         for _ = 1, 60 do
@@ -2940,14 +2947,15 @@ task.spawn(function()
             end
             task.wait(1)
         end
-        -- doi them cho rider script init xong
         task.wait(5)
 
-        -- restore xe tu file
+        -- restore xe tu ridegoCar.txt
         local savedCar = ""
         if readfile and isfile and isfile("ridegoCar.txt") then
             local ok, v = pcall(readfile, "ridegoCar.txt")
-            if ok and v and v ~= "" then savedCar = v:gsub("[\r\n%s]+$", "") end
+            if ok and v and v ~= "" then
+                savedCar = v:gsub("[\r\n%s]+$", "")
+            end
         end
         if savedCar ~= "" then
             pcall(function()
