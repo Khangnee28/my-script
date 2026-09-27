@@ -2314,15 +2314,38 @@ end)
     local flatRot = flatYawCFrame(cp)
     local dest = Vector3.new(target.X, upTargetY, target.Z)
 
-    -- Bật CanCollide cho XE trước khi pivot (tránh rớt xuyên đất)
+    local h = hum()
+    local c = char()
+    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+
+    -- BƯỚC 1: anchor HRP char tạm để không rớt void trong lúc pivot xe
+    local wasAnchored = false
+    if hrp then
+        pcall(function()
+            wasAnchored = hrp.Anchored
+            hrp.Anchored = true
+        end)
+    end
+
+    -- BƯỚC 2: bật CanCollide xe trước khi pivot
     for _, p in ipairs(car:GetDescendants()) do
         if p:IsA("BasePart") then
             pcall(function() p.CanCollide = true end)
         end
     end
 
-    -- Bật CanCollide cho CHAR trước khi pivot (tránh rớt void)
-    local c = char()
+    -- BƯỚC 3: pivot xe lên mặt đất
+    pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
+    task.wait(0.12)
+
+    -- BƯỚC 4: tele HRP vào seat mới (cùng lúc, HRP đang anchor)
+    if hrp and vs then
+        pcall(function() hrp.CFrame = vs.CFrame end)
+    end
+    task.wait(0.08)
+
+    -- BƯỚC 5: bật CanCollide char trước khi unanchor
     if c then
         for _, p in ipairs(c:GetDescendants()) do
             if p:IsA("BasePart") then
@@ -2331,29 +2354,36 @@ end)
         end
     end
 
-    -- PivotTo lên mặt đất
-    pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
-    task.wait(0.35)
+    -- BƯỚC 6: unanchor HRP
+    if hrp then
+        pcall(function() hrp.Anchored = wasAnchored end)
+    end
+    task.wait(0.05)
 
-    -- Force sit lại để đảm bảo char dính vào xe (weld có thể lỏng sau PivotTo)
-    local h = hum()
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    -- BƯỚC 7: force sit lại (2 lần retry)
     if h and vs then
         pcall(function() vs:Sit(h) end)
-        task.wait(0.1)
+        task.wait(0.15)
         pcall(function() h.Sit = true end)
         pcall(function() h.AutoRotate = false end)
         task.wait(0.1)
+
+        if not h.Sit then
+            if hrp then pcall(function() hrp.CFrame = vs.CFrame end) end
+            task.wait(0.1)
+            pcall(function() vs:Sit(h) end)
+            task.wait(0.15)
+            pcall(function() h.Sit = true end)
+        end
     end
 
-    -- Đảm bảo mọi seat khác không bị disabled
+    -- BƯỚC 8: đảm bảo tất cả seat khác enable
     for _, s in ipairs(car:GetDescendants()) do
         if s:IsA("VehicleSeat") then
             pcall(function() s.Disabled = false end)
         end
     end
-end
-
+    end
     local function flyTo(target, flyingLabel)
         flyingLabel = flyingLabel or "bay"
         stopHold()
