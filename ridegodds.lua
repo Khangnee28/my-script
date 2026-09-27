@@ -1,6 +1,6 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v27.4
--- State theo trinh tu don/tra khach. Milestone 10 chuyen tat/mo lai online.
+-- RideGo Farm — FINAL v27.5
+-- Milestone 10 chuyen: bat acceptingOrder ngay sau GoOnline -> nhan don luon.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -824,28 +824,30 @@ local function runTrip()
 
     startHold()
 
-    orderToken = nil
-    pickupPos = nil
-    dropPos = nil
-    pendingFare = 0
-    acceptingOrder = true
-    setStatus("◦ Chờ đơn")
-
-    local deadline = os.clock() + ORDER_TIMEOUT
-
-    while os.clock() < deadline and enabled do
-        if pickupPos then break end
-        if not holdActive then
-            startHold()
-        end
-        task.wait(0.4)
-    end
-
-    acceptingOrder = false
-
+    -- Nếu đã có đơn sẵn (từ milestone window) -> bay luôn
     if not pickupPos then
-        setStatus("⚠ Không có đơn")
-        return
+        orderToken = nil
+        dropPos = nil
+        pendingFare = 0
+        acceptingOrder = true
+        setStatus("◦ Chờ đơn")
+
+        local deadline = os.clock() + ORDER_TIMEOUT
+        while os.clock() < deadline and enabled do
+            if pickupPos then break end
+            if not holdActive then startHold() end
+            task.wait(0.4)
+        end
+
+        acceptingOrder = false
+
+        if not pickupPos then
+            setStatus("⚠ Không có đơn")
+            return
+        end
+    else
+        acceptingOrder = false
+        setStatus("◦ Đã có đơn — bay luôn")
     end
 
     flyTo(pickupPos, "đón khách")
@@ -873,12 +875,18 @@ local function runTrip()
 
         if stats.trips > 0 and stats.trips % TRIP_MILESTONE == 0 and stats.trips ~= lastMilestone then
             lastMilestone = stats.trips
+            -- Xoa don cu truoc khi mo lai
+            pickupPos = nil
+            dropPos = nil
+            orderToken = nil
             setStatus("◦ Đủ " .. TRIP_MILESTONE .. " chuyến — tắt/mở lại online")
             fire(TaxiEvent, "GoOffline")
             task.wait(2)
             fire(TaxiEvent, "GoOnline")
-            task.wait(2)
+            acceptingOrder = true   -- nhận đơn ngay khi vừa GoOnline
+            task.wait(1.5)
             setStatus("◦ Đã mở lại online")
+            return  -- đơn đến trong window sẽ được runTrip sau xử lý
         end
     end
 
