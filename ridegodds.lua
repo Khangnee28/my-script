@@ -1,5 +1,5 @@
 -- ============================================================
--- KHANGLE DDS HUB v22 — RideGo v27.6 + IgnoreGuiInset
+-- KHANGLE DDS HUB v23 — MERGED LED + WATERMARK TOAST
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -35,8 +35,45 @@ ScreenGui.Name = "KhangLeCustomTuner"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 100
-ScreenGui.IgnoreGuiInset = true  -- FIX top clip
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = parent
+
+-- ============ WATERMARK TOAST (hien 1 lan roi fade) ============
+do
+    local wm = Instance.new("Frame", ScreenGui)
+    wm.Size = UDim2.new(0, 260, 0, 44)
+    wm.Position = UDim2.new(1, -280, 1, -70)
+    wm.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
+    wm.BackgroundTransparency = 0.08
+    wm.BorderSizePixel = 0
+    wm.ZIndex = 999
+    Instance.new("UICorner", wm).CornerRadius = UDim.new(0, 10)
+    local wmStroke = Instance.new("UIStroke", wm)
+    wmStroke.Color = Color3.fromRGB(0, 229, 160)
+    wmStroke.Thickness = 1.5
+    wmStroke.Transparency = 0.1
+    local wmLbl = Instance.new("TextLabel", wm)
+    wmLbl.Size = UDim2.new(1, -20, 1, 0)
+    wmLbl.Position = UDim2.new(0, 10, 0, 0)
+    wmLbl.BackgroundTransparency = 1
+    wmLbl.Text = "✨ Script Made By Khang Lê!"
+    wmLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    wmLbl.TextSize = 14
+    wmLbl.Font = Enum.Font.GothamBold
+    wmLbl.TextXAlignment = Enum.TextXAlignment.Center
+    wmLbl.ZIndex = 1000
+    task.spawn(function()
+        task.wait(5)
+        for i = 1, 20 do
+            local a = i / 20
+            wm.BackgroundTransparency = 0.08 + a * 0.92
+            wmStroke.Transparency = 0.1 + a * 0.9
+            wmLbl.TextTransparency = a
+            task.wait(0.05)
+        end
+        wm:Destroy()
+    end)
+end
 
 local function makeHeaderDraggable(header, frame)
     header.Active = true
@@ -58,7 +95,7 @@ local function makeHeaderDraggable(header, frame)
     end)
 end
 
--- ============ THEME + RAINBOW ============
+-- ============ THEME ============
 local HUB_BG    = Color3.fromRGB(10, 14, 22)
 local HUB_SIDE  = Color3.fromRGB(14, 20, 32)
 local CARD_BG   = Color3.fromRGB(18, 26, 40)
@@ -82,58 +119,16 @@ local function rainbowAt(pos)
     return RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
 end
 
--- MENU color state
-local menuRainbow = false
-local menuFixedColor = Color3.fromRGB(0, 229, 160)
-
--- LED nut noi state (TACH RIENG, co toggle + rainbow nhu cu)
+-- LED nut noi (luon ON, mau = themeColor)
 local floatRGB = {}
-local ledOn = true
-local ledMode = "fixed"  -- "fixed" | "rainbow"
-local ledFixedColor = Color3.fromRGB(0, 229, 160)
-
 local function addRGBStroke(btn)
     local s = Instance.new("UIStroke", btn)
     s.Name = "RGB"; s.Thickness = 2.4
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Transparency = 0; s.Color = ledFixedColor
+    s.Transparency = 0; s.Color = themeColor
     table.insert(floatRGB, s)
     return s
 end
-
--- LED loop (nút nổi)
-task.spawn(function()
-    local t = 0
-    while true do
-        t = t + 0.15
-        for _, s in ipairs(floatRGB) do
-            if s and s.Parent then
-                if ledOn then
-                    s.Transparency = 0
-                    if ledMode == "rainbow" then s.Color = rainbowAt(t)
-                    else s.Color = ledFixedColor end
-                else
-                    s.Transparency = 1
-                end
-            end
-        end
-        task.wait(0.03)
-    end
-end)
-
--- Menu RGB loop
-task.spawn(function()
-    local t = 0
-    while true do
-        t = t + 0.15
-        if hubStroke and hubStroke.Parent and menuRainbow then
-            hubStroke.Color = rainbowAt(t)
-            if hubHeader then hubHeader.TextColor3 = rainbowAt(t + 2) end
-            if ToggleBtn then ToggleBtn.TextColor3 = rainbowAt(t + 4) end
-        end
-        task.wait(0.03)
-    end
-end)
 
 -- ============ FORWARD DECL ============
 local ControlPanel, freecamMenuFrame, hideFloatBtn
@@ -144,12 +139,9 @@ local ToggleFloatMenuBtn
 local lblMode, lblStat1, lblStat2, lblTime, lblWork
 local showAutoTFloat = false
 local farmOffice = false
-local ofAnswers = 0
-local ofPrints = 0
-local activeMode = nil
-local farmStart = 0
-local antiAfk = true
-local optFPS = false
+local ofAnswers, ofPrints = 0, 0
+local activeMode, farmStart = nil, 0
+local antiAfk, optFPS = true, false
 
 local ridegoSwitch
 local ridegoStatusFrame
@@ -168,16 +160,10 @@ _G._ridegoEnabled = false
 -- ============ NUT NOI ============
 local function makeFloatBtn(icon, color, yPos)
     local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0, 48, 0, 48)
-    b.Position = UDim2.new(0, 25, yPos, 0)
-    b.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    b.TextColor3 = color
-    b.Text = icon
-    b.TextSize = 22
-    b.Font = Enum.Font.GothamBold
-    b.Draggable = true
-    b.ZIndex = 10
-    b.Parent = ScreenGui
+    b.Size = UDim2.new(0, 48, 0, 48); b.Position = UDim2.new(0, 25, yPos, 0)
+    b.BackgroundColor3 = Color3.fromRGB(15, 15, 15); b.TextColor3 = color
+    b.Text = icon; b.TextSize = 22; b.Font = Enum.Font.GothamBold
+    b.Draggable = true; b.ZIndex = 10; b.Parent = ScreenGui
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 7)
     return b
 end
@@ -195,20 +181,17 @@ do
     statPanel.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
     statPanel.BackgroundTransparency = 0.15
     statPanel.BorderSizePixel = 0
-    statPanel.Active = true
-    statPanel.Draggable = true
-    statPanel.Visible = false
-    statPanel.ZIndex = 9
+    statPanel.Active = true; statPanel.Draggable = true
+    statPanel.Visible = false; statPanel.ZIndex = 9
     statPanel.Parent = ScreenGui
     Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 10)
-    local strokeOff = Instance.new("UIStroke", statPanel)
-    strokeOff.Name = "RainbowBorder"; strokeOff.Thickness = 2
-    strokeOff.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    strokeOff.Color = themeColor
+    local so = Instance.new("UIStroke", statPanel)
+    so.Name = "RainbowBorder"; so.Thickness = 2
+    so.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; so.Color = themeColor
     task.spawn(function()
         local t = 0
         while true do task.wait(0.03); t = t + 0.15
-            if strokeOff and strokeOff.Parent then strokeOff.Color = rainbowAt(t) end
+            if so and so.Parent then so.Color = rainbowAt(t) end
         end
     end)
     local t1 = Instance.new("TextLabel", statPanel)
@@ -277,27 +260,6 @@ task.spawn(function()
     while true do task.wait(1)
         local fps = fpsFrames; fpsFrames = 0
         if perfOn then perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, getPing()) end
-    end
-end)
-
--- ============ WATERMARK ============
-local watermark = Instance.new("TextLabel", ScreenGui)
-watermark.Size = UDim2.new(0, 240, 0, 22)
-watermark.Position = UDim2.new(1, -250, 1, -30)
-watermark.BackgroundTransparency = 1
-watermark.Text = "Script Made By Khang Lê!"
-watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
-watermark.TextStrokeTransparency = 0
-watermark.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-watermark.TextSize = 13
-watermark.Font = Enum.Font.GothamBold
-watermark.TextXAlignment = Enum.TextXAlignment.Right
-watermark.ZIndex = 999
-task.spawn(function()
-    local t = 0
-    while true do t = t + 0.15
-        watermark.TextColor3 = rainbowAt(t)
-        task.wait(0.03)
     end
 end)
 
@@ -405,8 +367,7 @@ do
         for n, pg in pairs(pages) do pg.Visible = (n == name) end
         for n, b in pairs(navBtns) do
             if n == name then
-                b.BackgroundColor3 = Color3.fromRGB(24, 36, 54)
-                b.TextColor3 = menuRainbow and Color3.fromRGB(255, 255, 255) or themeColor
+                b.BackgroundColor3 = Color3.fromRGB(24, 36, 54); b.TextColor3 = themeColor
             else
                 b.BackgroundColor3 = Color3.fromRGB(18, 26, 40); b.TextColor3 = TXT_DIM
             end
@@ -415,8 +376,7 @@ do
     local navIndex = 0
     local function addNav(name, icon)
         local b = Instance.new("TextButton", sidebar)
-        b.Size = UDim2.new(1, -12, 0, 40)
-        b.Position = UDim2.new(0, 6, 0, 6 + navIndex * 44)
+        b.Size = UDim2.new(1, -12, 0, 40); b.Position = UDim2.new(0, 6, 0, 6 + navIndex * 44)
         b.BackgroundColor3 = Color3.fromRGB(18, 26, 40)
         b.Text = icon .. " " .. name; b.TextColor3 = TXT_DIM; b.TextSize = 11
         b.Font = Enum.Font.GothamBold; b.ZIndex = 15
@@ -433,6 +393,23 @@ do
     local chungPage = pages["CHUNG"]
     local farmingPage = pages["FARMING"]
     local settingsPage = pages["SETTINGS"]
+
+    -- ==== APPLY MAIN COLOR (cap nhat menu + LED nut noi) ====
+    local function applyMainColor(c)
+        themeColor = c
+        if hubStroke then hubStroke.Color = c end
+        if hubHeader then hubHeader.TextColor3 = c end
+        if ToggleBtn then ToggleBtn.TextColor3 = c end
+        for _, s in ipairs(floatRGB) do
+            if s and s.Parent then
+                s.Color = c
+                s.Transparency = 0
+            end
+        end
+        if currentPageName then selectPage(currentPageName) end
+        if farmSwitch and farmSwitch.isOn() then farmSwitch.set(true) end
+        if ridegoSwitch and ridegoSwitch.isOn() then ridegoSwitch.set(true) end
+    end
 
     -- ============== TUNER ==============
     local function createInput(name, dv, posY, pg)
@@ -589,9 +566,13 @@ do
 
     -- ============== CHUNG ==============
     local scroll = Instance.new("ScrollingFrame", chungPage)
-    scroll.Size = UDim2.new(1, 0, 1, 0); scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0; scroll.CanvasSize = UDim2.new(0, 0, 0, 260)
-    scroll.ScrollBarThickness = 4; scroll.ZIndex = 12
+    scroll.Size = UDim2.new(1, 0, 1, 0); scroll.Position = UDim2.new(0, 0, 0, 0)
+    scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 260); scroll.ScrollBarThickness = 4; scroll.ZIndex = 12
+    local chungPad = Instance.new("UIPadding", scroll)
+    chungPad.PaddingTop = UDim.new(0, 6)
+    chungPad.PaddingBottom = UDim.new(0, 6)
+
     local function makeCard(par, y, title, desc, col)
         local card = Instance.new("Frame", par)
         card.Size = UDim2.new(1, -8, 0, 110); card.Position = UDim2.new(0, 4, 0, y)
@@ -626,9 +607,12 @@ do
 
     -- ============== FARMING ==============
     local farmScroll = Instance.new("ScrollingFrame", farmingPage)
-    farmScroll.Size = UDim2.new(1, 0, 1, 0); farmScroll.BackgroundTransparency = 1
-    farmScroll.BorderSizePixel = 0; farmScroll.CanvasSize = UDim2.new(0, 0, 0, 320)
-    farmScroll.ScrollBarThickness = 4; farmScroll.ZIndex = 12
+    farmScroll.Size = UDim2.new(1, 0, 1, 0); farmScroll.Position = UDim2.new(0, 0, 0, 0)
+    farmScroll.BackgroundTransparency = 1; farmScroll.BorderSizePixel = 0
+    farmScroll.CanvasSize = UDim2.new(0, 0, 0, 320); farmScroll.ScrollBarThickness = 4; farmScroll.ZIndex = 12
+    local farmPad = Instance.new("UIPadding", farmScroll)
+    farmPad.PaddingTop = UDim.new(0, 6)
+    farmPad.PaddingBottom = UDim.new(0, 6)
 
     local function makeSwitch(par, posY)
         local track = Instance.new("TextButton", par)
@@ -693,50 +677,46 @@ do
     local ridegoCarBtnPad = Instance.new("UIPadding", ridegoCarBtn)
     ridegoCarBtnPad.PaddingLeft = UDim.new(0, 10)
 
-    -- CAR MODAL (NHO GON)
+    -- CAR MODAL — nho gon 240x280
     ridegoCarListPanel = Instance.new("Frame", ScreenGui)
-    ridegoCarListPanel.Size = UDim2.new(0, 300, 0, 360)
-    ridegoCarListPanel.Position = UDim2.new(0.5, -150, 0.5, -180)
+    ridegoCarListPanel.Size = UDim2.new(0, 240, 0, 280)
+    ridegoCarListPanel.Position = UDim2.new(0.5, -120, 0.5, -140)
     ridegoCarListPanel.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
     ridegoCarListPanel.BackgroundTransparency = 0.05
     ridegoCarListPanel.BorderSizePixel = 0
     ridegoCarListPanel.Visible = false
-    ridegoCarListPanel.ZIndex = 200
-    ridegoCarListPanel.Active = true
-    Instance.new("UICorner", ridegoCarListPanel).CornerRadius = UDim.new(0, 12)
+    ridegoCarListPanel.ZIndex = 200; ridegoCarListPanel.Active = true
+    Instance.new("UICorner", ridegoCarListPanel).CornerRadius = UDim.new(0, 10)
     local carPanelStroke = Instance.new("UIStroke", ridegoCarListPanel)
-    carPanelStroke.Color = Color3.fromRGB(255, 140, 40)
-    carPanelStroke.Thickness = 2
-    carPanelStroke.Transparency = 0.1
+    carPanelStroke.Color = Color3.fromRGB(255, 140, 40); carPanelStroke.Thickness = 2; carPanelStroke.Transparency = 0.1
 
     local carPickTitle = Instance.new("TextLabel", ridegoCarListPanel)
-    carPickTitle.Size = UDim2.new(1, -60, 0, 36); carPickTitle.Position = UDim2.new(0, 16, 0, 6)
+    carPickTitle.Size = UDim2.new(1, -50, 0, 30); carPickTitle.Position = UDim2.new(0, 12, 0, 4)
     carPickTitle.BackgroundTransparency = 1; carPickTitle.Text = "🚗 CHỌN XE"
-    carPickTitle.TextColor3 = Color3.fromRGB(255, 160, 60); carPickTitle.TextSize = 14
+    carPickTitle.TextColor3 = Color3.fromRGB(255, 160, 60); carPickTitle.TextSize = 12
     carPickTitle.Font = Enum.Font.GothamBold; carPickTitle.TextXAlignment = Enum.TextXAlignment.Left; carPickTitle.ZIndex = 201
 
     local carPickClose = Instance.new("TextButton", ridegoCarListPanel)
-    carPickClose.Size = UDim2.new(0, 28, 0, 28); carPickClose.Position = UDim2.new(1, -40, 0, 10)
+    carPickClose.Size = UDim2.new(0, 24, 0, 24); carPickClose.Position = UDim2.new(1, -32, 0, 6)
     carPickClose.BackgroundColor3 = Color3.fromRGB(30, 38, 54); carPickClose.TextColor3 = Color3.fromRGB(220, 230, 240)
-    carPickClose.Text = "✕"; carPickClose.TextSize = 13; carPickClose.Font = Enum.Font.GothamBold
-    carPickClose.ZIndex = 201
-    Instance.new("UICorner", carPickClose).CornerRadius = UDim.new(0, 8)
+    carPickClose.Text = "✕"; carPickClose.TextSize = 12; carPickClose.Font = Enum.Font.GothamBold; carPickClose.ZIndex = 201
+    Instance.new("UICorner", carPickClose).CornerRadius = UDim.new(0, 6)
     carPickClose.MouseButton1Click:Connect(function()
         ridegoCarListPanel.Visible = false; ridegoCarOpen = false
     end)
 
     local carPickDiv = Instance.new("Frame", ridegoCarListPanel)
-    carPickDiv.Size = UDim2.new(1, -32, 0, 1); carPickDiv.Position = UDim2.new(0, 16, 0, 46)
+    carPickDiv.Size = UDim2.new(1, -24, 0, 1); carPickDiv.Position = UDim2.new(0, 12, 0, 38)
     carPickDiv.BackgroundColor3 = Color3.fromRGB(40, 55, 80); carPickDiv.BorderSizePixel = 0; carPickDiv.ZIndex = 201
 
     ridegoCarScroll = Instance.new("ScrollingFrame", ridegoCarListPanel)
-    ridegoCarScroll.Size = UDim2.new(1, -20, 1, -66); ridegoCarScroll.Position = UDim2.new(0, 10, 0, 54)
+    ridegoCarScroll.Size = UDim2.new(1, -16, 1, -52); ridegoCarScroll.Position = UDim2.new(0, 8, 0, 44)
     ridegoCarScroll.BackgroundTransparency = 1; ridegoCarScroll.BorderSizePixel = 0
-    ridegoCarScroll.ScrollBarThickness = 5; ridegoCarScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ridegoCarScroll.ScrollBarThickness = 4; ridegoCarScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     ridegoCarScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y; ridegoCarScroll.ZIndex = 201
 
     local sListR = Instance.new("UIListLayout", ridegoCarScroll)
-    sListR.Padding = UDim.new(0, 6); sListR.SortOrder = Enum.SortOrder.LayoutOrder
+    sListR.Padding = UDim.new(0, 5); sListR.SortOrder = Enum.SortOrder.LayoutOrder
     local sPadR = Instance.new("UIPadding", ridegoCarScroll)
     sPadR.PaddingTop = UDim.new(0, 2); sPadR.PaddingLeft = UDim.new(0, 2)
     sPadR.PaddingRight = UDim.new(0, 2); sPadR.PaddingBottom = UDim.new(0, 2)
@@ -864,8 +844,8 @@ do
         return box
     end
 
-    -- SECTION 1: Mau menu
-    local colorSection = makeSection(1, "🎨 Màu menu (chính)", false)
+    -- SECTION 1: MAU CHU DAO (menu + LED nut noi)
+    local colorSection = makeSection(1, "🎨 Màu chủ đạo (menu + LED nút nổi)", false)
     local colorRow = Instance.new("Frame", colorSection)
     colorRow.Size = UDim2.new(1, 0, 0, 30); colorRow.LayoutOrder = 1; colorRow.BackgroundTransparency = 1
     local colorList = Instance.new("UIListLayout", colorRow)
@@ -878,54 +858,17 @@ do
         local sw = Instance.new("TextButton", colorRow)
         sw.Size = UDim2.new(0, 26, 1, 0); sw.BackgroundColor3 = c; sw.Text = ""
         Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        sw.MouseButton1Click:Connect(function() menuRainbow = false; menuFixedColor = c; applyTheme(c) end)
+        sw.MouseButton1Click:Connect(function() applyMainColor(c) end)
     end
-    local rainbowSw = Instance.new("TextButton", colorRow)
-    rainbowSw.Size = UDim2.new(0, 26, 1, 0); rainbowSw.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
-    rainbowSw.Text = "🌈"; rainbowSw.TextSize = 14; rainbowSw.Font = Enum.Font.GothamBold
-    rainbowSw.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Instance.new("UICorner", rainbowSw).CornerRadius = UDim.new(0, 6)
-    rainbowSw.MouseButton1Click:Connect(function() menuRainbow = true end)
-    makeInput(colorSection, 2, "Mã menu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
+    makeInput(colorSection, 2, "Mã màu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
         local col, up = parseHex(txt)
         if not col then cb("❌ mã màu sai (VD: #00E5A0)", false); return end
-        menuRainbow = false; menuFixedColor = col; applyTheme(col)
-        cb("✔ màu menu = #" .. up, true)
+        applyMainColor(col)
+        cb("✔ màu = #" .. up, true)
     end)
 
-    -- SECTION 2: LED nut noi (co toggle + rainbow nhu cu)
-    local ledSection = makeSection(2, "💡 LED nút nổi", false)
-    makeToggle(ledSection, 1, ledOn, "💡 LED NÚT NỔI: BẬT", "💡 LED NÚT NỔI: TẮT",
-        Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
-        function(v) ledOn = v end)
-    local ledColorRow = Instance.new("Frame", ledSection)
-    ledColorRow.Size = UDim2.new(1, 0, 0, 30); ledColorRow.LayoutOrder = 2; ledColorRow.BackgroundTransparency = 1
-    local ledColorList = Instance.new("UIListLayout", ledColorRow)
-    ledColorList.FillDirection = Enum.FillDirection.Horizontal; ledColorList.Padding = UDim.new(0, 4)
-    for _, c in ipairs(themePresets) do
-        local sw = Instance.new("TextButton", ledColorRow)
-        sw.Size = UDim2.new(0, 26, 1, 0); sw.BackgroundColor3 = c; sw.Text = ""
-        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        sw.MouseButton1Click:Connect(function() ledMode = "fixed"; ledFixedColor = c; ledOn = true end)
-    end
-    local ledRainbowSw = Instance.new("TextButton", ledColorRow)
-    ledRainbowSw.Size = UDim2.new(0, 26, 1, 0); ledRainbowSw.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
-    ledRainbowSw.Text = "🌈"; ledRainbowSw.TextSize = 14; ledRainbowSw.Font = Enum.Font.GothamBold
-    ledRainbowSw.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Instance.new("UICorner", ledRainbowSw).CornerRadius = UDim.new(0, 6)
-    ledRainbowSw.MouseButton1Click:Connect(function() ledMode = "rainbow"; ledOn = true end)
-    makeInput(ledSection, 3, "Mã LED", "#FF00AA", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
-        local col, up = parseHex(txt)
-        if not col then cb("❌ hex sai", false); return end
-        ledMode = "fixed"; ledFixedColor = col; ledOn = true
-        cb("✔ LED = #" .. up, true)
-    end)
-    makeToggle(ledSection, 4, ledMode == "rainbow", "🌈 LED: RAINBOW", "🌈 LED: ĐƠN SẮC",
-        Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
-        function(v) if v then ledMode = "rainbow" else ledMode = "fixed" end end)
-
-    -- SECTION 3: Ten hien thi
-    local nameSection = makeSection(3, "👤 Tên hiển thị", false)
+    -- SECTION 2: Ten hien thi
+    local nameSection = makeSection(2, "👤 Tên hiển thị", false)
     makeToggle(nameSection, 1, false, "👤 ẨN TÊN: BẬT", "👤 ẨN TÊN: TẮT",
         Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70),
         function(v) hideNameOn = v; if v then hideNameTags() else showNameTags() end end)
@@ -934,8 +877,8 @@ do
         customName = txt; applyCustomName(); cb("✔ đã đổi tên", true)
     end)
 
-    -- SECTION 4: Hieu nang
-    local perfSection = makeSection(4, "⚡ Hiệu năng", false)
+    -- SECTION 3: Hieu nang
+    local perfSection = makeSection(3, "⚡ Hiệu năng", false)
     makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT",
         Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
         optFPS = v
@@ -961,8 +904,8 @@ do
         Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70),
         function(v) perfLocked = v; perfFrame.Draggable = not v end)
 
-    -- SECTION 5: Server
-    local serverSection = makeSection(5, "🔄 Server", false)
+    -- SECTION 4: Server
+    local serverSection = makeSection(4, "🔄 Server", false)
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
     local function fetchServers()
@@ -1010,8 +953,8 @@ do
         pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
     end)
 
-    -- SECTION 6: Auto Rejoin
-    local rejoinSection = makeSection(6, "🤖 Auto Rejoin", false)
+    -- SECTION 5: Auto Rejoin
+    local rejoinSection = makeSection(5, "🤖 Auto Rejoin", false)
     local rejoinNote = Instance.new("TextLabel", rejoinSection)
     rejoinNote.Size = UDim2.new(1, 0, 0, 28); rejoinNote.LayoutOrder = 1
     rejoinNote.BackgroundTransparency = 1
@@ -1031,22 +974,15 @@ do
         if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
-    -- SECTION 7: Anti-AFK
-    local afkSection = makeSection(7, "🛡️ Anti-AFK", false)
+    -- SECTION 6: Anti-AFK
+    local afkSection = makeSection(6, "🛡️ Anti-AFK", false)
     makeToggle(afkSection, 1, true, "🛡️ ANTI-AFK: BẬT", "🛡️ ANTI-AFK: TẮT",
         Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v) antiAfk = v end)
 
     selectPage("TUNER")
 
-    function applyTheme(c)
-        themeColor = c
-        if not menuRainbow then
-            hubStroke.Color = c; hubHeader.TextColor3 = c; ToggleBtn.TextColor3 = c
-        end
-        if currentPageName then selectPage(currentPageName) end
-        if farmSwitch and farmSwitch.isOn() then farmSwitch.set(true) end
-        if ridegoSwitch and ridegoSwitch.isOn() then ridegoSwitch.set(true) end
-    end
+    -- expose applyMainColor ra ngoai scope de su dung o cuoi file
+    _G._khangApplyMainColor = applyMainColor
 
     local function applyFarmAvailability()
         local ok = checkFarmOK()
@@ -1936,25 +1872,14 @@ do
 end
 
 -- ============================================================
--- KHOI 6: RIDEGO FARM (LOGIC COPY TỪ ridegodds.lua v27.6)
+-- KHOI 6: RIDEGO FARM
 -- ============================================================
 do
-    local STEP_DIST = 250
-    local LAND_OFFSET = 8
-    local ARRIVE_DIST = 8
-    local ORDER_TIMEOUT = 60
-    local PICKUP_WAIT = 4
-    local DROP_WAIT = 5
-    local ACK_DELAY = 3
-    local DECEL_DIST = 200
-    local TICK = 0.05
-    local UNDERGROUND_DEPTH = 200
-    local UNDER_STEP_MAX = 50
-    local UNDER_DESCEND_STEPS = 12
-    local UNDER_STEP_TIME = 0.03
-    local TRIP_MILESTONE = 10
-    local FLY_TIMEOUT = 30
-    local SEAT_DELAY = 0.5
+    local STEP_DIST = 250; local LAND_OFFSET = 8; local ARRIVE_DIST = 8
+    local ORDER_TIMEOUT = 60; local PICKUP_WAIT = 4; local DROP_WAIT = 5
+    local ACK_DELAY = 3; local DECEL_DIST = 200; local TICK = 0.05
+    local UNDERGROUND_DEPTH = 200; local UNDER_STEP_MAX = 50; local UNDER_DESCEND_STEPS = 12
+    local UNDER_STEP_TIME = 0.03; local TRIP_MILESTONE = 10; local FLY_TIMEOUT = 30; local SEAT_DELAY = 0.5
 
     local enabled = false
     local hasInitOnce = false
@@ -2065,7 +1990,7 @@ do
         for _, c in ipairs(ridegoCarListWrap:GetChildren()) do
             if c:IsA("GuiObject") then c:Destroy() end
         end
-        ridegoCarListWrap.CanvasSize = UDim2.new(0, 0, 0, #carList * 34 + 8)
+        ridegoCarListWrap.CanvasSize = UDim2.new(0, 0, 0, #carList * 28 + 8)
         if #carList == 0 then
             local lbl = Instance.new("TextLabel", ridegoCarListWrap)
             lbl.Size = UDim2.new(1, -8, 0, 40); lbl.BackgroundTransparency = 1
@@ -2075,14 +2000,14 @@ do
         end
         for i, name in ipairs(carList) do
             local btn = Instance.new("TextButton", ridegoCarListWrap)
-            btn.Size = UDim2.new(1, -8, 0, 28)
+            btn.Size = UDim2.new(1, -8, 0, 24)
             btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
             btn.Text = "  " .. name
             btn.TextColor3 = (name == selectedCar) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 230, 240)
             btn.TextSize = 10; btn.Font = Enum.Font.Code
             btn.TextXAlignment = Enum.TextXAlignment.Left; btn.TextTruncate = Enum.TextTruncate.AtEnd
             btn.LayoutOrder = i
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
             btn.MouseButton1Click:Connect(function()
                 selectedCar = name; ridegoSelectedCar = name
                 if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. name end
@@ -2607,7 +2532,7 @@ do
         end)
     end
 
-    -- STATUS PANEL
+    -- STATUS PANEL — ZIndex cao de luon hien
     ridegoStatusFrame = Instance.new("Frame", ScreenGui)
     ridegoStatusFrame.Size = UDim2.new(0, 250, 0, 148)
     ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 190)
@@ -2615,7 +2540,7 @@ do
     ridegoStatusFrame.BackgroundTransparency = 0.15
     ridegoStatusFrame.BorderSizePixel = 0
     ridegoStatusFrame.Active = true; ridegoStatusFrame.Draggable = true
-    ridegoStatusFrame.Visible = false; ridegoStatusFrame.ZIndex = 9
+    ridegoStatusFrame.Visible = false; ridegoStatusFrame.ZIndex = 20
     Instance.new("UICorner", ridegoStatusFrame).CornerRadius = UDim.new(0, 10)
     local rgStroke = Instance.new("UIStroke", ridegoStatusFrame)
     rgStroke.Name = "RainbowBorder"; rgStroke.Thickness = 2
@@ -2630,14 +2555,14 @@ do
     rgTitle.Size = UDim2.new(1, -20, 0, 24); rgTitle.Position = UDim2.new(0, 10, 0, 4)
     rgTitle.BackgroundTransparency = 1; rgTitle.Text = "🚕 RideGo Status"
     rgTitle.TextColor3 = Color3.fromRGB(255, 140, 40); rgTitle.TextSize = 13
-    rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 10
+    rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 21
     local function rgLabel(y)
         local l = Instance.new("TextLabel", ridegoStatusFrame)
         l.Size = UDim2.new(1, -20, 0, 18); l.Position = UDim2.new(0, 10, 0, y)
         l.BackgroundTransparency = 1; l.Text = ""
         l.TextColor3 = Color3.fromRGB(200, 220, 240); l.TextSize = 11
         l.Font = Enum.Font.GothamMedium; l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 10
+        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 21
         return l
     end
     ridegoTimeLbl = rgLabel(32); ridegoTripsLbl = rgLabel(50); ridegoEarnLbl = rgLabel(68)
@@ -2658,9 +2583,13 @@ do
         end
     end)
 
-    RunService.Heartbeat:Connect(function()
-        if enabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
-            ridegoStatusFrame.Visible = true
+    -- FORCE VISIBLE: neu enabled ma bi an thi hien lai
+    task.spawn(function()
+        while true do
+            task.wait(0.1)
+            if enabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
+                ridegoStatusFrame.Visible = true
+            end
         end
     end)
 
@@ -2709,6 +2638,7 @@ do
         enabled = true; _G._ridegoEnabled = true
         farmStartTime = os.time()
         stats.trips = 0; stats.earn = 0
+        -- FORCE SHOW STATUS
         ridegoStatusFrame.Visible = true
         ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
         ridegoTripsLbl.Text = "🚕 Chuyến: 0"
