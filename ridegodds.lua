@@ -1,5 +1,5 @@
 -- ============================================================
--- KHANGLE DDS HUB v23 — MERGED LED + WATERMARK TOAST
+-- KHANGLE DDS HUB v24 — RGB DEFAULT + STATUS FIX
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -38,43 +38,6 @@ ScreenGui.DisplayOrder = 100
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = parent
 
--- ============ WATERMARK TOAST (hien 1 lan roi fade) ============
-do
-    local wm = Instance.new("Frame", ScreenGui)
-    wm.Size = UDim2.new(0, 260, 0, 44)
-    wm.Position = UDim2.new(1, -280, 1, -70)
-    wm.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
-    wm.BackgroundTransparency = 0.08
-    wm.BorderSizePixel = 0
-    wm.ZIndex = 999
-    Instance.new("UICorner", wm).CornerRadius = UDim.new(0, 10)
-    local wmStroke = Instance.new("UIStroke", wm)
-    wmStroke.Color = Color3.fromRGB(0, 229, 160)
-    wmStroke.Thickness = 1.5
-    wmStroke.Transparency = 0.1
-    local wmLbl = Instance.new("TextLabel", wm)
-    wmLbl.Size = UDim2.new(1, -20, 1, 0)
-    wmLbl.Position = UDim2.new(0, 10, 0, 0)
-    wmLbl.BackgroundTransparency = 1
-    wmLbl.Text = "✨ Script Made By Khang Lê!"
-    wmLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    wmLbl.TextSize = 14
-    wmLbl.Font = Enum.Font.GothamBold
-    wmLbl.TextXAlignment = Enum.TextXAlignment.Center
-    wmLbl.ZIndex = 1000
-    task.spawn(function()
-        task.wait(5)
-        for i = 1, 20 do
-            local a = i / 20
-            wm.BackgroundTransparency = 0.08 + a * 0.92
-            wmStroke.Transparency = 0.1 + a * 0.9
-            wmLbl.TextTransparency = a
-            task.wait(0.05)
-        end
-        wm:Destroy()
-    end)
-end
-
 local function makeHeaderDraggable(header, frame)
     header.Active = true
     local dragging, dragInput, dragStart, startPos
@@ -95,7 +58,7 @@ local function makeHeaderDraggable(header, frame)
     end)
 end
 
--- ============ THEME ============
+-- ============ THEME + RAINBOW ============
 local HUB_BG    = Color3.fromRGB(10, 14, 22)
 local HUB_SIDE  = Color3.fromRGB(14, 20, 32)
 local CARD_BG   = Color3.fromRGB(18, 26, 40)
@@ -119,13 +82,18 @@ local function rainbowAt(pos)
     return RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
 end
 
--- LED nut noi (luon ON, mau = themeColor)
+-- ============ LED STATE (DEFAULT RAINBOW ON) ============
+local menuRainbow = true
+local menuFixedColor = Color3.fromRGB(0, 229, 160)
+local floatRainbow = true
+local floatFixedColor = Color3.fromRGB(0, 229, 160)
 local floatRGB = {}
+
 local function addRGBStroke(btn)
     local s = Instance.new("UIStroke", btn)
     s.Name = "RGB"; s.Thickness = 2.4
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Transparency = 0; s.Color = themeColor
+    s.Transparency = 0; s.Color = rainbowAt(#floatRGB)
     table.insert(floatRGB, s)
     return s
 end
@@ -136,7 +104,7 @@ local HubFrame, hubClose, hubHeader, hubStroke, statPanel
 local farmSwitch, farmNote
 local bodyOpenBtn, fcOpenBtn
 local ToggleFloatMenuBtn
-local lblMode, lblStat1, lblStat2, lblTime, lblWork
+local lblStat1, lblStat2, lblTime, lblWork
 local showAutoTFloat = false
 local farmOffice = false
 local ofAnswers, ofPrints = 0, 0
@@ -173,6 +141,42 @@ local AutoTFloatingBtn = makeFloatBtn("🕹️", Color3.fromRGB(255, 100, 0), 0.
 local BodyManagerFloatingBtn = makeFloatBtn("🚗", Color3.fromRGB(0, 230, 180), 0.66); BodyManagerFloatingBtn.Visible = false
 local FreecamFloatingBtn = makeFloatBtn("📷", Color3.fromRGB(255, 255, 255), 0.79); FreecamFloatingBtn.Visible = false
 
+-- MENU RGB LOOP (default chay)
+task.spawn(function()
+    local t = 0
+    while true do
+        task.wait(0.03)
+        t = t + 0.15
+        if hubStroke and hubStroke.Parent then
+            if menuRainbow then
+                local c = rainbowAt(t)
+                hubStroke.Color = c
+                if hubHeader then hubHeader.TextColor3 = c end
+                if ToggleBtn then ToggleBtn.TextColor3 = c end
+            end
+        end
+    end
+end)
+
+-- FLOAT RGB LOOP (default chay)
+task.spawn(function()
+    local t = 0
+    while true do
+        task.wait(0.03)
+        t = t + 0.15
+        for i, s in ipairs(floatRGB) do
+            if s and s.Parent then
+                if floatRainbow then
+                    s.Color = rainbowAt(t + i * 0.8)
+                else
+                    s.Color = floatFixedColor
+                end
+                s.Transparency = 0
+            end
+        end
+    end
+end)
+
 -- ============ STATUS OFFICE ============
 do
     statPanel = Instance.new("Frame")
@@ -208,11 +212,12 @@ do
         l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 10
         return l
     end
-    lblMode = sl(32); lblStat1 = sl(50); lblStat2 = sl(68); lblTime = sl(86); lblWork = sl(110)
-    lblMode.TextColor3 = Color3.fromRGB(255, 200, 80)
+    -- BO lblMode, day cac label len
+    lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68); lblWork = sl(92)
+    lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
 end
 
-local function setStatus(t) if lblWork then lblWork.Text = "📍 status: " .. t end end
+local function setStatus(t) if lblWork then lblWork.Text = "📍 " .. t end end
 local function fmtTime(s)
     s = math.floor(s)
     local h = math.floor(s / 3600); local m = math.floor((s % 3600) / 60); local sec = s % 60
@@ -221,7 +226,6 @@ local function fmtTime(s)
 end
 local function refreshStatPanel()
     if activeMode == "office" then
-        lblMode.Text = "🌾 OFFICE FARM"
         lblStat1.Text = "🧮 Lượt giải: " .. ofAnswers
         lblStat2.Text = "🖨️ Lượt in: " .. ofPrints
     end
@@ -327,12 +331,12 @@ do
     HubFrame.ClipsDescendants = false; HubFrame.ZIndex = 8; HubFrame.Parent = ScreenGui
     Instance.new("UICorner", HubFrame).CornerRadius = UDim.new(0, 12)
     hubStroke = Instance.new("UIStroke", HubFrame)
-    hubStroke.Color = themeColor; hubStroke.Thickness = 1.5; hubStroke.Transparency = 0.25
+    hubStroke.Color = rainbowAt(0); hubStroke.Thickness = 1.5; hubStroke.Transparency = 0.25
 
     hubHeader = Instance.new("TextLabel", HubFrame)
     hubHeader.Size = UDim2.new(1, -40, 0, 34); hubHeader.Position = UDim2.new(0, 12, 0, 0)
     hubHeader.BackgroundTransparency = 1; hubHeader.Text = "👑 KHANGLE DDS HUB"
-    hubHeader.TextColor3 = themeColor; hubHeader.TextSize = 13
+    hubHeader.TextColor3 = rainbowAt(0); hubHeader.TextSize = 13
     hubHeader.Font = Enum.Font.GothamBold; hubHeader.TextXAlignment = Enum.TextXAlignment.Left
     hubHeader.ZIndex = 18
     makeHeaderDraggable(hubHeader, HubFrame)
@@ -367,7 +371,7 @@ do
         for n, pg in pairs(pages) do pg.Visible = (n == name) end
         for n, b in pairs(navBtns) do
             if n == name then
-                b.BackgroundColor3 = Color3.fromRGB(24, 36, 54); b.TextColor3 = themeColor
+                b.BackgroundColor3 = Color3.fromRGB(24, 36, 54); b.TextColor3 = Color3.fromRGB(255, 255, 255)
             else
                 b.BackgroundColor3 = Color3.fromRGB(18, 26, 40); b.TextColor3 = TXT_DIM
             end
@@ -394,21 +398,26 @@ do
     local farmingPage = pages["FARMING"]
     local settingsPage = pages["SETTINGS"]
 
-    -- ==== APPLY MAIN COLOR (cap nhat menu + LED nut noi) ====
-    local function applyMainColor(c)
-        themeColor = c
+    -- ============ COLOR APPLY FUNCTIONS ============
+    local function applyMenuColor(c)
+        menuRainbow = false
+        menuFixedColor = c
         if hubStroke then hubStroke.Color = c end
         if hubHeader then hubHeader.TextColor3 = c end
         if ToggleBtn then ToggleBtn.TextColor3 = c end
+    end
+    local function applyMenuRainbow()
+        menuRainbow = true
+    end
+    local function applyFloatColor(c)
+        floatRainbow = false
+        floatFixedColor = c
         for _, s in ipairs(floatRGB) do
-            if s and s.Parent then
-                s.Color = c
-                s.Transparency = 0
-            end
+            if s and s.Parent then s.Color = c; s.Transparency = 0 end
         end
-        if currentPageName then selectPage(currentPageName) end
-        if farmSwitch and farmSwitch.isOn() then farmSwitch.set(true) end
-        if ridegoSwitch and ridegoSwitch.isOn() then ridegoSwitch.set(true) end
+    end
+    local function applyFloatRainbow()
+        floatRainbow = true
     end
 
     -- ============== TUNER ==============
@@ -570,8 +579,7 @@ do
     scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0
     scroll.CanvasSize = UDim2.new(0, 0, 0, 260); scroll.ScrollBarThickness = 4; scroll.ZIndex = 12
     local chungPad = Instance.new("UIPadding", scroll)
-    chungPad.PaddingTop = UDim.new(0, 6)
-    chungPad.PaddingBottom = UDim.new(0, 6)
+    chungPad.PaddingTop = UDim.new(0, 6); chungPad.PaddingBottom = UDim.new(0, 6)
 
     local function makeCard(par, y, title, desc, col)
         local card = Instance.new("Frame", par)
@@ -611,8 +619,7 @@ do
     farmScroll.BackgroundTransparency = 1; farmScroll.BorderSizePixel = 0
     farmScroll.CanvasSize = UDim2.new(0, 0, 0, 320); farmScroll.ScrollBarThickness = 4; farmScroll.ZIndex = 12
     local farmPad = Instance.new("UIPadding", farmScroll)
-    farmPad.PaddingTop = UDim.new(0, 6)
-    farmPad.PaddingBottom = UDim.new(0, 6)
+    farmPad.PaddingTop = UDim.new(0, 6); farmPad.PaddingBottom = UDim.new(0, 6)
 
     local function makeSwitch(par, posY)
         local track = Instance.new("TextButton", par)
@@ -677,7 +684,7 @@ do
     local ridegoCarBtnPad = Instance.new("UIPadding", ridegoCarBtn)
     ridegoCarBtnPad.PaddingLeft = UDim.new(0, 10)
 
-    -- CAR MODAL — nho gon 240x280
+    -- CAR MODAL 240x280
     ridegoCarListPanel = Instance.new("Frame", ScreenGui)
     ridegoCarListPanel.Size = UDim2.new(0, 240, 0, 280)
     ridegoCarListPanel.Position = UDim2.new(0.5, -120, 0.5, -140)
@@ -780,7 +787,7 @@ do
         local sl = Instance.new("UIListLayout", section); sl.Padding = UDim.new(0, 0); sl.SortOrder = Enum.SortOrder.LayoutOrder
         local header = Instance.new("TextButton", section)
         header.Size = UDim2.new(1, 0, 0, 28); header.LayoutOrder = 1
-        header.BackgroundColor3 = Color3.fromRGB(24, 32, 48); header.TextColor3 = themeColor
+        header.BackgroundColor3 = Color3.fromRGB(24, 32, 48); header.TextColor3 = Color3.fromRGB(255, 255, 255)
         header.TextSize = 11; header.Font = Enum.Font.GothamBold; header.TextXAlignment = Enum.TextXAlignment.Left
         header.ZIndex = 14; Instance.new("UICorner", header).CornerRadius = UDim.new(0, 6)
         local hp = Instance.new("UIPadding", header); hp.PaddingLeft = UDim.new(0, 8)
@@ -817,11 +824,11 @@ do
         local row = Instance.new("Frame", parent)
         row.Size = UDim2.new(1, 0, 0, 26); row.LayoutOrder = order; row.BackgroundTransparency = 1
         local lbl = Instance.new("TextLabel", row)
-        lbl.Size = UDim2.new(0, 80, 1, 0); lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(0, 90, 1, 0); lbl.BackgroundTransparency = 1
         lbl.Text = label; lbl.TextColor3 = Color3.fromRGB(200, 210, 220); lbl.TextSize = 10
         lbl.Font = Enum.Font.GothamBold; lbl.TextXAlignment = Enum.TextXAlignment.Left
         local box = Instance.new("TextBox", row)
-        box.Size = UDim2.new(1, -160, 1, 0); box.Position = UDim2.new(0, 82, 0, 0)
+        box.Size = UDim2.new(1, -170, 1, 0); box.Position = UDim2.new(0, 92, 0, 0)
         box.BackgroundColor3 = Color3.fromRGB(22, 26, 34); box.TextColor3 = Color3.fromRGB(255, 255, 255)
         box.PlaceholderText = placeholder; box.Text = ""; box.TextSize = 10
         box.Font = Enum.Font.GothamBold; box.BorderSizePixel = 0
@@ -844,30 +851,78 @@ do
         return box
     end
 
-    -- SECTION 1: MAU CHU DAO (menu + LED nut noi)
-    local colorSection = makeSection(1, "🎨 Màu chủ đạo (menu + LED nút nổi)", false)
-    local colorRow = Instance.new("Frame", colorSection)
-    colorRow.Size = UDim2.new(1, 0, 0, 30); colorRow.LayoutOrder = 1; colorRow.BackgroundTransparency = 1
-    local colorList = Instance.new("UIListLayout", colorRow)
-    colorList.FillDirection = Enum.FillDirection.Horizontal; colorList.Padding = UDim.new(0, 4)
-    local themePresets = {
+    -- SECTION 1: MÀU MENU + NÚT NỔI (GỘP)
+    local colorSection = makeSection(1, "🎨 Màu menu + nút nổi", true)
+    local presetColors = {
         Color3.fromRGB(0, 229, 160), Color3.fromRGB(56, 189, 248), Color3.fromRGB(167, 139, 250),
         Color3.fromRGB(255, 100, 100), Color3.fromRGB(255, 170, 60), Color3.fromRGB(255, 110, 190),
     }
-    for _, c in ipairs(themePresets) do
-        local sw = Instance.new("TextButton", colorRow)
+
+    local menuLbl = Instance.new("TextLabel", colorSection)
+    menuLbl.Size = UDim2.new(1, 0, 0, 16); menuLbl.LayoutOrder = 1
+    menuLbl.BackgroundTransparency = 1; menuLbl.Text = "MENU CHÍNH"
+    menuLbl.TextColor3 = Color3.fromRGB(255, 200, 80); menuLbl.TextSize = 10
+    menuLbl.Font = Enum.Font.GothamBold; menuLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local menuRow = Instance.new("Frame", colorSection)
+    menuRow.Size = UDim2.new(1, 0, 0, 30); menuRow.LayoutOrder = 2; menuRow.BackgroundTransparency = 1
+    local mrl = Instance.new("UIListLayout", menuRow)
+    mrl.FillDirection = Enum.FillDirection.Horizontal; mrl.Padding = UDim.new(0, 4)
+    for _, c in ipairs(presetColors) do
+        local sw = Instance.new("TextButton", menuRow)
         sw.Size = UDim2.new(0, 26, 1, 0); sw.BackgroundColor3 = c; sw.Text = ""
         Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        sw.MouseButton1Click:Connect(function() applyMainColor(c) end)
+        sw.MouseButton1Click:Connect(function() applyMenuColor(c) end)
     end
-    makeInput(colorSection, 2, "Mã màu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
+    local menuRainbowSw = Instance.new("TextButton", menuRow)
+    menuRainbowSw.Size = UDim2.new(0, 26, 1, 0); menuRainbowSw.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
+    menuRainbowSw.Text = "🌈"; menuRainbowSw.TextSize = 14; menuRainbowSw.Font = Enum.Font.GothamBold
+    menuRainbowSw.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", menuRainbowSw).CornerRadius = UDim.new(0, 6)
+    menuRainbowSw.MouseButton1Click:Connect(function() applyMenuRainbow() end)
+
+    makeInput(colorSection, 3, "Mã menu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
         local col, up = parseHex(txt)
-        if not col then cb("❌ mã màu sai (VD: #00E5A0)", false); return end
-        applyMainColor(col)
-        cb("✔ màu = #" .. up, true)
+        if not col then cb("❌ mã màu sai", false); return end
+        applyMenuColor(col)
+        cb("✔ menu = #" .. up, true)
     end)
 
-    -- SECTION 2: Ten hien thi
+    local divl = Instance.new("Frame", colorSection)
+    divl.Size = UDim2.new(1, 0, 0, 1); divl.LayoutOrder = 5
+    divl.BackgroundColor3 = Color3.fromRGB(40, 55, 80); divl.BorderSizePixel = 0
+
+    local floatLbl = Instance.new("TextLabel", colorSection)
+    floatLbl.Size = UDim2.new(1, 0, 0, 16); floatLbl.LayoutOrder = 6
+    floatLbl.BackgroundTransparency = 1; floatLbl.Text = "NÚT NỔI"
+    floatLbl.TextColor3 = Color3.fromRGB(255, 200, 80); floatLbl.TextSize = 10
+    floatLbl.Font = Enum.Font.GothamBold; floatLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local floatRow = Instance.new("Frame", colorSection)
+    floatRow.Size = UDim2.new(1, 0, 0, 30); floatRow.LayoutOrder = 7; floatRow.BackgroundTransparency = 1
+    local frl = Instance.new("UIListLayout", floatRow)
+    frl.FillDirection = Enum.FillDirection.Horizontal; frl.Padding = UDim.new(0, 4)
+    for _, c in ipairs(presetColors) do
+        local sw = Instance.new("TextButton", floatRow)
+        sw.Size = UDim2.new(0, 26, 1, 0); sw.BackgroundColor3 = c; sw.Text = ""
+        Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
+        sw.MouseButton1Click:Connect(function() applyFloatColor(c) end)
+    end
+    local floatRainbowSw = Instance.new("TextButton", floatRow)
+    floatRainbowSw.Size = UDim2.new(0, 26, 1, 0); floatRainbowSw.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
+    floatRainbowSw.Text = "🌈"; floatRainbowSw.TextSize = 14; floatRainbowSw.Font = Enum.Font.GothamBold
+    floatRainbowSw.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", floatRainbowSw).CornerRadius = UDim.new(0, 6)
+    floatRainbowSw.MouseButton1Click:Connect(function() applyFloatRainbow() end)
+
+    makeInput(colorSection, 8, "Mã LED", "#FF00AA", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
+        local col, up = parseHex(txt)
+        if not col then cb("❌ hex sai", false); return end
+        applyFloatColor(col)
+        cb("✔ LED = #" .. up, true)
+    end)
+
+    -- SECTION 2: TÊN HIỂN THỊ
     local nameSection = makeSection(2, "👤 Tên hiển thị", false)
     makeToggle(nameSection, 1, false, "👤 ẨN TÊN: BẬT", "👤 ẨN TÊN: TẮT",
         Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70),
@@ -877,7 +932,7 @@ do
         customName = txt; applyCustomName(); cb("✔ đã đổi tên", true)
     end)
 
-    -- SECTION 3: Hieu nang
+    -- SECTION 3: HIỆU NĂNG
     local perfSection = makeSection(3, "⚡ Hiệu năng", false)
     makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT",
         Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
@@ -904,7 +959,7 @@ do
         Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70),
         function(v) perfLocked = v; perfFrame.Draggable = not v end)
 
-    -- SECTION 4: Server
+    -- SECTION 4: SERVER
     local serverSection = makeSection(4, "🔄 Server", false)
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
@@ -953,7 +1008,7 @@ do
         pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
     end)
 
-    -- SECTION 5: Auto Rejoin
+    -- SECTION 5: AUTO REJOIN
     local rejoinSection = makeSection(5, "🤖 Auto Rejoin", false)
     local rejoinNote = Instance.new("TextLabel", rejoinSection)
     rejoinNote.Size = UDim2.new(1, 0, 0, 28); rejoinNote.LayoutOrder = 1
@@ -974,15 +1029,12 @@ do
         if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
-    -- SECTION 6: Anti-AFK
+    -- SECTION 6: ANTI-AFK
     local afkSection = makeSection(6, "🛡️ Anti-AFK", false)
     makeToggle(afkSection, 1, true, "🛡️ ANTI-AFK: BẬT", "🛡️ ANTI-AFK: TẮT",
         Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v) antiAfk = v end)
 
     selectPage("TUNER")
-
-    -- expose applyMainColor ra ngoai scope de su dung o cuoi file
-    _G._khangApplyMainColor = applyMainColor
 
     local function applyFarmAvailability()
         local ok = checkFarmOK()
@@ -2532,15 +2584,15 @@ do
         end)
     end
 
-    -- STATUS PANEL — ZIndex cao de luon hien
+    -- STATUS PANEL
     ridegoStatusFrame = Instance.new("Frame", ScreenGui)
     ridegoStatusFrame.Size = UDim2.new(0, 250, 0, 148)
-    ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 190)
+    ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 20)
     ridegoStatusFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
     ridegoStatusFrame.BackgroundTransparency = 0.15
     ridegoStatusFrame.BorderSizePixel = 0
     ridegoStatusFrame.Active = true; ridegoStatusFrame.Draggable = true
-    ridegoStatusFrame.Visible = false; ridegoStatusFrame.ZIndex = 20
+    ridegoStatusFrame.Visible = false; ridegoStatusFrame.ZIndex = 30
     Instance.new("UICorner", ridegoStatusFrame).CornerRadius = UDim.new(0, 10)
     local rgStroke = Instance.new("UIStroke", ridegoStatusFrame)
     rgStroke.Name = "RainbowBorder"; rgStroke.Thickness = 2
@@ -2555,14 +2607,14 @@ do
     rgTitle.Size = UDim2.new(1, -20, 0, 24); rgTitle.Position = UDim2.new(0, 10, 0, 4)
     rgTitle.BackgroundTransparency = 1; rgTitle.Text = "🚕 RideGo Status"
     rgTitle.TextColor3 = Color3.fromRGB(255, 140, 40); rgTitle.TextSize = 13
-    rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 21
+    rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 31
     local function rgLabel(y)
         local l = Instance.new("TextLabel", ridegoStatusFrame)
         l.Size = UDim2.new(1, -20, 0, 18); l.Position = UDim2.new(0, 10, 0, y)
         l.BackgroundTransparency = 1; l.Text = ""
         l.TextColor3 = Color3.fromRGB(200, 220, 240); l.TextSize = 11
         l.Font = Enum.Font.GothamMedium; l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 21
+        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 31
         return l
     end
     ridegoTimeLbl = rgLabel(32); ridegoTripsLbl = rgLabel(50); ridegoEarnLbl = rgLabel(68)
@@ -2583,13 +2635,10 @@ do
         end
     end)
 
-    -- FORCE VISIBLE: neu enabled ma bi an thi hien lai
-    task.spawn(function()
-        while true do
-            task.wait(0.1)
-            if enabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
-                ridegoStatusFrame.Visible = true
-            end
+    -- FORCE VISIBLE: dung Heartbeat + global
+    RunService.Heartbeat:Connect(function()
+        if _G._ridegoEnabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
+            ridegoStatusFrame.Visible = true
         end
     end)
 
@@ -2633,27 +2682,32 @@ do
 
     ridegoSwitch.track.MouseButton1Click:Connect(function()
         if enabled then stopRidego(); return end
-        if _G._officeStop then pcall(_G._officeStop, true) end
-        resetRidegoState()
-        enabled = true; _G._ridegoEnabled = true
-        farmStartTime = os.time()
-        stats.trips = 0; stats.earn = 0
-        -- FORCE SHOW STATUS
+        -- Set global TRUOC khi lam bat cu thu gi khac (de Heartbeat force visible)
+        _G._ridegoEnabled = true
+        enabled = true
+        -- Set Visible=true truoc
         ridegoStatusFrame.Visible = true
-        ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
-        ridegoTripsLbl.Text = "🚕 Chuyến: 0"
-        ridegoEarnLbl.Text = "💰 Kiếm: Rp 0"
-        ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
-        ridegoStatusLbl.Text = "📍 ◦ Đang khởi động"
-        if writefile then
-            pcall(writefile, "ridegoState.txt", "1")
-            pcall(writefile, "farmState.txt", "0")
-        end
-        if queue_on_teleport then
-            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
-        end
-        ridegoSwitch.set(true)
-        startLoop()
+        -- Sau do moi lam cac thu khac trong pcall
+        pcall(function()
+            if _G._officeStop then _G._officeStop(true) end
+            resetRidegoState()
+            farmStartTime = os.time()
+            stats.trips = 0; stats.earn = 0
+            ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
+            ridegoTripsLbl.Text = "🚕 Chuyến: 0"
+            ridegoEarnLbl.Text = "💰 Kiếm: Rp 0"
+            ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
+            ridegoStatusLbl.Text = "📍 ◦ Đang khởi động"
+            if writefile then
+                pcall(writefile, "ridegoState.txt", "1")
+                pcall(writefile, "farmState.txt", "0")
+            end
+            if queue_on_teleport then
+                pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+            end
+            ridegoSwitch.set(true)
+            startLoop()
+        end)
     end)
 end
 
