@@ -1,7 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v27.1
--- Format tien co dau cach. Doi khach xuong 5s. Watchdog online 3s.
--- Menu + Status tach rieng. ToggleBtn di chuyen duoc.
+-- RideGo Farm — FINAL v27.2
+-- Bo watchdog online. Moi 5 chuyen -> tat/mo lai online.
+-- Format tien co dau cach. Doi khach xuong 5s.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,7 +22,7 @@ local UNDERGROUND_DEPTH   = 200
 local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
-local ONLINE_CHECK_INTERVAL = 3
+local TRIP_MILESTONE      = 5
 
 -- ============ TRẠNG THÁI ============
 local enabled     = false
@@ -44,7 +44,7 @@ local flying      = false
 local acceptingOrder = false
 local farmStartTime  = 0
 local menuVisible = true
-local onlineOn    = false
+local lastMilestone = 0
 
 local function resetState()
     orderToken = nil
@@ -57,6 +57,7 @@ local function resetState()
     acceptingOrder = false
     initialized = false
     farmStartTime = 0
+    lastMilestone = 0
     holdActive = false
     if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
     if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
@@ -133,27 +134,6 @@ local function flatYawCFrame(cf)
     local yaw = math.atan2(flat.X, flat.Z)
     return CFrame.Angles(0, yaw, 0)
 end
-
-local function setOnline(on)
-    if on then
-        fire(TaxiEvent, "GoOnline")
-        onlineOn = true
-    else
-        fire(TaxiEvent, "GoOffline")
-        onlineOn = false
-    end
-end
-
--- Watchdog: neu dang farm ma online bi tat -> bat lai ngay
-task.spawn(function()
-    while true do
-        task.wait(ONLINE_CHECK_INTERVAL)
-        if enabled and not onlineOn then
-            setStatus("⚠ Online bị tắt — bật lại")
-            setOnline(true)
-        end
-    end
-end)
 
 -- ============ SỰ KIỆN TAXI ============
 if TaxiEvent then
@@ -805,7 +785,7 @@ local function doFullInit()
     myCar = findMyCar()
 
     setStatus("◦ Bật online")
-    setOnline(true)
+    fire(TaxiEvent, "GoOnline")
     task.wait(2)
 
     hasInitOnce = true
@@ -823,11 +803,11 @@ local function doRestartInit()
     myCar = findMyCar()
 
     setStatus("◦ Tắt online")
-    setOnline(false)
+    fire(TaxiEvent, "GoOffline")
     task.wait(1)
 
     setStatus("◦ Bật lại online")
-    setOnline(true)
+    fire(TaxiEvent, "GoOnline")
     task.wait(2)
 
     setStatus("◦ Sẵn sàng nhận đơn")
@@ -894,6 +874,17 @@ local function runTrip()
         fire(TaxiEvent, "AckTripComplete")
         setStatus("✓ Đã báo hoàn thành — chờ đơn tiếp")
         pendingFare = 0
+
+        -- Moi 5 chuyen -> tat/mo lai online
+        if stats.trips > 0 and stats.trips % TRIP_MILESTONE == 0 and stats.trips ~= lastMilestone then
+            lastMilestone = stats.trips
+            setStatus("◦ Đủ " .. TRIP_MILESTONE .. " chuyến — tắt/mở lại online")
+            fire(TaxiEvent, "GoOffline")
+            task.wait(2)
+            fire(TaxiEvent, "GoOnline")
+            task.wait(2)
+            setStatus("◦ Đã mở lại online")
+        end
     end
 
     pickupPos = nil
@@ -1235,7 +1226,6 @@ farmBtn.MouseButton1Click:Connect(function()
         enabled = false
         acceptingOrder = false
         flying = false
-        onlineOn = false
         resetState()
         detachNpcFollowers()
         stopHold()
@@ -1306,4 +1296,4 @@ task.spawn(function()
     print("[RideGo] Đã quét được " .. #carList .. " xe")
 end)
 
-print("[RideGo] Đã load v27.1")
+print("[RideGo] Đã load v27.2")
