@@ -1,6 +1,7 @@
 -- language: Luau, executor: Delta
--- RideGo Farm — FINAL v27.5
--- Milestone 10 chuyen: bat acceptingOrder ngay sau GoOnline -> nhan don luon.
+-- RideGo Farm — FINAL v27.6
+-- Spawn: tele tam ghe + doi 0.5s -> sit.
+-- flyTo: timeout 30s -> reset char + off/on + cho don.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -22,6 +23,8 @@ local UNDER_STEP_MAX      = 50
 local UNDER_DESCEND_STEPS = 12
 local UNDER_STEP_TIME     = 0.03
 local TRIP_MILESTONE      = 10
+local FLY_TIMEOUT         = 30
+local SEAT_DELAY          = 0.5
 
 -- ============ TRẠNG THÁI ============
 local enabled     = false
@@ -476,11 +479,11 @@ local function forceSeat()
         end
     end
 
+    -- Tele thang tam ghe + doi 0.5s -> sit
     local hrp = root()
     if hrp then
-        local centerCF = vs.CFrame * CFrame.new(0, 1, 0)
-        pcall(function() hrp.CFrame = centerCF end)
-        task.wait(0.05)
+        pcall(function() hrp.CFrame = vs.CFrame end)
+        task.wait(SEAT_DELAY)
     end
 
     pcall(function() vs:Sit(h) end)
@@ -492,9 +495,8 @@ local function forceSeat()
         if h.Sit and h.SeatPart == vs then break end
         local hrpR = root()
         if hrpR then
-            local cf = vs.CFrame * CFrame.new(0, 1, 0)
-            pcall(function() hrpR.CFrame = cf end)
-            task.wait(0.06)
+            pcall(function() hrpR.CFrame = vs.CFrame end)
+            task.wait(0.1)
         end
         pcall(function() vs:Sit(h) end)
         task.wait(0.1)
@@ -578,6 +580,7 @@ local function ascendToGround(car, target, targetFloor)
 end
 
 -- ============ BAY DƯỚI LÒNG ĐẤT ============
+-- Tra ve: true = toi noi, false = timeout
 local function flyTo(target, flyingLabel)
     flyingLabel = flyingLabel or "bay"
     stopHold()
@@ -614,6 +617,7 @@ local function flyTo(target, flyingLabel)
     end
 
     flying = true
+    local flyStart = os.clock()
 
     local startPivot = car:GetPivot()
     local rotOnly = flatYawCFrame(startPivot)
@@ -629,12 +633,19 @@ local function flyTo(target, flyingLabel)
     setStatus("◦ " .. flyingLabel)
 
     local reached = false
+    local timedOut = false
     local lastNpcRefresh = 0
     local fakeVelCounter = 0
 
     while enabled do
         local c = myCar or findMyCar()
         if not c then break end
+
+        -- Timeout 30s
+        if os.clock() - flyStart > FLY_TIMEOUT then
+            timedOut = true
+            break
+        end
 
         local curP = c:GetPivot().Position
         local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
@@ -680,6 +691,13 @@ local function flyTo(target, flyingLabel)
         end
 
         task.wait(TICK)
+    end
+
+    if timedOut then
+        flying = false
+        detachNpcFollowers()
+        setStatus("⚠ Bay quá 30s — hủy")
+        return false
     end
 
     car = myCar or findMyCar()
@@ -812,6 +830,40 @@ local function doRestartInit()
     return true
 end
 
+-- ============ RESET KHI TIMEOUT BAY ============
+local function recoverFromTimeout()
+    enabled = false
+    acceptingOrder = false
+    flying = false
+    detachNpcFollowers()
+    stopHold()
+    local car = myCar or findMyCar()
+    if car then
+        unanchorCar(car)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.CanCollide = true end)
+                pcall(function() p.Anchored = false end)
+            end
+        end
+    end
+    local c = char()
+    if c then fullCollideOn(c) end
+
+    resetState()
+    resetCharacter()
+
+    enabled = true
+    farmStartTime = os.time()
+
+    fire(TaxiEvent, "GoOffline")
+    task.wait(1)
+    fire(TaxiEvent, "GoOnline")
+    task.wait(1)
+
+    setStatus("◦ Đã khôi phục — chờ đơn")
+end
+
 -- ============ CHUYẾN ĐI ============
 local function runTrip()
     local h = hum()
@@ -824,7 +876,6 @@ local function runTrip()
 
     startHold()
 
-    -- Nếu đã có đơn sẵn (từ milestone window) -> bay luôn
     if not pickupPos then
         orderToken = nil
         dropPos = nil
@@ -850,14 +901,22 @@ local function runTrip()
         setStatus("◦ Đã có đơn — bay luôn")
     end
 
-    flyTo(pickupPos, "đón khách")
+    local ok1 = flyTo(pickupPos, "đón khách")
+    if not ok1 then
+        recoverFromTimeout()
+        return
+    end
     setStatus("◦ Đã tới")
     forceSeat()
     setStatus("⌛ Đợi khách lên xe (4s)")
     task.wait(PICKUP_WAIT)
 
     if dropPos then
-        flyTo(dropPos, "đưa khách tới nơi")
+        local ok2 = flyTo(dropPos, "đưa khách tới nơi")
+        if not ok2 then
+            recoverFromTimeout()
+            return
+        end
         setStatus("◦ Đã tới")
         forceSeat()
         setStatus("⌛ Đợi khách xuống xe (5s)")
@@ -875,7 +934,6 @@ local function runTrip()
 
         if stats.trips > 0 and stats.trips % TRIP_MILESTONE == 0 and stats.trips ~= lastMilestone then
             lastMilestone = stats.trips
-            -- Xoa don cu truoc khi mo lai
             pickupPos = nil
             dropPos = nil
             orderToken = nil
@@ -883,10 +941,10 @@ local function runTrip()
             fire(TaxiEvent, "GoOffline")
             task.wait(2)
             fire(TaxiEvent, "GoOnline")
-            acceptingOrder = true   -- nhận đơn ngay khi vừa GoOnline
+            acceptingOrder = true
             task.wait(1.5)
             setStatus("◦ Đã mở lại online")
-            return  -- đơn đến trong window sẽ được runTrip sau xử lý
+            return
         end
     end
 
