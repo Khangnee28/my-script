@@ -1,5 +1,5 @@
 -- ============================================================
--- KHANGLE DDS HUB + RIDEGO FARM
+-- KHANGLE DDS HUB v18 — FARMING INTEGRATED
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -7,16 +7,16 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
-local farmSwitch
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
 local camera = workspace.CurrentCamera
+
 local function checkFarmOK()
     return workspace:FindFirstChild("Computers") ~= nil
 end
-local count = 0
+
 pcall(function()
     Lighting.GlobalShadows = true
     Lighting.Brightness = 2
@@ -29,15 +29,9 @@ pcall(function()
     end
 end)
 
--- v17: nhan dien map — office (Computers) chi co o Surakarta
-
 local parent = nil
-pcall(function()
-    parent = gethui and gethui() or CoreGui
-end)
-if not parent then
-    parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+pcall(function() parent = gethui and gethui() or CoreGui end)
+if not parent then parent = LocalPlayer:WaitForChild("PlayerGui") end
 if parent:FindFirstChild("KhangLeCustomTuner") then
     parent.KhangLeCustomTuner:Destroy()
 end
@@ -58,9 +52,7 @@ local function makeHeaderDraggable(header, frame)
             dragStart = input.Position
             startPos = frame.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
@@ -80,7 +72,7 @@ local function makeHeaderDraggable(header, frame)
     end)
 end
 
--- ============ THEME + RAINBOW 12 MAU ============
+-- ============ THEME + RAINBOW 16 MAU ============
 local HUB_BG    = Color3.fromRGB(10, 14, 22)
 local HUB_SIDE  = Color3.fromRGB(14, 20, 32)
 local CARD_BG   = Color3.fromRGB(18, 26, 40)
@@ -90,32 +82,36 @@ local TXT_DIM   = Color3.fromRGB(150, 165, 185)
 
 local RAINBOW = {
     Color3.fromRGB(255, 60, 60),
-    Color3.fromRGB(255, 120, 40),
-    Color3.fromRGB(255, 180, 40),
-    Color3.fromRGB(255, 230, 60),
-    Color3.fromRGB(160, 230, 60),
-    Color3.fromRGB(90, 230, 90),
-    Color3.fromRGB(60, 220, 160),
-    Color3.fromRGB(60, 200, 220),
-    Color3.fromRGB(70, 160, 255),
-    Color3.fromRGB(110, 110, 255),
-    Color3.fromRGB(160, 90, 255),
+    Color3.fromRGB(255, 100, 40),
+    Color3.fromRGB(255, 150, 40),
+    Color3.fromRGB(255, 200, 40),
+    Color3.fromRGB(240, 240, 60),
+    Color3.fromRGB(180, 235, 60),
+    Color3.fromRGB(100, 230, 90),
+    Color3.fromRGB(60, 225, 150),
+    Color3.fromRGB(50, 210, 210),
+    Color3.fromRGB(60, 180, 240),
+    Color3.fromRGB(80, 140, 255),
+    Color3.fromRGB(130, 110, 255),
+    Color3.fromRGB(180, 90, 255),
     Color3.fromRGB(225, 80, 220),
+    Color3.fromRGB(255, 70, 180),
+    Color3.fromRGB(255, 60, 120),
 }
 local RN = #RAINBOW
 local function rainbowAt(pos)
     pos = pos % RN
     local idx = math.floor(pos) + 1
     local f = pos - (idx - 1)
-    local a = RAINBOW[idx]
-    local b = RAINBOW[(idx % RN) + 1]
-    return a:Lerp(b, f)
+    return RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
 end
 
 local floatRGB = {}
 local ledOn = true
 local ledMode = "rainbow"
 local ledFixedColor = Color3.fromRGB(0, 229, 160)
+local menuRainbow = false   -- NEW: menu border rainbow
+
 local function addRGBStroke(btn)
     local s = Instance.new("UIStroke", btn)
     s.Name = "RGB"
@@ -125,6 +121,35 @@ local function addRGBStroke(btn)
     table.insert(floatRGB, s)
     return s
 end
+
+-- ============ TAY NAM KHAI BAO TRUOC ============
+local ControlPanel, freecamMenuFrame, hideFloatBtn
+local HubFrame, hubClose, hubHeader, hubStroke, statPanel
+local farmSwitch
+local farmNote
+local bodyOpenBtn, fcOpenBtn
+local ToggleFloatMenuBtn
+local lblMode, lblStat1, lblStat2, lblTime, lblWork
+local showAutoTFloat = false
+local farmOffice = false
+local ofAnswers = 0
+local ofPrints = 0
+local activeMode = nil
+local farmStart = 0
+local antiAfk = true
+local autoRejoinEnabled = false
+local optFPS = false
+
+-- RideGo forward refs
+local ridegoSwitch
+local ridegoStatusFrame
+local ridegoTimeLbl, ridegoTripsLbl, ridegoEarnLbl, ridegoCarLbl, ridegoStatusLbl
+local ridegoCarBtn, ridegoCarLbl, ridegoCarListPanel, ridegoCarScroll, ridegoCarListWrap
+local ridegoCarOpen = false
+local ridegoSelectedCar = ""
+local ridegoCarList = {}
+
+-- LED RGB LOOP (update ca menu border neu menuRainbow)
 task.spawn(function()
     local t = 0
     while true do
@@ -143,91 +168,14 @@ task.spawn(function()
                 s.Transparency = 1
             end
         end
-        task.wait(0.03)
-    end
-end)
-
-local statRingSegs = {}
-local statRingFrame = nil
-local function makeStatRing(target, W, H, inset, T, n1, n2)
-    local rf = Instance.new("Frame")
-    rf.Name = "StatRing"
-    rf.BackgroundTransparency = 1
-    rf.BorderSizePixel = 0
-    rf.Size = UDim2.new(0, W, 0, H)
-    rf.Position = target.Position
-    rf.Visible = target.Visible
-    rf.ZIndex = 20
-    rf.Active = false
-    rf.Parent = ScreenGui
-    local xs = {}
-    for i = 0, n1 do xs[i] = math.floor(inset + i * (W - 2 * inset) / n1) end
-    local ys = {}
-    for i = 0, n2 do ys[i] = math.floor(inset + i * (H - 2 * inset) / n2) end
-    local function addPx(x, y, w, h)
-        local f = Instance.new("Frame")
-        f.Position = UDim2.new(0, x, 0, y)
-        f.Size = UDim2.new(0, w, 0, h)
-        f.BorderSizePixel = 0
-        f.ZIndex = 21
-        f.Parent = rf
-        table.insert(statRingSegs, f)
-    end
-    for i = 0, n1 - 1 do addPx(xs[i], inset, xs[i + 1] - xs[i], T) end
-    for i = 0, n2 - 1 do addPx(W - inset - T, ys[i], T, ys[i + 1] - ys[i]) end
-    for i = n1 - 1, 0, -1 do addPx(xs[i], H - inset - T, xs[i + 1] - xs[i], T) end
-    for i = n2 - 1, 0, -1 do addPx(inset, ys[i], T, ys[i + 1] - ys[i]) end
-    return rf
-end
-task.spawn(function()
-    local t = 0
-    local n = #statRingSegs
-    while true do
-        t = t + 0.15
-        if statRingFrame and ledOn then
-            statRingFrame.Position = statPanel and statPanel.Position or statRingFrame.Position
-            statRingFrame.Visible = statPanel and statPanel.Visible or false
-            if statRingFrame.Visible and n > 0 then
-                for i, seg in ipairs(statRingSegs) do
-                    seg.BackgroundColor3 = rainbowAt(t + (i - 1) * RN / n)
-                end
+        if hubStroke and ledOn then
+            if menuRainbow then
+                hubStroke.Color = rainbowAt(t)
             end
         end
         task.wait(0.03)
     end
 end)
-
--- ============ TAY NAM KHAI BAO TRUOC ============
-local ControlPanel, freecamMenuFrame, hideFloatBtn
-local HubFrame, hubClose, hubHeader, hubStroke, statPanel
-local farmSwitch
-local ridegoSwitch
-local farmNote
-local ridegoNote
-local ridegoCarBtn
-local ridegoCarNameLbl
-local bodyOpenBtn, fcOpenBtn
-local ToggleFloatMenuBtn
-local lblMode, lblStat1, lblStat2, lblStat3, lblTime, lblWork
-local showAutoTFloat = false
-local farmOffice = false
-local ridegoActive = false
-local ofAnswers = 0
-local ofPrints = 0
-local activeMode = nil
-local farmStart = 0
-local antiAfk = true
-local autoRejoinEnabled = false
-local optFPS = false
-
--- RIDEGO state (mirror)
-local rd_enabled = false
-local rd_stats = { trips = 0, earn = 0 }
-local rd_selectedCar = ""
-local rd_carList = {}
-local rd_curStatus = "◦ TẮT"
-local rd_farmStart = 0
-local rd_pendingFare = 0
 
 -- ============ NUT NOI ============
 local ToggleBtn = Instance.new("TextButton")
@@ -256,9 +204,6 @@ AutoTFloatingBtn.Visible = false
 AutoTFloatingBtn.ZIndex = 10
 AutoTFloatingBtn.Parent = ScreenGui
 Instance.new("UICorner", AutoTFloatingBtn).CornerRadius = UDim.new(0, 7)
-local strokeAutoTFloat = Instance.new("UIStroke", AutoTFloatingBtn)
-strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
-strokeAutoTFloat.Thickness = 2
 
 local BodyManagerFloatingBtn = Instance.new("TextButton")
 BodyManagerFloatingBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -273,9 +218,6 @@ BodyManagerFloatingBtn.Visible = false
 BodyManagerFloatingBtn.ZIndex = 10
 BodyManagerFloatingBtn.Parent = ScreenGui
 Instance.new("UICorner", BodyManagerFloatingBtn).CornerRadius = UDim.new(0, 7)
-local strokeBodyFloat = Instance.new("UIStroke", BodyManagerFloatingBtn)
-strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
-strokeBodyFloat.Thickness = 2
 
 local FreecamFloatingBtn = Instance.new("TextButton")
 FreecamFloatingBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -290,17 +232,14 @@ FreecamFloatingBtn.Visible = false
 FreecamFloatingBtn.ZIndex = 10
 FreecamFloatingBtn.Parent = ScreenGui
 Instance.new("UICorner", FreecamFloatingBtn).CornerRadius = UDim.new(0, 7)
-local strokeFreecamFloat = Instance.new("UIStroke", FreecamFloatingBtn)
-strokeFreecamFloat.Color = Color3.fromRGB(100, 150, 255)
-strokeFreecamFloat.Thickness = 2
 
--- ============ BANG STATUS (support ca office + ridego) ============
+-- ============ BANG STATUS OFFICE (style giong RideGo: icon + GothamMedium) ============
 do
     statPanel = Instance.new("Frame")
-    statPanel.Size = UDim2.new(0, 250, 0, 162)
-    statPanel.Position = UDim2.new(0, 76, 0.5, 62)
-    statPanel.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
-    statPanel.BackgroundTransparency = 0.45
+    statPanel.Size = UDim2.new(0, 250, 0, 148)
+    statPanel.Position = UDim2.new(0, 76, 0.5, 20)
+    statPanel.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
+    statPanel.BackgroundTransparency = 0.15
     statPanel.BorderSizePixel = 0
     statPanel.Active = true
     statPanel.Draggable = true
@@ -308,89 +247,79 @@ do
     statPanel.ZIndex = 5
     statPanel.Parent = ScreenGui
     Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 10)
-    local function statLabel(text, y, size, color)
+    local strokeOff = Instance.new("UIStroke", statPanel)
+    strokeOff.Name = "RainbowBorder"
+    strokeOff.Thickness = 2
+    strokeOff.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    strokeOff.Color = themeColor
+
+    local function statLabel(y, size, color)
         local l = Instance.new("TextLabel")
-        l.Size = UDim2.new(1, -24, 0, size or 16)
-        l.Position = UDim2.new(0, 14, 0, y)
+        l.Size = UDim2.new(1, -20, 0, 18)
+        l.Position = UDim2.new(0, 10, 0, y)
         l.BackgroundTransparency = 1
-        l.Text = text
-        l.TextColor3 = color or Color3.fromRGB(235, 235, 235)
+        l.Text = ""
+        l.TextColor3 = color or Color3.fromRGB(200, 220, 240)
         l.Font = Enum.Font.GothamMedium
-        l.TextSize = size or 15
+        l.TextSize = 11
         l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextTruncate = Enum.TextTruncate.AtEnd
         l.ZIndex = 7
         l.Parent = statPanel
         return l
     end
-    lblMode  = statLabel("—", 12, 17, Color3.fromRGB(255, 200, 80))
-    lblMode.Font = Enum.Font.GothamBold
-    lblStat1 = statLabel("", 38, 15, Color3.fromRGB(140, 255, 140))
-    lblStat2 = statLabel("", 59, 15, Color3.fromRGB(140, 220, 255))
-    lblStat3 = statLabel("", 80, 15, Color3.fromRGB(255, 200, 140))
-    lblTime  = statLabel("⏱ thời gian farm: 00:00", 104, 14, Color3.fromRGB(255, 220, 140))
-    lblWork  = statLabel("status: tạm nghỉ", 128, 13, Color3.fromRGB(200, 200, 200))
+
+    local statusTitle = Instance.new("TextLabel", statPanel)
+    statusTitle.Size = UDim2.new(1, -20, 0, 24)
+    statusTitle.Position = UDim2.new(0, 10, 0, 4)
+    statusTitle.BackgroundTransparency = 1
+    statusTitle.Text = "🌾 Office Status"
+    statusTitle.TextColor3 = Color3.fromRGB(255, 140, 40)
+    statusTitle.TextSize = 13
+    statusTitle.Font = Enum.Font.GothamBold
+    statusTitle.TextXAlignment = Enum.TextXAlignment.Left
+    statusTitle.ZIndex = 7
+
+    lblMode  = statLabel(32, 17, Color3.fromRGB(255, 200, 80))
+    lblStat1 = statLabel(50, 11, Color3.fromRGB(140, 255, 140))
+    lblStat2 = statLabel(68, 11, Color3.fromRGB(140, 220, 255))
+    lblTime  = statLabel(86, 11, Color3.fromRGB(255, 220, 140))
+    lblWork  = statLabel(110, 11, Color3.fromRGB(200, 200, 200))
 end
 
 local function setStatus(t)
-    if lblWork then
-        lblWork.Text = "status: " .. t
-    end
+    if lblWork then lblWork.Text = "📍 status: " .. t end
 end
 local function fmtTime(s)
     s = math.floor(s)
     local h = math.floor(s / 3600)
     local m = math.floor((s % 3600) / 60)
     local sec = s % 60
-    if h > 0 then
-        return string.format("%d:%02d:%02d", h, m, sec)
-    end
+    if h > 0 then return string.format("%d:%02d:%02d", h, m, sec) end
     return string.format("%02d:%02d", m, sec)
-end
-local function fmtMoney(n)
-    local s = tostring(math.floor(n or 0))
-    local out = ""
-    local len = #s
-    for i = 1, len do
-        out = out .. s:sub(i, i)
-        local remain = len - i
-        if remain > 0 and remain % 3 == 0 then
-            out = out .. " "
-        end
-    end
-    return out
 end
 local function refreshStatPanel()
     if activeMode == "office" then
-        lblMode.Text = "🌾 OFFICE STATUS"
-        lblMode.TextColor3 = Color3.fromRGB(120, 200, 255)
-        lblStat1.Text = "🎯 lượt giải: " .. ofAnswers
-        lblStat2.Text = "🖨️ lượt in: " .. ofPrints
-        lblStat3.Text = ""
-    elseif activeMode == "ridego" then
-        lblMode.Text = "🚗 RIDEGO STATUS"
-        lblMode.TextColor3 = Color3.fromRGB(255, 140, 40)
-        lblStat1.Text = "🚕 Chuyến: " .. rd_stats.trips
-        lblStat2.Text = "💰 Kiếm: Rp " .. fmtMoney(rd_stats.earn)
-        lblStat3.Text = "🚗 Xe: " .. ((rd_selectedCar ~= "" and rd_selectedCar) or "(chưa chọn)")
+        lblMode.Text = "🌾 OFFICE FARM"
+        lblMode.TextColor3 = Color3.fromRGB(255, 200, 80)
+        lblStat1.Text = "🧮 Lượt giải: " .. ofAnswers
+        lblStat2.Text = "🖨️ Lượt in: " .. ofPrints
     else
         lblMode.Text = "—"
         lblStat1.Text = ""
         lblStat2.Text = ""
-        lblStat3.Text = ""
     end
 end
 task.spawn(function()
     while true do
         task.wait(1)
         if activeMode == "office" and farmStart > 0 then
-            lblTime.Text = "⏱ thời gian farm: " .. fmtTime(os.clock() - farmStart)
-        elseif activeMode == "ridego" and rd_farmStart > 0 then
-            lblTime.Text = "⏱ thời gian farm: " .. fmtTime(os.clock() - rd_farmStart)
+            lblTime.Text = "⏱ Thời gian: " .. fmtTime(os.clock() - farmStart)
         end
     end
 end)
 
--- ============ FPS / PING OVERLAY ============
+-- ============ FPS / PING ============
 local perfOn = false
 local perfLocked = false
 local perfFrame = Instance.new("Frame")
@@ -420,90 +349,59 @@ perfLabel.Parent = perfFrame
 local function getPing()
     local p = 0
     pcall(function() p = StatsService:GetNetworkPing() end)
-    if (not p) or p <= 0 then
-        pcall(function() p = player:GetNetworkPing() end)
-    end
-    if p and p > 0 and p < 1 then
-        p = p * 1000
-    end
+    if (not p) or p <= 0 then pcall(function() p = player:GetNetworkPing() end) end
+    if p and p > 0 and p < 1 then p = p * 1000 end
     return math.floor(p or 0)
 end
 local fpsFrames = 0
-RunService.RenderStepped:Connect(function()
-    fpsFrames = fpsFrames + 1
-end)
+RunService.RenderStepped:Connect(function() fpsFrames = fpsFrames + 1 end)
 task.spawn(function()
     while true do
         task.wait(1)
         local fps = fpsFrames
         fpsFrames = 0
-        if perfOn then
-            perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, getPing())
-        end
+        if perfOn then perfLabel.Text = string.format("FPS: %d | Ping: %dms", fps, getPing()) end
     end
 end)
 
--- ============ CHUC NANG AN TEN / DOI TEN ============
+-- ============ AN TEN / DOI TEN ============
 local hideNameOn = false
 local customName = ""
-
 local function getChar() return LocalPlayer.Character end
-
 local function hideNameTags()
-    local c = getChar()
-    if not c then return end
+    local c = getChar(); if not c then return end
     local h = c:FindFirstChildOfClass("Humanoid")
-    if h then
-        pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
-    end
+    if h then pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end) end
     for _, d in ipairs(c:GetDescendants()) do
-        if d:IsA("BillboardGui") then
-            pcall(function() d.Enabled = false end)
-        end
+        if d:IsA("BillboardGui") then pcall(function() d.Enabled = false end) end
     end
 end
-
 local function showNameTags()
-    local c = getChar()
-    if not c then return end
+    local c = getChar(); if not c then return end
     local h = c:FindFirstChildOfClass("Humanoid")
-    if h then
-        pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer end)
-    end
+    if h then pcall(function() h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer end) end
     for _, d in ipairs(c:GetDescendants()) do
-        if d:IsA("BillboardGui") then
-            pcall(function() d.Enabled = true end)
-        end
+        if d:IsA("BillboardGui") then pcall(function() d.Enabled = true end) end
     end
 end
-
 local function applyCustomName()
-    local c = getChar()
-    if not c then return end
+    local c = getChar(); if not c then return end
     pcall(function() LocalPlayer.DisplayName = customName end)
     local myName = LocalPlayer.Name
     for _, d in ipairs(c:GetDescendants()) do
         if d:IsA("BillboardGui") then
             for _, t in ipairs(d:GetDescendants()) do
-                if t:IsA("TextLabel") and t.Text:find(myName, 1, true) then
-                    t.Text = customName
-                end
+                if t:IsA("TextLabel") and t.Text:find(myName, 1, true) then t.Text = customName end
             end
         end
     end
 end
-
 local function watchChar(c)
     if not c then return end
     c.DescendantAdded:Connect(function(d)
         if d:IsA("BillboardGui") then
-            if hideNameOn then
-                pcall(function() d.Enabled = false end)
-            end
-            if customName ~= "" then
-                task.wait(0.2)
-                applyCustomName()
-            end
+            if hideNameOn then pcall(function() d.Enabled = false end) end
+            if customName ~= "" then task.wait(0.2); applyCustomName() end
         end
     end)
 end
@@ -514,13 +412,10 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     if customName ~= "" then applyCustomName() end
 end)
 if LocalPlayer.Character then watchChar(LocalPlayer.Character) end
-
 task.spawn(function()
     while true do
         task.wait(1)
-        if hideNameOn then
-            hideNameTags()
-        end
+        if hideNameOn then hideNameTags() end
     end
 end)
 
@@ -534,7 +429,6 @@ do
     HubFrame.BackgroundColor3 = HUB_SIDE
     HubFrame.BorderSizePixel = 0
     HubFrame.Active = true
-    HubFrame.Draggable = false
     HubFrame.Visible = false
     HubFrame.ClipsDescendants = true
     HubFrame.ZIndex = 8
@@ -603,9 +497,7 @@ do
     end
     local function selectPage(name)
         currentPageName = name
-        for n, pg in pairs(pages) do
-            pg.Visible = (n == name)
-        end
+        for n, pg in pairs(pages) do pg.Visible = (n == name) end
         for n, b in pairs(navBtns) do
             if n == name then
                 b.BackgroundColor3 = Color3.fromRGB(24, 36, 54)
@@ -631,24 +523,22 @@ do
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
         navIndex = navIndex + 1
         navBtns[name] = b
-        b.MouseButton1Click:Connect(function()
-            selectPage(name)
-        end)
+        b.MouseButton1Click:Connect(function() selectPage(name) end)
         addPage(name)
         return b
     end
 
     addNav("TUNER", "🎛️")
-    addNav("FARMING", "🌾")
     addNav("CHUNG", "🧰")
+    addNav("FARMING", "🌾")
     addNav("SETTINGS", "⚙️")
 
     local tunerPage = pages["TUNER"]
-    local farmingPage = pages["FARMING"]
     local chungPage = pages["CHUNG"]
+    local farmingPage = pages["FARMING"]
     local settingsPage = pages["SETTINGS"]
 
-    -- ============ TUNER PAGE ============
+    -- ================= TUNER =================
     local function createInput(name, defaultVal, posY, pg)
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(0.9, 0, 0, 14)
@@ -716,10 +606,9 @@ do
     ToggleFloatMenuBtn.Parent = tunerPage
     Instance.new("UICorner", ToggleFloatMenuBtn).CornerRadius = UDim.new(0, 7)
 
-    -- ============ TUNER LOGIC (unchanged) ============
+    -- ============ TUNER LOGIC ============
     local statusThread = nil
     local tunedModels = setmetatable({}, { __mode = "k" })
-
     local function setStatusTmp(msg, color, revertDelay)
         if not Status or not Status.Parent then return end
         if statusThread then task.cancel(statusThread); statusThread = nil end
@@ -732,32 +621,25 @@ do
             end
         end)
     end
-
     InjectBtn.MouseButton1Click:Connect(function()
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local seat = hum and hum.SeatPart
         local isInVehicle = seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat"))
-
         if not isInVehicle then
             setStatusTmp("❌ Hãy ngồi lên xe rồi bấm áp dụng nhé!", Color3.fromRGB(255, 50, 50))
             return
         end
-
         local vehicleModel = seat.Parent
-
         if vehicleModel and tunedModels[vehicleModel] then
-            setStatusTmp("⚠ Xe này đã tune rồi — respawn xe để apply",
-                         Color3.fromRGB(255, 180, 60), 4)
+            setStatusTmp("⚠ Xe này đã tune rồi — respawn xe để apply", Color3.fromRGB(255, 180, 60), 4)
             return
         end
-
         local hpMult    = tonumber(hpBox.Text)         or 5.0
         local rpmAdd    = tonumber(rpmBox.Text)        or 3500
         local gearMult  = tonumber(gearRatioBox.Text)  or 0.8
         local finalMult = tonumber(finalDriveBox.Text) or 0.8
         local count = 0
-
         local charParts = {}
         if char then
             for _, p in ipairs(char:GetDescendants()) do
@@ -766,7 +648,6 @@ do
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if hrp then charParts[hrp] = true end
         end
-
         local function isCharOwned(t)
             local ok1, res1 = pcall(function()
                 for _, v in pairs(t) do
@@ -777,11 +658,7 @@ do
             if ok1 and res1 then return true end
             return false
         end
-
-        local function unfreeze(t)
-            pcall(function() setreadonly(t, false) end)
-        end
-
+        local function unfreeze(t) pcall(function() setreadonly(t, false) end) end
         local SPEED_KEYS = { topspeed=true, maxspeed=true, speedlimit=true, maxvelocity=true, topspeedkmh=true, maxthrottle=true, limiter=true }
         local POWER_KEYS = { horsepower=true, torque=true, maxpower=true }
         local RPM_KEYS   = { redline=true, maxrpm=true, rpm=true }
@@ -789,7 +666,6 @@ do
         local GEAR_TBL   = { gearratios=true, gears=true }
         local DRAG_KEYS  = { drag=true, dragcoefficient=true, airresistance=true }
         local seen = {}
-
         local function tuneTable(t, depth)
             if depth > 6 or seen[t] then return end
             if isCharOwned(t) then return end
@@ -823,7 +699,6 @@ do
                 end
             end
         end
-
         if typeof(getgc) == "function" then
             pcall(function()
                 for _, obj in pairs(getgc(true)) do
@@ -833,7 +708,6 @@ do
                 end
             end)
         end
-
         if vehicleModel then
             for _, obj in pairs(vehicleModel:GetDescendants()) do
                 pcall(function()
@@ -858,9 +732,7 @@ do
                         elseif name:find("horsepower") or name:find("power") or name:find("torque") then
                             obj.Value = obj.Value * hpMult; count = count + 1
                         elseif name:find("rpm") or name:find("redline") then
-                            if obj.Value >= 1000 then
-                                obj.Value = obj.Value + rpmAdd; count = count + 1
-                            end
+                            if obj.Value >= 1000 then obj.Value = obj.Value + rpmAdd; count = count + 1 end
                         elseif name:find("gear") or name:find("ratio") then
                             obj.Value = obj.Value * gearMult; count = count + 1
                         elseif name:find("drive") then
@@ -872,29 +744,32 @@ do
                 end
             end
         end
-
         if count == 0 then
-            setStatusTmp("⚠ Không tìm thấy gì để tune",
-                         Color3.fromRGB(255, 180, 60), 4)
+            setStatusTmp("⚠ Không tìm thấy gì để tune", Color3.fromRGB(255, 180, 60), 4)
             return
         end
-
         if vehicleModel then tunedModels[vehicleModel] = true end
-
-        setStatusTmp("✔ Đã tune (xuống xe lên lại)",
-                     Color3.fromRGB(0, 255, 120), 4)
+        setStatusTmp("✔ Đã tune (xuống xe lên lại)", Color3.fromRGB(0, 255, 120), 4)
     end)
 
-    -- ============ FARMING PAGE ============
-    -- Helper tạo card (share cho FARMING + CHUNG)
-    local function makeCardIn(parent, y, title, desc, strokeColor, cardH)
+    -- ================= CHUNG (chi con body manager + freecam) =================
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, 0, 1, 0)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 260)
+    scroll.ScrollBarThickness = 4
+    scroll.ZIndex = 12
+    scroll.Parent = chungPage
+
+    local function makeCard(par, y, title, desc, strokeColor)
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -8, 0, cardH or 110)
+        card.Size = UDim2.new(1, -8, 0, 110)
         card.Position = UDim2.new(0, 4, 0, y)
         card.BackgroundColor3 = CARD_BG
         card.BorderSizePixel = 0
         card.ZIndex = 12
-        card.Parent = parent
+        card.Parent = par
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
         local cs = Instance.new("UIStroke", card)
         cs.Color = strokeColor
@@ -926,7 +801,44 @@ do
         return card
     end
 
-    local function makeSwitchIn(par, posY)
+    local cardBody = makeCard(scroll, 0, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
+    bodyOpenBtn = Instance.new("TextButton")
+    bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
+    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
+    bodyOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    bodyOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bodyOpenBtn.Text = "🚗 DÀN ÁO: ĐANG TẮT"
+    bodyOpenBtn.TextSize = 10
+    bodyOpenBtn.Font = Enum.Font.GothamBold
+    bodyOpenBtn.ZIndex = 13
+    bodyOpenBtn.Parent = cardBody
+    Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
+
+    local cardFc = makeCard(scroll, 120, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
+    fcOpenBtn = Instance.new("TextButton")
+    fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
+    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
+    fcOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    fcOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    fcOpenBtn.Text = "📷 FREECAM: ĐANG TẮT"
+    fcOpenBtn.TextSize = 10
+    fcOpenBtn.Font = Enum.Font.GothamBold
+    fcOpenBtn.ZIndex = 13
+    fcOpenBtn.Parent = cardFc
+    Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
+
+    -- ================= FARMING =================
+    local farmScroll = Instance.new("ScrollingFrame")
+    farmScroll.Size = UDim2.new(1, 0, 1, 0)
+    farmScroll.BackgroundTransparency = 1
+    farmScroll.BorderSizePixel = 0
+    farmScroll.CanvasSize = UDim2.new(0, 0, 0, 540)
+    farmScroll.ScrollBarThickness = 4
+    farmScroll.ZIndex = 12
+    farmScroll.Parent = farmingPage
+
+    -- helper: switch
+    local function makeSwitch(par, posY)
         local track = Instance.new("TextButton")
         track.Size = UDim2.new(0, 52, 0, 26)
         track.Position = UDim2.new(1, -64, 0, posY)
@@ -951,18 +863,9 @@ do
         return { track = track, knob = knob, set = set, isOn = function() return on end }
     end
 
-    local farmScroll = Instance.new("ScrollingFrame")
-    farmScroll.Size = UDim2.new(1, 0, 1, 0)
-    farmScroll.BackgroundTransparency = 1
-    farmScroll.BorderSizePixel = 0
-    farmScroll.CanvasSize = UDim2.new(0, 0, 0, 500)
-    farmScroll.ScrollBarThickness = 4
-    farmScroll.ZIndex = 12
-    farmScroll.Parent = farmingPage
-
-    -- Office card
-    local cardOffice = makeCardIn(farmScroll, 0, "🌾 OFFICE AUTOFARM — farm văn phòng", "Tự ngồi ghế, giải toán & in ấn.\nSố liệu hiện trong bảng status khi bật.", ACCENT2, 110)
-    farmSwitch = makeSwitchIn(cardOffice, 10)
+    -- OFFICE CARD (giu nguyen logic cu)
+    local cardFarm = makeCard(farmScroll, 0, "🌾 OFFICE AUTOFARM — farm văn phòng", "Tự ngồi ghế, giải toán & in ấn.\nSố liệu hiện trong bảng status khi bật.", ACCENT2)
+    farmSwitch = makeSwitch(cardFarm, 10)
     farmNote = Instance.new("TextLabel")
     farmNote.Size = UDim2.new(1, -24, 0, 16)
     farmNote.Position = UDim2.new(0, 12, 0, 86)
@@ -974,120 +877,105 @@ do
     farmNote.TextXAlignment = Enum.TextXAlignment.Left
     farmNote.TextWrapped = true
     farmNote.ZIndex = 13
-    farmNote.Parent = cardOffice
-    local farmOK = false
-    local function applyFarmAvailability()
-        local ok = checkFarmOK()
-        farmOK = ok
-        if ok then
-            farmNote.Text = ""
-            farmSwitch.track.Active = true
-            farmSwitch.track.AutoButtonColor = true
-            if not farmSwitch.isOn() then
-                farmSwitch.track.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-            end
-        else
-            farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-            farmSwitch.track.Active = false
-            farmSwitch.track.AutoButtonColor = false
-            farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-            farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
-        end
-    end
-    applyFarmAvailability()
-    task.spawn(function()
-        while true do
-            task.wait(2)
-            local ok = checkFarmOK()
-            if ok ~= farmOK then
-                applyFarmAvailability()
-            end
-        end
-    end)
+    farmNote.Parent = cardFarm
 
-    -- RideGo card (cao hon, co chon xe + ten xe)
-    local cardRidego = makeCardIn(farmScroll, 120, "🚗 RIDEGO FARM — taxi driver", "Tự nhận đơn, đón/trả khách, tính quãng đường.\nChọn xe bên dưới trước khi bật.", Color3.fromRGB(255, 140, 40), 150)
+    -- RIDEGO CARD (cao hon, co car picker)
+    local cardRide = Instance.new("Frame")
+    cardRide.Size = UDim2.new(1, -8, 0, 400)
+    cardRide.Position = UDim2.new(0, 4, 0, 120)
+    cardRide.BackgroundColor3 = CARD_BG
+    cardRide.BorderSizePixel = 0
+    cardRide.ZIndex = 12
+    cardRide.Parent = farmScroll
+    Instance.new("UICorner", cardRide).CornerRadius = UDim.new(0, 10)
+    local rs2 = Instance.new("UIStroke", cardRide)
+    rs2.Color = Color3.fromRGB(255, 140, 40)
+    rs2.Thickness = 1
+    rs2.Transparency = 0.4
 
-    ridegoCarNameLbl = Instance.new("TextLabel")
-    ridegoCarNameLbl.Size = UDim2.new(1, -24, 0, 16)
-    ridegoCarNameLbl.Position = UDim2.new(0, 12, 0, 66)
-    ridegoCarNameLbl.BackgroundTransparency = 1
-    ridegoCarNameLbl.Text = "🚗 Xe: (chưa chọn)"
-    ridegoCarNameLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
-    ridegoCarNameLbl.TextSize = 10
-    ridegoCarNameLbl.Font = Enum.Font.GothamMedium
-    ridegoCarNameLbl.TextXAlignment = Enum.TextXAlignment.Left
-    ridegoCarNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
-    ridegoCarNameLbl.ZIndex = 13
-    ridegoCarNameLbl.Parent = cardRidego
+    local rideTitle = Instance.new("TextLabel", cardRide)
+    rideTitle.Size = UDim2.new(1, -24, 0, 20)
+    rideTitle.Position = UDim2.new(0, 12, 0, 8)
+    rideTitle.BackgroundTransparency = 1
+    rideTitle.Text = "🚕 RIDEGO AUTOFARM — tài xế taxi"
+    rideTitle.TextColor3 = Color3.fromRGB(255, 140, 40)
+    rideTitle.TextSize = 12
+    rideTitle.Font = Enum.Font.GothamBold
+    rideTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rideTitle.ZIndex = 13
 
-    ridegoCarBtn = Instance.new("TextButton")
-    ridegoCarBtn.Size = UDim2.new(1, -24, 0, 26)
-    ridegoCarBtn.Position = UDim2.new(0, 12, 0, 84)
+    local rideDesc = Instance.new("TextLabel", cardRide)
+    rideDesc.Size = UDim2.new(1, -24, 0, 34)
+    rideDesc.Position = UDim2.new(0, 12, 0, 30)
+    rideDesc.BackgroundTransparency = 1
+    rideDesc.Text = "Spawn xe, đón khách, bay xuyên địa hình.\nChọn xe bên dưới trước khi bật."
+    rideDesc.TextColor3 = TXT_DIM
+    rideDesc.TextSize = 10
+    rideDesc.Font = Enum.Font.GothamMedium
+    rideDesc.TextXAlignment = Enum.TextXAlignment.Left
+    rideDesc.TextWrapped = true
+    rideDesc.ZIndex = 13
+
+    ridegoSwitch = makeSwitch(cardRide, 10)
+
+    -- Selected car label
+    ridegoCarLbl = Instance.new("TextLabel", cardRide)
+    ridegoCarLbl.Size = UDim2.new(1, -24, 0, 18)
+    ridegoCarLbl.Position = UDim2.new(0, 12, 0, 70)
+    ridegoCarLbl.BackgroundTransparency = 1
+    ridegoCarLbl.Text = "🚗 Xe: (chưa chọn)"
+    ridegoCarLbl.TextColor3 = Color3.fromRGB(180, 200, 220)
+    ridegoCarLbl.TextSize = 10
+    ridegoCarLbl.Font = Enum.Font.GothamMedium
+    ridegoCarLbl.TextXAlignment = Enum.TextXAlignment.Left
+    ridegoCarLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    ridegoCarLbl.ZIndex = 13
+
+    ridegoCarBtn = Instance.new("TextButton", cardRide)
+    ridegoCarBtn.Size = UDim2.new(1, -24, 0, 30)
+    ridegoCarBtn.Position = UDim2.new(0, 12, 0, 92)
     ridegoCarBtn.BackgroundColor3 = Color3.fromRGB(24, 32, 48)
-    ridegoCarBtn.Text = "🚗 CHỌN XE (0)"
     ridegoCarBtn.TextColor3 = Color3.fromRGB(255, 200, 80)
+    ridegoCarBtn.Text = "🚗 CHỌN XE (0)"
     ridegoCarBtn.TextSize = 11
     ridegoCarBtn.Font = Enum.Font.GothamBold
     ridegoCarBtn.TextXAlignment = Enum.TextXAlignment.Left
-    ridegoCarBtn.ZIndex = 14
-    ridegoCarBtn.Parent = cardRidego
+    ridegoCarBtn.ZIndex = 13
     Instance.new("UICorner", ridegoCarBtn).CornerRadius = UDim.new(0, 6)
+    local ridegoCarBtnPad = Instance.new("UIPadding", ridegoCarBtn)
+    ridegoCarBtnPad.PaddingLeft = UDim.new(0, 10)
 
-    ridegoSwitch = makeSwitchIn(cardRidego, 116)
-    ridegoNote = Instance.new("TextLabel")
-    ridegoNote.Size = UDim2.new(1, -24, 0, 14)
-    ridegoNote.Position = UDim2.new(0, 12, 0, 132)
-    ridegoNote.BackgroundTransparency = 1
-    ridegoNote.Text = ""
-    ridegoNote.TextColor3 = Color3.fromRGB(255, 120, 80)
-    ridegoNote.TextSize = 9
-    ridegoNote.Font = Enum.Font.GothamBold
-    ridegoNote.TextXAlignment = Enum.TextXAlignment.Left
-    ridegoNote.TextWrapped = true
-    ridegoNote.ZIndex = 13
-    ridegoNote.Parent = cardRidego
+    ridegoCarListPanel = Instance.new("Frame", cardRide)
+    ridegoCarListPanel.Size = UDim2.new(1, -24, 0, 0)
+    ridegoCarListPanel.Position = UDim2.new(0, 12, 0, 126)
+    ridegoCarListPanel.BackgroundTransparency = 1
+    ridegoCarListPanel.Visible = false
+    ridegoCarListPanel.ZIndex = 13
 
-    -- ============ CHUNG PAGE ============
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, 0, 1, 0)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 400)
-    scroll.ScrollBarThickness = 4
-    scroll.ZIndex = 12
-    scroll.Parent = chungPage
-    local function makeCard(y, title, desc, strokeColor)
-        return makeCardIn(scroll, y, title, desc, strokeColor, 110)
-    end
+    ridegoCarScroll = Instance.new("ScrollingFrame", ridegoCarListPanel)
+    ridegoCarScroll.Size = UDim2.new(1, 0, 0, 240)
+    ridegoCarScroll.Position = UDim2.new(0, 0, 0, 0)
+    ridegoCarScroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
+    ridegoCarScroll.BackgroundTransparency = 0.15
+    ridegoCarScroll.BorderSizePixel = 0
+    ridegoCarScroll.ScrollBarThickness = 4
+    ridegoCarScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ridegoCarScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    ridegoCarScroll.ZIndex = 13
+    Instance.new("UICorner", ridegoCarScroll).CornerRadius = UDim.new(0, 6)
 
-    local cardBody = makeCard(0, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
-    bodyOpenBtn = Instance.new("TextButton")
-    bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
-    bodyOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    bodyOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    bodyOpenBtn.Text = "🚗 DÀN ÁO: ĐANG TẮT"
-    bodyOpenBtn.TextSize = 10
-    bodyOpenBtn.Font = Enum.Font.GothamBold
-    bodyOpenBtn.ZIndex = 13
-    bodyOpenBtn.Parent = cardBody
-    Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
-    local cardFc = makeCard(120, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
-    fcOpenBtn = Instance.new("TextButton")
-    fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
-    fcOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    fcOpenBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fcOpenBtn.Text = "📷 FREECAM: ĐANG TẮT"
-    fcOpenBtn.TextSize = 10
-    fcOpenBtn.Font = Enum.Font.GothamBold
-    fcOpenBtn.ZIndex = 13
-    fcOpenBtn.Parent = cardFc
-    Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
+    local sListR = Instance.new("UIListLayout", ridegoCarScroll)
+    sListR.Padding = UDim.new(0, 4)
+    sListR.SortOrder = Enum.SortOrder.LayoutOrder
+    local sPadR = Instance.new("UIPadding", ridegoCarScroll)
+    sPadR.PaddingTop = UDim.new(0, 6)
+    sPadR.PaddingLeft = UDim.new(0, 6)
+    sPadR.PaddingRight = UDim.new(0, 6)
+    sPadR.PaddingBottom = UDim.new(0, 6)
 
-    -- ============ SETTINGS PAGE ============
+    ridegoCarListWrap = ridegoCarScroll
+
+    -- ================= SETTINGS =================
     local settingsScroll = Instance.new("ScrollingFrame")
     settingsScroll.Size = UDim2.new(1, 0, 1, 0)
     settingsScroll.BackgroundTransparency = 1
@@ -1124,16 +1012,11 @@ do
         return Color3.fromRGB(r, g, b), input:upper()
     end
     local QUAL = {
-        Enum.SavedQualitySetting.QualityLevel1,
-        Enum.SavedQualitySetting.QualityLevel2,
-        Enum.SavedQualitySetting.QualityLevel3,
-        Enum.SavedQualitySetting.QualityLevel4,
-        Enum.SavedQualitySetting.QualityLevel5,
-        Enum.SavedQualitySetting.QualityLevel6,
-        Enum.SavedQualitySetting.QualityLevel7,
-        Enum.SavedQualitySetting.QualityLevel8,
-        Enum.SavedQualitySetting.QualityLevel9,
-        Enum.SavedQualitySetting.QualityLevel10,
+        Enum.SavedQualitySetting.QualityLevel1, Enum.SavedQualitySetting.QualityLevel2,
+        Enum.SavedQualitySetting.QualityLevel3, Enum.SavedQualitySetting.QualityLevel4,
+        Enum.SavedQualitySetting.QualityLevel5, Enum.SavedQualitySetting.QualityLevel6,
+        Enum.SavedQualitySetting.QualityLevel7, Enum.SavedQualitySetting.QualityLevel8,
+        Enum.SavedQualitySetting.QualityLevel9, Enum.SavedQualitySetting.QualityLevel10,
     }
     local function setQualityLevel(idx)
         pcall(function()
@@ -1147,10 +1030,7 @@ do
     local function bloomSet(on, intensity, threshold)
         pcall(function()
             local b = Lighting:FindFirstChild("KhangLeBloom")
-            if not b then
-                b = Instance.new("BloomEffect", Lighting)
-                b.Name = "KhangLeBloom"
-            end
+            if not b then b = Instance.new("BloomEffect", Lighting); b.Name = "KhangLeBloom" end
             b.Enabled = on
             if intensity then b.Intensity = intensity end
             if threshold then b.Threshold = threshold end
@@ -1159,10 +1039,7 @@ do
     local function sunSet(on, intensity)
         pcall(function()
             local s = Lighting:FindFirstChild("KhangLeSun")
-            if not s then
-                s = Instance.new("SunRaysEffect", Lighting)
-                s.Name = "KhangLeSun"
-            end
+            if not s then s = Instance.new("SunRaysEffect", Lighting); s.Name = "KhangLeSun" end
             s.Enabled = on
             if intensity then s.Intensity = intensity end
         end)
@@ -1174,11 +1051,9 @@ do
         section.AutomaticSize = Enum.AutomaticSize.Y
         section.BackgroundTransparency = 1
         section.LayoutOrder = order
-
         local sl = Instance.new("UIListLayout", section)
         sl.Padding = UDim.new(0, 0)
         sl.SortOrder = Enum.SortOrder.LayoutOrder
-
         local header = Instance.new("TextButton", section)
         header.Size = UDim2.new(1, 0, 0, 28)
         header.LayoutOrder = 1
@@ -1191,7 +1066,6 @@ do
         Instance.new("UICorner", header).CornerRadius = UDim.new(0, 6)
         local hp = Instance.new("UIPadding", header)
         hp.PaddingLeft = UDim.new(0, 8)
-
         local content = Instance.new("Frame", section)
         content.Size = UDim2.new(1, 0, 0, 0)
         content.AutomaticSize = Enum.AutomaticSize.Y
@@ -1201,16 +1075,12 @@ do
         content.Visible = defaultOpen or false
         content.ZIndex = 13
         Instance.new("UICorner", content).CornerRadius = UDim.new(0, 6)
-
         local cl = Instance.new("UIListLayout", content)
         cl.Padding = UDim.new(0, 4)
         cl.SortOrder = Enum.SortOrder.LayoutOrder
         local cp = Instance.new("UIPadding", content)
-        cp.PaddingTop = UDim.new(0, 8)
-        cp.PaddingBottom = UDim.new(0, 8)
-        cp.PaddingLeft = UDim.new(0, 8)
-        cp.PaddingRight = UDim.new(0, 8)
-
+        cp.PaddingTop = UDim.new(0, 8); cp.PaddingBottom = UDim.new(0, 8)
+        cp.PaddingLeft = UDim.new(0, 8); cp.PaddingRight = UDim.new(0, 8)
         local isOpen = defaultOpen or false
         header.Text = (isOpen and "▼ " or "▶ ") .. title
         header.MouseButton1Click:Connect(function()
@@ -1249,7 +1119,6 @@ do
         row.Size = UDim2.new(1, 0, 0, 26)
         row.LayoutOrder = order
         row.BackgroundTransparency = 1
-
         local lbl = Instance.new("TextLabel", row)
         lbl.Size = UDim2.new(0, 80, 1, 0)
         lbl.BackgroundTransparency = 1
@@ -1258,7 +1127,6 @@ do
         lbl.TextSize = 10
         lbl.Font = Enum.Font.GothamBold
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-
         local box = Instance.new("TextBox", row)
         box.Size = UDim2.new(1, -160, 1, 0)
         box.Position = UDim2.new(0, 82, 0, 0)
@@ -1270,7 +1138,6 @@ do
         box.Font = Enum.Font.GothamBold
         box.BorderSizePixel = 0
         Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
-
         local btn = Instance.new("TextButton", row)
         btn.Size = UDim2.new(0, 72, 1, 0)
         btn.Position = UDim2.new(1, -72, 0, 0)
@@ -1280,7 +1147,6 @@ do
         btn.TextSize = 10
         btn.Font = Enum.Font.GothamBold
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-
         local status = Instance.new("TextLabel", parent)
         status.Size = UDim2.new(1, 0, 0, 14)
         status.LayoutOrder = order + 0.5
@@ -1290,7 +1156,6 @@ do
         status.TextSize = 9
         status.Font = Enum.Font.GothamBold
         status.TextXAlignment = Enum.TextXAlignment.Left
-
         btn.MouseButton1Click:Connect(function()
             onClick(box.Text, function(msg, ok)
                 status.Text = msg
@@ -1300,7 +1165,7 @@ do
         return box
     end
 
-    -- Màu menu + LED
+    -- ============ SECTION: MÀU MENU + LED ============
     local colorSection = makeSection(1, "🎨 Màu menu + LED", false)
     local colorRow = Instance.new("Frame", colorSection)
     colorRow.Size = UDim2.new(1, 0, 0, 30)
@@ -1319,15 +1184,32 @@ do
     }
     for i, c in ipairs(themePresets) do
         local sw = Instance.new("TextButton", colorRow)
-        sw.Size = UDim2.new(0, 30, 1, 0)
+        sw.Size = UDim2.new(0, 26, 1, 0)
         sw.BackgroundColor3 = c
         sw.Text = ""
         Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 6)
-        sw.MouseButton1Click:Connect(function() applyTheme(c) end)
+        sw.MouseButton1Click:Connect(function()
+            menuRainbow = false
+            applyTheme(c)
+        end)
     end
+    -- Nut RGB rainbow cho menu
+    local rainbowSw = Instance.new("TextButton", colorRow)
+    rainbowSw.Size = UDim2.new(0, 26, 1, 0)
+    rainbowSw.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
+    rainbowSw.Text = "🌈"
+    rainbowSw.TextSize = 14
+    rainbowSw.Font = Enum.Font.GothamBold
+    rainbowSw.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", rainbowSw).CornerRadius = UDim.new(0, 6)
+    rainbowSw.MouseButton1Click:Connect(function()
+        menuRainbow = true
+    end)
+
     makeInput(colorSection, 2, "Mã menu", "#00E5A0", "ÁP DỤNG", Color3.fromRGB(0, 150, 120), function(txt, cb)
         local col, up = parseHex(txt)
         if not col then cb("❌ mã màu sai (VD: #00E5A0)", false) return end
+        menuRainbow = false
         applyTheme(col)
         cb("✔ màu menu = #" .. up, true)
     end)
@@ -1336,13 +1218,15 @@ do
         if not col then cb("❌ hex sai", false) return end
         ledMode = "fixed"
         ledFixedColor = col
+        menuRainbow = false
+        if hubStroke then hubStroke.Color = col end
         cb("✔ LED = #" .. up, true)
     end)
     makeToggle(colorSection, 6, ledMode == "rainbow", "🌈 LED: RAINBOW", "🌈 LED: ĐƠN SẮC", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
         if v then ledMode = "rainbow" else ledMode = "fixed" end
     end)
 
-    -- Tên hiển thị
+    -- ============ SECTION: TÊN HIỂN THỊ ============
     local nameSection = makeSection(2, "👤 Tên hiển thị", false)
     makeToggle(nameSection, 1, false, "👤 ẨN TÊN: BẬT", "👤 ẨN TÊN: TẮT", Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
         hideNameOn = v
@@ -1355,14 +1239,13 @@ do
         cb("✔ đã đổi tên", true)
     end)
 
-    -- Hiệu năng
+    -- ============ SECTION: HIỆU NĂNG ============
     local perfSection = makeSection(3, "⚡ Hiệu năng", false)
     makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT", Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
         optFPS = v
         if v then
             pcall(function() Lighting.GlobalShadows = false end)
-            bloomSet(false)
-            sunSet(false)
+            bloomSet(false); sunSet(false)
             pcall(function() workspace.StreamingEnabled = true end)
             setQualityLevel(4)
         else
@@ -1376,29 +1259,24 @@ do
         if v then
             pcall(function() Lighting.GlobalShadows = true end)
             pcall(function() Lighting.Brightness = 3 end)
-            bloomSet(true, 0.6, 0.7)
-            sunSet(true, 0.3)
+            bloomSet(true, 0.6, 0.7); sunSet(true, 0.3)
             setQualityLevel(10)
         else
-            bloomSet(true, 0.4, 0.8)
-            sunSet(false)
+            bloomSet(true, 0.4, 0.8); sunSet(false)
             setQualityLevel(nil)
         end
     end)
     makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT", Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70), function(v)
-        perfOn = v
-        perfFrame.Visible = v
+        perfOn = v; perfFrame.Visible = v
     end)
     makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT", Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70), function(v)
-        perfLocked = v
-        perfFrame.Draggable = not v
+        perfLocked = v; perfFrame.Draggable = not v
     end)
 
-    -- Server
+    -- ============ SECTION: SERVER ============
     local serverSection = makeSection(4, "🔄 Server", false)
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
-
     local function fetchServers()
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         local ok, res = pcall(function() return game:HttpGet(url) end)
@@ -1407,7 +1285,6 @@ do
         if not ok2 or not data or not data.data then return nil end
         return data.data
     end
-
     local btnHop = Instance.new("TextButton", serverSection)
     btnHop.Size = UDim2.new(1, 0, 0, 28)
     btnHop.LayoutOrder = 1
@@ -1417,7 +1294,6 @@ do
     btnHop.TextSize = 10
     btnHop.Font = Enum.Font.GothamBold
     Instance.new("UICorner", btnHop).CornerRadius = UDim.new(0, 7)
-
     local btnSmall = Instance.new("TextButton", serverSection)
     btnSmall.Size = UDim2.new(1, 0, 0, 28)
     btnSmall.LayoutOrder = 2
@@ -1427,7 +1303,6 @@ do
     btnSmall.TextSize = 10
     btnSmall.Font = Enum.Font.GothamBold
     Instance.new("UICorner", btnSmall).CornerRadius = UDim.new(0, 7)
-
     local btnRejoin = Instance.new("TextButton", serverSection)
     btnRejoin.Size = UDim2.new(1, 0, 0, 28)
     btnRejoin.LayoutOrder = 3
@@ -1437,10 +1312,8 @@ do
     btnRejoin.TextSize = 10
     btnRejoin.Font = Enum.Font.GothamBold
     Instance.new("UICorner", btnRejoin).CornerRadius = UDim.new(0, 7)
-
     btnHop.MouseButton1Click:Connect(function()
-        local servers = fetchServers()
-        if not servers then return end
+        local servers = fetchServers(); if not servers then return end
         for _, s in ipairs(servers) do
             if s.id ~= game.JobId and s.playing < s.maxPlayers - 1 then
                 pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, player) end)
@@ -1449,23 +1322,20 @@ do
         end
     end)
     btnSmall.MouseButton1Click:Connect(function()
-        local servers = fetchServers()
-        if not servers then return end
+        local servers = fetchServers(); if not servers then return end
         local best = nil
         for _, s in ipairs(servers) do
             if s.id ~= game.JobId and s.playing < s.maxPlayers - 1 then
                 if not best or s.playing < best.playing then best = s end
             end
         end
-        if best then
-            pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, best.id, player) end)
-        end
+        if best then pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, best.id, player) end) end
     end)
     btnRejoin.MouseButton1Click:Connect(function()
         pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
     end)
 
-    -- Auto Rejoin
+    -- ============ SECTION: AUTO REJOIN ============
     local rejoinSection = makeSection(5, "🤖 Auto Rejoin", false)
     local rejoinNote = Instance.new("TextLabel", rejoinSection)
     rejoinNote.Size = UDim2.new(1, 0, 0, 28)
@@ -1487,12 +1357,11 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
 ]])
         end
     end)
-
     makeToggle(rejoinSection, 3, readFlag("autoRejoin.txt"), "🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT", Color3.fromRGB(140, 80, 40), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoRejoin.txt", v and "1" or "0") end
     end)
 
-    -- Anti-AFK
+    -- ============ SECTION: ANTI-AFK ============
     local afkSection = makeSection(6, "🛡️ Anti-AFK", false)
     makeToggle(afkSection, 1, true, "🛡️ ANTI-AFK: BẬT", "🛡️ ANTI-AFK: TẮT", Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v)
         antiAfk = v
@@ -1505,16 +1374,39 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
         hubStroke.Color = c
         hubHeader.TextColor3 = c
         ToggleBtn.TextColor3 = c
-        if currentPageName then
-            selectPage(currentPageName)
-        end
-        if farmSwitch and farmSwitch.isOn() then
-            farmSwitch.set(true)
-        end
-        if ridegoSwitch and ridegoSwitch.isOn() then
-            ridegoSwitch.set(true)
+        if currentPageName then selectPage(currentPageName) end
+        if farmSwitch and farmSwitch.isOn() then farmSwitch.set(true) end
+        if ridegoSwitch and ridegoSwitch.isOn() then ridegoSwitch.set(true) end
+    end
+
+    -- Apply farm availability (office)
+    local function applyFarmAvailability()
+        local ok = checkFarmOK()
+        farmOK = ok
+        if ok then
+            farmNote.Text = ""
+            farmSwitch.track.Active = true
+            farmSwitch.track.AutoButtonColor = true
+            if not farmSwitch.isOn() then
+                farmSwitch.track.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+                farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
+            end
+        else
+            farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
+            farmSwitch.track.Active = false
+            farmSwitch.track.AutoButtonColor = false
+            farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+            farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
         end
     end
+    applyFarmAvailability()
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            local ok = checkFarmOK()
+            if ok ~= farmOK then applyFarmAvailability() end
+        end
+    end)
 
     HubFrame.Visible = true
 end
@@ -1535,26 +1427,17 @@ do
             ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
             autoTActive = false
             AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
-            end)
+            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
         end
     end)
     AutoTFloatingBtn.MouseButton1Click:Connect(function()
         autoTActive = not autoTActive
         if autoTActive then
             AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-            strokeAutoTFloat.Color = Color3.fromRGB(0, 255, 120)
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
-            end)
+            pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game) end)
         else
             AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
-            end)
+            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
         end
     end)
     RunService.Heartbeat:Connect(function()
@@ -1564,16 +1447,11 @@ do
         local isInVehicle = (s and (s:IsA("VehicleSeat") or s:IsA("Seat")))
         if autoTActive then
             if isInVehicle then
-                pcall(function()
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
-                end)
+                pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game) end)
             else
                 autoTActive = false
                 AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-                strokeAutoTFloat.Color = Color3.fromRGB(255, 100, 0)
-                pcall(function()
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
-                end)
+                pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
             end
         end
     end)
@@ -1609,7 +1487,6 @@ do
     local ControlStroke = Instance.new("UIStroke", ControlPanel)
     ControlStroke.Color = Color3.fromRGB(0, 230, 180)
     ControlStroke.Thickness = 1.5
-    ControlStroke.Parent = ControlPanel
     local ControlTitle = Instance.new("TextLabel")
     ControlTitle.Parent = ControlPanel
     ControlTitle.BackgroundTransparency = 1
@@ -1677,10 +1554,8 @@ do
         ControlPanel.Visible = not ControlPanel.Visible
         if ControlPanel.Visible then
             BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 100)
-            strokeBodyFloat.Color = Color3.fromRGB(0, 255, 180)
         else
             BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
         end
     end)
     local CloseControlBtn = Instance.new("TextButton")
@@ -1695,33 +1570,24 @@ do
     CloseControlBtn.MouseButton1Click:Connect(function()
         ControlPanel.Visible = false
         BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
     end)
     local SelectionBoxObj = Instance.new("SelectionBox")
     SelectionBoxObj.Color3 = Color3.fromRGB(0, 230, 180)
     SelectionBoxObj.LineThickness = 0.05
     SelectionBoxObj.Adornee = nil
-    pcall(function()
-        SelectionBoxObj.Parent = CoreGui
-    end)
-    if SelectionBoxObj.Parent ~= CoreGui then
-        SelectionBoxObj.Parent = ScreenGui
-    end
+    pcall(function() SelectionBoxObj.Parent = CoreGui end)
+    if SelectionBoxObj.Parent ~= CoreGui then SelectionBoxObj.Parent = ScreenGui end
     ScanBtn.MouseButton1Click:Connect(function()
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChild("Humanoid") then
             ScanBtn.Text = "Không tìm thấy nhân vật!"
-            task.wait(1.5)
-            ScanBtn.Text = "Quét Lại Xe"
-            return
+            task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"; return
         end
         local humanoid = char.Humanoid
         local seatPart = humanoid.SeatPart
         if not seatPart then
             ScanBtn.Text = "Hãy ngồi lên xe!"
-            task.wait(1.5)
-            ScanBtn.Text = "Quét Lại Xe"
-            return
+            task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"; return
         end
         local model = seatPart.Parent
         while model and model ~= workspace and not model:FindFirstChildOfClass("Humanoid") do
@@ -1731,12 +1597,10 @@ do
         if model then
             currentVehicle = model
             ScanBtn.Text = "Quét Thành Công!"
-            task.wait(1.5)
-            ScanBtn.Text = "Quét Lại Xe"
+            task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"
         else
             ScanBtn.Text = "Không nhận diện!"
-            task.wait(1.5)
-            ScanBtn.Text = "Quét Lại Xe"
+            task.wait(1.5); ScanBtn.Text = "Quét Lại Xe"
         end
     end)
     local function restorePartAppearance()
@@ -1749,9 +1613,7 @@ do
             originalMaterials[lastSelectedPart] = nil
         end
         for decal, trans in pairs(originalDecalTransparencies) do
-            if decal and decal.Parent then
-                decal.Transparency = trans
-            end
+            if decal and decal.Parent then decal.Transparency = trans end
         end
         originalDecalTransparencies = {}
         SelectionBoxObj.Adornee = nil
@@ -1759,9 +1621,7 @@ do
     ToggleModeBtn.MouseButton1Click:Connect(function()
         if not currentVehicle then
             ToggleModeBtn.Text = "Hãy Quét Xe Trước!"
-            task.wait(1.5)
-            ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"
-            return
+            task.wait(1.5); ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"; return
         end
         modeActive = not modeActive
         if modeActive then
@@ -1771,18 +1631,15 @@ do
             ToggleModeBtn.Text = "Chế độ Soi & Tháo: TẮT"
             ToggleModeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
             restorePartAppearance()
-            selectedPart = nil
-            selectedParentContainer = nil
-            modelPartsList = {}
-            lastSelectedPart = nil
+            selectedPart = nil; selectedParentContainer = nil
+            modelPartsList = {}; lastSelectedPart = nil
         end
     end)
     local function updateSelectionInfo()
         restorePartAppearance()
         if not selectedPart or not selectedPart.Parent or not currentVehicle then
             StatusText.Text = " Part: Chưa chọn\nCụm: Chưa chọn\nSố part trong cụm: 0"
-            lastSelectedPart = nil
-            return
+            lastSelectedPart = nil; return
         end
         lastSelectedPart = selectedPart
         originalTransparencies[selectedPart] = selectedPart.Transparency
@@ -1841,18 +1698,13 @@ do
                 modelPartsList = {}
                 if selectedParentContainer and (selectedParentContainer:IsA("Model") or selectedParentContainer:IsA("Folder")) then
                     for _, child in ipairs(selectedParentContainer:GetDescendants()) do
-                        if child:IsA("BasePart") then
-                            table.insert(modelPartsList, child)
-                        end
+                        if child:IsA("BasePart") then table.insert(modelPartsList, child) end
                     end
                 else
                     table.insert(modelPartsList, selectedPart)
                 end
                 for i, p in ipairs(modelPartsList) do
-                    if p == targetPart then
-                        currentIndex = i
-                        break
-                    end
+                    if p == targetPart then currentIndex = i; break end
                 end
                 updateSelectionInfo()
             end
@@ -1871,9 +1723,7 @@ do
                 originalDecalTransparencies[descendant] = nil
             end
         end
-        if not originalParents[part] then
-            originalParents[part] = part.Parent
-        end
+        if not originalParents[part] then originalParents[part] = part.Parent end
         part.Parent = nil
         SelectionBoxObj.Adornee = nil
     end
@@ -1886,20 +1736,15 @@ do
                     currentIndex = currentIndex % #modelPartsList + 1
                     local p = modelPartsList[currentIndex]
                     if p and p.Parent ~= nil then
-                        selectedPart = p
-                        foundNext = true
-                        break
+                        selectedPart = p; foundNext = true; break
                     end
                 end
             end
-            if foundNext then
-                updateSelectionInfo()
+            if foundNext then updateSelectionInfo()
             else
                 restorePartAppearance()
-                selectedPart = nil
-                selectedParentContainer = nil
-                modelPartsList = {}
-                lastSelectedPart = nil
+                selectedPart = nil; selectedParentContainer = nil
+                modelPartsList = {}; lastSelectedPart = nil
                 updateSelectionInfo()
             end
         end
@@ -1907,15 +1752,11 @@ do
     HideCompBtn.MouseButton1Click:Connect(function()
         if selectedParentContainer then
             for _, child in ipairs(selectedParentContainer:GetDescendants()) do
-                if child:IsA("BasePart") then
-                    hideSinglePart(child)
-                end
+                if child:IsA("BasePart") then hideSinglePart(child) end
             end
             restorePartAppearance()
-            selectedPart = nil
-            selectedParentContainer = nil
-            modelPartsList = {}
-            lastSelectedPart = nil
+            selectedPart = nil; selectedParentContainer = nil
+            modelPartsList = {}; lastSelectedPart = nil
             updateSelectionInfo()
         end
     end)
@@ -1925,18 +1766,10 @@ do
             for count = 1, #modelPartsList do
                 currentIndex = currentIndex % #modelPartsList + 1
                 local p = modelPartsList[currentIndex]
-                if p and p.Parent ~= nil then
-                    selectedPart = p
-                    found = true
-                    break
-                end
+                if p and p.Parent ~= nil then selectedPart = p; found = true; break end
             end
-            if found then
-                updateSelectionInfo()
-            else
-                selectedPart = nil
-                SelectionBoxObj.Adornee = nil
-            end
+            if found then updateSelectionInfo()
+            else selectedPart = nil; SelectionBoxObj.Adornee = nil end
         end
     end)
     PrevPartBtn.MouseButton1Click:Connect(function()
@@ -1946,26 +1779,16 @@ do
                 currentIndex = currentIndex - 1
                 if currentIndex < 1 then currentIndex = #modelPartsList end
                 local p = modelPartsList[currentIndex]
-                if p and p.Parent ~= nil then
-                    selectedPart = p
-                    found = true
-                    break
-                end
+                if p and p.Parent ~= nil then selectedPart = p; found = true; break end
             end
-            if found then
-                updateSelectionInfo()
-            else
-                selectedPart = nil
-                SelectionBoxObj.Adornee = nil
-            end
+            if found then updateSelectionInfo()
+            else selectedPart = nil; SelectionBoxObj.Adornee = nil end
         end
     end)
     DeselectBtn.MouseButton1Click:Connect(function()
         restorePartAppearance()
-        selectedPart = nil
-        selectedParentContainer = nil
-        modelPartsList = {}
-        lastSelectedPart = nil
+        selectedPart = nil; selectedParentContainer = nil
+        modelPartsList = {}; lastSelectedPart = nil
         updateSelectionInfo()
     end)
     RestoreBtn.MouseButton1Click:Connect(function()
@@ -1976,10 +1799,8 @@ do
         end
         originalParents = {}
         restorePartAppearance()
-        selectedPart = nil
-        selectedParentContainer = nil
-        modelPartsList = {}
-        lastSelectedPart = nil
+        selectedPart = nil; selectedParentContainer = nil
+        modelPartsList = {}; lastSelectedPart = nil
         updateSelectionInfo()
     end)
 end
@@ -2101,53 +1922,53 @@ do
     local btnDown = createPadBtn("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
     local btnZoomIn = createPadBtn("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 100))
     local btnZoomOut = createPadBtn("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 148))
-    local hideDragging, hideDragStart, hideStartPos
-    hideFloatBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            hideDragging = true
-            hideDragStart = input.Position
-            hideStartPos = hideFloatBtn.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if hideDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - hideDragStart
-            hideFloatBtn.Position = UDim2.new(hideStartPos.X.Scale, hideStartPos.X.Offset + delta.X, hideStartPos.Y.Scale, hideStartPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            hideDragging = false
-        end
-    end)
-    local freecamMenuDragging, freecamMenuDragStart, freecamMenuStartPos
-    freecamMenuTitle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            freecamMenuDragging = true
-            freecamMenuDragStart = input.Position
-            freecamMenuStartPos = freecamMenuFrame.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if freecamMenuDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - freecamMenuDragStart
-            freecamMenuFrame.Position = UDim2.new(freecamMenuStartPos.X.Scale, freecamMenuStartPos.X.Offset + delta.X, freecamMenuStartPos.Y.Scale, freecamMenuStartPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            freecamMenuDragging = false
-        end
-    end)
+    -- drag hideFloatBtn
+    do
+        local dragging, dragStart, startPos
+        hideFloatBtn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = hideFloatBtn.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                hideFloatBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
+    -- drag freecamMenu
+    do
+        local dragging, dragStart, startPos
+        freecamMenuTitle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = freecamMenuFrame.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                freecamMenuFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+    end
     FreecamFloatingBtn.MouseButton1Click:Connect(function()
         freecamMenuFrame.Visible = not freecamMenuFrame.Visible
     end)
     local function setRobloxTouchGuiTransparency(transparency)
         local touchGui = LocalPlayer.PlayerGui:FindFirstChild("TouchGui")
         if touchGui then
-            local descTable = touchGui:GetDescendants()
-            for i = 1, #descTable do
-                local descendant = descTable[i]
+            for _, descendant in ipairs(touchGui:GetDescendants()) do
                 if descendant:IsA("ImageLabel") or descendant:IsA("ImageButton") then
                     descendant.ImageTransparency = transparency
                 elseif descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
@@ -2255,12 +2076,8 @@ do
             end
         end)
     end
-    bindTouch(btnW, "W")
-    bindTouch(btnS, "S")
-    bindTouch(btnA, "A")
-    bindTouch(btnD, "D")
-    bindTouch(btnUp, "Up")
-    bindTouch(btnDown, "Down")
+    bindTouch(btnW, "W"); bindTouch(btnS, "S"); bindTouch(btnA, "A"); bindTouch(btnD, "D")
+    bindTouch(btnUp, "Up"); bindTouch(btnDown, "Down")
     local zoomInActive, zoomOutActive = false, false
     btnZoomIn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomInActive = true end end)
     btnZoomIn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then zoomInActive = false end end)
@@ -2318,20 +2135,14 @@ do
         end
     end)
     UserInputService.TouchEnded:Connect(function(touch)
-        if touch == activeTouch then
-            activeTouch = nil
-            lastTouchPos = nil
-        end
+        if touch == activeTouch then activeTouch = nil; lastTouchPos = nil end
     end)
     RunService.RenderStepped:Connect(function(dt)
         if not freecamActive then return end
         local smoothFactor = math.clamp(dt * 16, 0, 1)
         camAngles = camAngles:Lerp(targetCamAngles, smoothFactor)
-        if zoomInActive then
-            currentFOV = math.clamp(currentFOV - 35 * dt, 10, 120)
-        elseif zoomOutActive then
-            currentFOV = math.clamp(currentFOV + 35 * dt, 10, 120)
-        end
+        if zoomInActive then currentFOV = math.clamp(currentFOV - 35 * dt, 10, 120)
+        elseif zoomOutActive then currentFOV = math.clamp(currentFOV + 35 * dt, 10, 120) end
         camera.FieldOfView = currentFOV
         local moveDir = Vector3.new()
         if moveStates.W then moveDir = moveDir + Vector3.new(0, 0, -1) end
@@ -2347,7 +2158,7 @@ do
 end
 
 -- ============================================================
--- KHOI 5: OFFICE FARM
+-- KHOI 5: OFFICE FARM (giu nguyen logic cu)
 -- ============================================================
 do
     local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
@@ -2398,37 +2209,26 @@ do
             end
         elseif next(of_savedCollide) then
             for p in pairs(of_savedCollide) do
-                if p.Parent then
-                    p.CanCollide = true
-                end
+                if p.Parent then p.CanCollide = true end
             end
             table.clear(of_savedCollide)
         end
     end)
     local of_sprintOn = false
-
-    local function of_sprintToggle()
-        pcall(function()
-            keypress(Enum.KeyCode.LeftShift)
-        end)
-    end
-
+    local function of_sprintToggle() pcall(function() keypress(Enum.KeyCode.LeftShift) end) end
     local of_sprintActivated = false
-
     local function of_ensureSprint(h)
         if of_sprintActivated then return end
         pcall(function() keypress(Enum.KeyCode.LeftShift) end)
         of_sprintActivated = true
     end
+    local function of_endSprint(h) end
 
-    local function of_endSprint(h)
-    end
     local function of_enableSit(char)
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        end
+        if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true) end
     end
+
     GenerateQuestion.OnClientEvent:Connect(function(...)
         local q = { text = nil, choices = nil, questionID = nil }
         for _, a in ipairs({ ... }) do
@@ -2445,9 +2245,7 @@ do
         of_pendingQuestion = q
         of_lastKnownQuestion = q
         of_questionArrivedAt = os.clock()
-        if farmOffice then
-            setStatus("đang giải")
-        end
+        if farmOffice then setStatus("đang giải") end
     end)
     CorrectAnswer.OnClientEvent:Connect(function(status)
         of_awaitingAck = false
@@ -2458,28 +2256,23 @@ do
             refreshStatPanel()
         end
     end)
-    AssignPrintJob.OnClientEvent:Connect(function(name)
-        of_printAssigned = name
-    end)
+    AssignPrintJob.OnClientEvent:Connect(function(name) of_printAssigned = name end)
     ClearPrintJob.OnClientEvent:Connect(function()
         of_printAssigned = nil
         ofPrints = ofPrints + 1
         refreshStatPanel()
     end)
+
     local function of_findButton(text)
         local pg = player:FindFirstChildOfClass("PlayerGui")
         if not pg then return nil end
         for _, d in ipairs(pg:GetDescendants()) do
-            if d:IsA("TextButton") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then
-                return d
-            end
+            if d:IsA("TextButton") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then return d end
         end
         for _, d in ipairs(pg:GetDescendants()) do
             if d:IsA("TextLabel") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then
                 local p = d.Parent
-                if p and (p:IsA("TextButton") or p:IsA("ImageButton")) then
-                    return p
-                end
+                if p and (p:IsA("TextButton") or p:IsA("ImageButton")) then return p end
             end
         end
         return nil
@@ -2491,47 +2284,26 @@ do
         return x >= 0 and y >= 0 and x <= vp.X and y <= vp.Y
     end
     local function of_clickButton(btn)
-        if pcall(function() firesignal(btn.MouseButton1Click) end) then
-            return 1
-        end
-        if pcall(function() firesignal(btn.Activated) end) then
-            return 2
-        end
+        if pcall(function() firesignal(btn.MouseButton1Click) end) then return 1 end
+        if pcall(function() firesignal(btn.Activated) end) then return 2 end
         local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
         local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
         if of_onScreen(x, y) then
-            if pcall(function()
-                touchpress(x, y)
-                task.wait(0.06)
-                touchrelease(x, y)
-            end) then
-                return 3
-            end
+            if pcall(function() touchpress(x, y); task.wait(0.06); touchrelease(x, y) end) then return 3 end
         end
         return nil
     end
-    local function of_root()
-        local c = player.Character
-        return c and c:FindFirstChild("HumanoidRootPart")
-    end
-    local function of_humanoid()
-        local c = player.Character
-        return c and c:FindFirstChildOfClass("Humanoid")
-    end
+    local function of_root() local c = player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
+    local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
     local function of_seatsNear(pos, radius)
         local out = {}
-        local ok, parts = pcall(function()
-            return workspace:GetPartBoundsInRadius(pos, radius)
-        end)
+        local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, radius) end)
         if not ok or not parts then return out end
         for _, p in ipairs(parts) do
-            if p:IsA("Seat") or p:IsA("VehicleSeat") then
-                table.insert(out, p)
-            end
+            if p:IsA("Seat") or p:IsA("VehicleSeat") then table.insert(out, p) end
         end
         return out
     end
-
     local function of_flyTo(target, stopDist, timeout)
         local hrp = of_root()
         if not hrp then return false end
@@ -2556,9 +2328,7 @@ do
             task.wait(0.3)
         end
     end
-
     local OF_TELE_MIN = 60
-
     local function of_walkTo(target, stopDist, timeout, allowSit, useNoclip)
         stopDist = stopDist or 3
         timeout = timeout or 20
@@ -2570,43 +2340,31 @@ do
                 local hrp = of_root()
                 if not h or not hrp then break end
                 if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-                    if allowSit then
-                        reached = true
-                        break
-                    else
-                        of_standUp()
-                    end
+                    if allowSit then reached = true; break
+                    else of_standUp() end
                 end
                 local delta = target - hrp.Position
                 local flat = Vector3.new(delta.X, 0, delta.Z)
-                if flat.Magnitude <= stopDist then
-                    reached = true
-                    break
-                end
+                if flat.Magnitude <= stopDist then reached = true; break end
                 h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
                 task.wait(0.15)
             end
         end)
         local h = of_humanoid()
         local hrp = of_root()
-        if h and hrp then
-            h:MoveTo(hrp.Position)
-        end
+        if h and hrp then h:MoveTo(hrp.Position) end
         return reached
     end
     local function of_teleTo(target)
         local hrp = of_root()
         if not hrp then return false end
         local dist = (target - hrp.Position).Magnitude
-        if dist < OF_TELE_MIN then
-            return of_walkTo(target, 3, 15, false, false)
-        end
+        if dist < OF_TELE_MIN then return of_walkTo(target, 3, 15, false, false) end
         setStatus("tele xa (" .. math.floor(dist) .. ")")
         hrp.CFrame = CFrame.new(target)
         task.wait(0.6)
         return true
     end
-
     local function of_teleNear(target, offsetDist)
         local hrp = of_root()
         if not hrp then return false end
@@ -2626,7 +2384,6 @@ do
         task.wait(0.6)
         return true
     end
-
     local function of_forceSit(h)
         for _, seat in ipairs(of_seatsNear(CHAIR_POS, 8)) do
             if seat.Occupant == nil then
@@ -2639,11 +2396,8 @@ do
         end
         return false
     end
-
     local function of_solve(q)
-        if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then
-            return nil
-        end
+        if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then return nil end
         local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
         if not a then return nil end
         a, b = tonumber(a), tonumber(b)
@@ -2657,9 +2411,7 @@ do
         end
         for _, c in ipairs(q.choices) do
             local v = tonumber(c.Text)
-            if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then
-                return c
-            end
+            if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then return c end
         end
         return nil
     end
@@ -2682,21 +2434,16 @@ do
         local btn = of_findButton(choice.Text)
         local how = btn and of_clickButton(btn) or nil
         if how then
-            pcall(function()
-                CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice)))
-            end)
+            pcall(function() CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice))) end)
         end
         of_awaitingAck = true
         of_lastFireAt = os.clock()
         return true
     end
-
     local function of_findNearestSeat(pos, radius)
         radius = radius or 150
         local candidates = {}
-        local ok, parts = pcall(function()
-            return workspace:GetPartBoundsInRadius(pos, math.min(radius, 40))
-        end)
+        local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, math.min(radius, 40)) end)
         if not ok or not parts then return nil end
         for _, p in ipairs(parts) do
             if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
@@ -2716,16 +2463,12 @@ do
     end
     local function of_findSeatAtDist(pos, minDist, maxDist)
         local out = {}
-        local ok, parts = pcall(function()
-            return workspace:GetPartBoundsInRadius(pos, maxDist or 250)
-        end)
+        local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, maxDist or 250) end)
         if not ok or not parts then return nil end
         for _, p in ipairs(parts) do
             if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
                 local d = (p.Position - pos).Magnitude
-                if d >= (minDist or 60) then
-                    table.insert(out, { seat = p, dist = d })
-                end
+                if d >= (minDist or 60) then table.insert(out, { seat = p, dist = d }) end
             end
         end
         if #out == 0 then return nil end
@@ -2735,9 +2478,7 @@ do
     local of_initialTeleDone = false
     local OF_SKIPPED_SEATS = {}
     local function of_findNearestUntriedSeat(pos, radius, tried)
-        local ok, parts = pcall(function()
-            return workspace:GetPartBoundsInRadius(pos, radius or 350)
-        end)
+        local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, radius or 350) end)
         if not ok or not parts then return nil end
         local best, bestD = nil, math.huge
         for _, p in ipairs(parts) do
@@ -2751,7 +2492,6 @@ do
         end
         return best
     end
-
     local function of_sitAtChair(searchFrom)
         local h = of_humanoid()
         if h and h.Sit then return true end
@@ -2767,9 +2507,7 @@ do
             of_initialTeleDone = true
         end
         h = of_humanoid()
-        if h and h.Sit then
-            return true
-        end
+        if h and h.Sit then return true end
         local tried = {}
         while farmOffice do
             hrp = of_root()
@@ -2795,14 +2533,11 @@ do
         end
         return false
     end
-
     local function of_doPrint(name)
         local Computers = workspace:FindFirstChild("Computers")
         if not Computers then return end
         local model = Computers:FindFirstChild(name)
-        if not model then
-            return
-        end
+        if not model then return end
         local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
         if not part then return end
         of_standUp()
@@ -2816,31 +2551,22 @@ do
             local attempt = 0
             while of_printAssigned and farmOffice and attempt < 3 do
                 attempt = attempt + 1
-                if attempt == 1 then
-                    setStatus("đang in")
-                else
-                    setStatus("thử in lại")
-                end
+                if attempt == 1 then setStatus("đang in")
+                else setStatus("thử in lại") end
                 if prompt then
                     pcall(function() prompt:InputHoldBegin() end)
                     local t1 = os.clock()
-                    while of_printAssigned and farmOffice and os.clock() - t1 < 3 do
-                        task.wait(0.2)
-                    end
+                    while of_printAssigned and farmOffice and os.clock() - t1 < 3 do task.wait(0.2) end
                     pcall(function() prompt:InputHoldEnd() end)
                 end
                 local t2 = os.clock()
-                while of_printAssigned and farmOffice and os.clock() - t2 < 3 do
-                    task.wait(0.2)
-                end
+                while of_printAssigned and farmOffice and os.clock() - t2 < 3 do task.wait(0.2) end
                 if not of_printAssigned then break end
             end
             if not of_printAssigned then break end
             setStatus("chờ 5s thử lại")
             local t3 = os.clock()
-            while of_printAssigned and farmOffice and os.clock() - t3 < 5 do
-                task.wait(0.2)
-            end
+            while of_printAssigned and farmOffice and os.clock() - t3 < 5 do task.wait(0.2) end
         end
         if not farmOffice then return end
         setStatus("đã in")
@@ -2854,9 +2580,7 @@ do
         end
         if not farmOffice then return end
         if not of_sitAtChair() then
-            if farmOffice then
-                task.wait(3)
-            end
+            if farmOffice then task.wait(3) end
             return
         end
         setStatus("ngồi ghế, chờ câu hỏi")
@@ -2864,9 +2588,7 @@ do
         local noQuestionStart = os.clock()
         while farmOffice do
             if of_printAssigned then break end
-            if of_pendingQuestion then
-                noQuestionStart = os.clock()
-            end
+            if of_pendingQuestion then noQuestionStart = os.clock() end
             if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
                 local q = of_pendingQuestion
                 of_pendingQuestion = nil
@@ -2976,149 +2698,237 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/
     end)
 end
 
+-- >> PHAN B (KHOI 6 RideGo + wiring cuoi) o duoi
 -- ============================================================
--- KHOI 6: RIDEGO FARM
+-- KHOI 6: RIDEGO FARM (nguyen logic tu ridegodds.lua)
 -- ============================================================
 do
-    -- Config
-    local RD_STEP_DIST         = 250
-    local RD_LAND_OFFSET       = 8
-    local RD_ARRIVE_DIST       = 8
-    local RD_ORDER_TIMEOUT     = 60
-    local RD_PICKUP_WAIT       = 4
-    local RD_DROP_WAIT         = 5
-    local RD_ACK_DELAY         = 3
-    local RD_DECEL_DIST        = 200
-    local RD_TICK              = 0.05
-    local RD_UNDERGROUND_DEPTH = 200
-    local RD_UNDER_STEP_MAX    = 50
-    local RD_UNDER_DESCEND     = 12
-    local RD_UNDER_STEP_TIME   = 0.03
-    local RD_TRIP_MILESTONE    = 10
-    local RD_FLY_TIMEOUT       = 30
-    local RD_SEAT_DELAY        = 0.5
+    local Players_ = Players
+    local rs_ = ReplicatedStorage
+    local lp = LocalPlayer
 
-    -- Refs (dung rs ben ngoai)
-    local rd_JobEvents = ReplicatedStorage:FindFirstChild("JobEvents")
-    if not rd_JobEvents then
-        rd_JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 15)
+    local STEP_DIST           = 250
+    local LAND_OFFSET         = 8
+    local ARRIVE_DIST         = 8
+    local ORDER_TIMEOUT       = 60
+    local PICKUP_WAIT         = 4
+    local DROP_WAIT           = 5
+    local ACK_DELAY           = 3
+    local DECEL_DIST          = 200
+    local TICK                = 0.05
+    local UNDERGROUND_DEPTH   = 200
+    local UNDER_STEP_MAX      = 50
+    local UNDER_DESCEND_STEPS = 12
+    local UNDER_STEP_TIME     = 0.03
+    local TRIP_MILESTONE      = 10
+    local FLY_TIMEOUT         = 30
+    local SEAT_DELAY          = 0.5
+
+    local enabled     = false
+    local initialized = false
+    local hasInitOnce = false
+    local orderToken  = nil
+    local pickupPos   = nil
+    local dropPos     = nil
+    local pendingFare = 0
+    local myCar       = nil
+    local selectedCar = ""
+    local carList     = {}
+    local stats       = { trips = 0, earn = 0 }
+    local curStatus   = "◦ TẮT"
+    local holdActive  = false
+    local holdBP      = nil
+    local holdGyro    = nil
+    local flying      = false
+    local acceptingOrder = false
+    local farmStartTime  = 0
+    local lastMilestone = 0
+    local ridegoStartTime = 0
+
+    local function resetState()
+        orderToken = nil
+        pickupPos = nil
+        dropPos = nil
+        pendingFare = 0
+        myCar = nil
+        curStatus = "◦ TẮT"
+        flying = false
+        acceptingOrder = false
+        initialized = false
+        farmStartTime = 0
+        lastMilestone = 0
+        holdActive = false
+        if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+        if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
     end
-    local rd_TeamChangeRequest = rd_JobEvents and rd_JobEvents:FindFirstChild("TeamChangeRequest")
 
-    local rd_TaxiAssets = ReplicatedStorage:WaitForChild("TaxiAssets", 10)
-    local rd_TaxiEvent
-    if rd_TaxiAssets then
-        local ev = rd_TaxiAssets:WaitForChild("Events", 5)
-        if ev then rd_TaxiEvent = ev:FindFirstChild("TaxiEvent", true) end
-    end
-
-    local rd_SpawnCarEvents = ReplicatedStorage:WaitForChild("SpawnCarEvents", 10)
-    local rd_SpawnCarEv
-    if rd_SpawnCarEvents then
-        rd_SpawnCarEv = rd_SpawnCarEvents:WaitForChild("SpawnCar", 5)
-    end
-
-    local rd_DealershipEvents = ReplicatedStorage:FindFirstChild("DealershipEvents")
-    local rd_InitCarData
-    if rd_DealershipEvents then
-        rd_InitCarData = rd_DealershipEvents:FindFirstChild("InitializeCarData")
-    end
-
-    -- State (dung rd_ de phan biet)
-    local rd_initialized = false
-    local rd_hasInitOnce = false
-    local rd_orderToken  = nil
-    local rd_pickupPos   = nil
-    local rd_dropPos     = nil
-    local rd_myCar       = nil
-    local rd_holdActive  = false
-    local rd_holdBP      = nil
-    local rd_holdGyro    = nil
-    local rd_flying      = false
-    local rd_acceptingOrder = false
-    local rd_lastMilestone = 0
-    local rd_npcFollowers = {}
-    local rd_npcRenderConn = nil
-
-    local function rd_setStatus(s)
-        rd_curStatus = s
-        if activeMode == "ridego" then
-            refreshStatPanel()
+    local function setRgStatus(s)
+        curStatus = s
+        if ridegoStatusLbl then
+            ridegoStatusLbl.Text = "📍 " .. s
         end
     end
 
-    local function rd_char() return LocalPlayer.Character end
-    local function rd_root() local c = rd_char(); return c and c:FindFirstChild("HumanoidRootPart") end
-    local function rd_hum() local c = rd_char(); return c and c:FindFirstChildOfClass("Humanoid") end
+    local JobEvents = rs_:WaitForChild("JobEvents", 10)
+    local TeamChangeRequest = JobEvents and JobEvents:WaitForChild("TeamChangeRequest", 5)
 
-    local function rd_fire(remote, ...)
+    local TaxiAssets = rs_:WaitForChild("TaxiAssets", 10)
+    local TaxiEvent
+    if TaxiAssets then
+        local ev = TaxiAssets:WaitForChild("Events", 5)
+        if ev then TaxiEvent = ev:FindFirstChild("TaxiEvent", true) end
+    end
+
+    local SpawnCarEvents = rs_:WaitForChild("SpawnCarEvents", 10)
+    local SpawnCarEv
+    if SpawnCarEvents then SpawnCarEv = SpawnCarEvents:WaitForChild("SpawnCar", 5) end
+
+    local DealershipEvents = rs_:FindFirstChild("DealershipEvents")
+    local InitCarData
+    if DealershipEvents then InitCarData = DealershipEvents:FindFirstChild("InitializeCarData") end
+
+    local function char() return lp.Character end
+    local function root() local c = char(); return c and c:FindFirstChild("HumanoidRootPart") end
+    local function hum() local c = char(); return c and c:FindFirstChildOfClass("Humanoid") end
+
+    local function fire(remote, ...)
         if not remote then return false end
         local args = {...}
-        local ok = pcall(function() remote:FireServer(table.unpack(args)) end)
-        return ok
+        return pcall(function() remote:FireServer(table.unpack(args)) end)
     end
 
-    local function rd_flatYawCFrame(cf)
+    local function formatTime(sec)
+        local h = math.floor(sec / 3600)
+        local m = math.floor((sec % 3600) / 60)
+        local s = math.floor(sec % 60)
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+    local function formatMoney(n)
+        local s = tostring(math.floor(n or 0))
+        local out = ""
+        local len = #s
+        for i = 1, len do
+            out = out .. s:sub(i, i)
+            local remain = len - i
+            if remain > 0 and remain % 3 == 0 then out = out .. " " end
+        end
+        return out
+    end
+    local function flatYawCFrame(cf)
         local look = cf.LookVector
         local flat = Vector3.new(look.X, 0, look.Z)
-        if flat.Magnitude < 0.01 then
-            flat = Vector3.new(0, 0, -1)
-        end
+        if flat.Magnitude < 0.01 then flat = Vector3.new(0, 0, -1) end
         flat = flat.Unit
         local yaw = math.atan2(flat.X, flat.Z)
         return CFrame.Angles(0, yaw, 0)
     end
 
-    -- TaxiEvent hook
-    if rd_TaxiEvent then
-        rd_TaxiEvent.OnClientEvent:Connect(function(action, data)
+    if TaxiEvent then
+        TaxiEvent.OnClientEvent:Connect(function(action, data)
             if type(data) ~= "table" then return end
             if action == "OrderOffer" then
-                if not rd_acceptingOrder then return end
-                rd_orderToken = data.Token
-                pcall(function() rd_TaxiEvent:FireServer("AcceptOrder", data.Token) end)
+                if not acceptingOrder then return end
+                orderToken = data.Token
+                pcall(function() TaxiEvent:FireServer("AcceptOrder", data.Token) end)
             elseif action == "OrderAccepted" then
-                rd_pickupPos = data.PickupPos
-                rd_dropPos   = data.DropPos
-                rd_orderToken = data.Token
-                if type(data.Fare) == "number" then
-                    rd_pendingFare = data.Fare
-                else
-                    rd_pendingFare = 0
-                end
+                pickupPos = data.PickupPos
+                dropPos   = data.DropPos
+                orderToken = data.Token
+                if type(data.Fare) == "number" then pendingFare = data.Fare
+                else pendingFare = 0 end
             end
         end)
     end
 
-    -- Scan cars
-    local function rd_scanCars()
-        rd_carList = {}
-        if not rd_InitCarData then return rd_carList end
-        local ok, data = pcall(function() return rd_InitCarData:InvokeServer() end)
-        if not ok or type(data) ~= "table" then return rd_carList end
+    local function scanCars()
+        carList = {}
+        if not InitCarData then return carList end
+        local ok, data = pcall(function() return InitCarData:InvokeServer() end)
+        if not ok or type(data) ~= "table" then return carList end
         for _, v in pairs(data) do
             if type(v) == "table" and type(v.Name) == "string" and v.Name ~= "" then
-                table.insert(rd_carList, v.Name)
+                table.insert(carList, v.Name)
             end
         end
         local seen, uniq = {}, {}
-        for _, n in ipairs(rd_carList) do
+        for _, n in ipairs(carList) do
             if not seen[n] then seen[n] = true; table.insert(uniq, n) end
         end
         table.sort(uniq)
-        rd_carList = uniq
-        return rd_carList
+        carList = uniq
+        ridegoCarList = uniq
+        return carList
     end
 
-    local function rd_findMyCar()
-        local c = rd_char()
+    -- Render car list vao FARMING page scroll
+    local function renderRidegoCars()
+        if not ridegoCarListWrap then return end
+        for _, c in ipairs(ridegoCarListWrap:GetChildren()) do
+            if c:IsA("GuiObject") then c:Destroy() end
+        end
+        ridegoCarListWrap.CanvasSize = UDim2.new(0, 0, 0, #carList * 38 + 12)
+        if #carList == 0 then
+            local lbl = Instance.new("TextLabel", ridegoCarListWrap)
+            lbl.Size = UDim2.new(1, -12, 0, 40)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = "Chưa quét xe"
+            lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
+            lbl.TextSize = 10
+            lbl.Font = Enum.Font.GothamMedium
+            ridegoCarBtn.Text = "🚗 CHỌN XE (0)"
+            return
+        end
+        for i, name in ipairs(carList) do
+            local btn = Instance.new("TextButton", ridegoCarListWrap)
+            btn.Size = UDim2.new(1, -12, 0, 34)
+            btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
+            btn.Text = "  " .. name
+            btn.TextColor3 = Color3.fromRGB(220, 230, 240)
+            btn.TextSize = 10
+            btn.Font = Enum.Font.Code
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.TextTruncate = Enum.TextTruncate.AtEnd
+            btn.LayoutOrder = i
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+            btn.MouseButton1Click:Connect(function()
+                selectedCar = name
+                ridegoSelectedCar = name
+                renderRidegoCars()
+                if ridegoCarLbl then
+                    ridegoCarLbl.Text = "🚗 Xe: " .. name
+                end
+                ridegoCarOpen = false
+                ridegoCarListPanel.Visible = false
+                ridegoCarListPanel.Size = UDim2.new(1, -24, 0, 0)
+                ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
+                if ridegoCarScroll then ridegoCarScroll.Size = UDim2.new(1, 0, 0, 240) end
+            end)
+        end
+        ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
+    end
+    ridegoRenderCars = renderRidegoCars
+
+    -- Car button toggle
+    ridegoCarBtn.MouseButton1Click:Connect(function()
+        if enabled then return end
+        ridegoCarOpen = not ridegoCarOpen
+        ridegoCarListPanel.Visible = ridegoCarOpen
+        if ridegoCarOpen then
+            ridegoCarListPanel.Size = UDim2.new(1, -24, 0, 240)
+        else
+            ridegoCarListPanel.Size = UDim2.new(1, -24, 0, 0)
+        end
+    end)
+
+    local function findMyCar()
+        local c = char()
         if c then
             local h = c:FindFirstChildOfClass("Humanoid")
             if h and h.SeatPart then
                 return h.SeatPart:FindFirstAncestorOfClass("Model")
             end
         end
-        local pname = LocalPlayer.Name:lower()
+        local pname = lp.Name:lower()
         for _, d in ipairs(workspace:GetDescendants()) do
             if d:IsA("Model") and d.Name:lower():find(pname, 1, true)
                and d:FindFirstChildWhichIsA("VehicleSeat", true) then
@@ -3128,31 +2938,31 @@ do
         return nil
     end
 
-    local function rd_makeRayParams()
+    local function makeRayParams()
         local params = RaycastParams.new()
         params.FilterType = Enum.RaycastFilterType.Exclude
         local ign = {}
-        local c = rd_char()
+        local c = char()
         if c then table.insert(ign, c) end
-        local car = rd_myCar or rd_findMyCar()
+        local car = myCar or findMyCar()
         if car then table.insert(ign, car) end
         params.FilterDescendantsInstances = ign
         params.IgnoreWater = true
         return params
     end
-
-    local function rd_floorBelow(pos)
+    local function floorBelow(pos)
         if not pos then return nil end
-        local params = rd_makeRayParams()
+        local params = makeRayParams()
         local origin = Vector3.new(pos.X, pos.Y + 4, pos.Z)
         local hit = workspace:Raycast(origin, Vector3.new(0, -800, 0), params)
         if hit then return hit.Position.Y end
         return nil
     end
 
-    -- NPC followers
-    local function rd_safeRefreshNpc()
-        for _, f in ipairs(rd_npcFollowers) do
+    local npcFollowers = {}
+    local npcRenderConn = nil
+    local function safeRefreshNpc()
+        for _, f in ipairs(npcFollowers) do
             if not f then continue end
             pcall(function()
                 if not f.char or not f.char.Parent then return end
@@ -3171,10 +2981,9 @@ do
             end)
         end
     end
-
-    local function rd_attachNpcFollowers(car)
-        rd_npcFollowers = {}
-        local myChar = rd_char()
+    local function attachNpcFollowers(car)
+        npcFollowers = {}
+        local myChar = char()
         if not car then return end
         for _, d in ipairs(car:GetDescendants()) do
             if d:IsA("VehicleSeat") and d.Occupant then
@@ -3189,7 +2998,7 @@ do
                                 pcall(function() p.Anchored = true end)
                                 pcall(function() p.CanCollide = false end)
                                 pcall(function() p.Massless = true end)
-                                pcall(function() p:SetNetworkOwner(LocalPlayer) end)
+                                pcall(function() p:SetNetworkOwner(lp) end)
                             end
                         end
                         local existing = hrp:FindFirstChild("RG_NpcWeld")
@@ -3214,36 +3023,29 @@ do
                         pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
                         pcall(function() oh:SetStateEnabled(Enum.HumanoidStateType.Swimming, false) end)
                         pcall(function() oh:ChangeState(Enum.HumanoidStateType.Physics) end)
-                        table.insert(rd_npcFollowers, {
-                            char = npcChar,
-                            hum = oh,
-                            seat = d,
-                            offset = offset,
-                            hrp = hrp,
+                        table.insert(npcFollowers, {
+                            char = npcChar, hum = oh, seat = d,
+                            offset = offset, hrp = hrp,
                         })
                     end
                 end
             end
         end
-        if rd_npcRenderConn then
-            pcall(function() rd_npcRenderConn:Disconnect() end)
-            rd_npcRenderConn = nil
+        if npcRenderConn then
+            pcall(function() npcRenderConn:Disconnect() end)
+            npcRenderConn = nil
         end
-        rd_npcRenderConn = RunService.RenderStepped:Connect(function()
-            pcall(rd_safeRefreshNpc)
+        npcRenderConn = RunService.RenderStepped:Connect(function()
+            pcall(safeRefreshNpc)
         end)
     end
-
-    local function rd_updateNpcFollowers()
-        pcall(rd_safeRefreshNpc)
-    end
-
-    local function rd_detachNpcFollowers()
-        if rd_npcRenderConn then
-            pcall(function() rd_npcRenderConn:Disconnect() end)
-            rd_npcRenderConn = nil
+    local function updateNpcFollowers() pcall(safeRefreshNpc) end
+    local function detachNpcFollowers()
+        if npcRenderConn then
+            pcall(function() npcRenderConn:Disconnect() end)
+            npcRenderConn = nil
         end
-        for _, f in ipairs(rd_npcFollowers) do
+        for _, f in ipairs(npcFollowers) do
             if f and f.char and f.char.Parent then
                 local hrp = f.char:FindFirstChild("HumanoidRootPart")
                 if hrp then
@@ -3265,22 +3067,21 @@ do
                 end
             end
         end
-        rd_npcFollowers = {}
+        npcFollowers = {}
     end
 
-    local function rd_claimNetworkOwner(inst)
+    local function claimNetworkOwner(inst)
         if not inst then return end
         if inst:IsA("BasePart") and not inst.Anchored then
-            pcall(function() inst:SetNetworkOwner(LocalPlayer) end)
+            pcall(function() inst:SetNetworkOwner(lp) end)
         end
         for _, p in ipairs(inst:GetDescendants()) do
             if p:IsA("BasePart") and not p.Anchored then
-                pcall(function() p:SetNetworkOwner(LocalPlayer) end)
+                pcall(function() p:SetNetworkOwner(lp) end)
             end
         end
     end
-
-    local function rd_unanchorCar(car)
+    local function unanchorCar(car)
         if not car then return end
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") and p.Anchored then
@@ -3288,8 +3089,7 @@ do
             end
         end
     end
-
-    local function rd_fullCollideOn(inst)
+    local function fullCollideOn(inst)
         if not inst then return end
         if inst:IsA("BasePart") and not inst.CanCollide then
             pcall(function() inst.CanCollide = true end)
@@ -3301,10 +3101,10 @@ do
         end
     end
 
-    local function rd_startHold()
-        if rd_holdBP then pcall(function() rd_holdBP:Destroy() end) rd_holdBP = nil end
-        if rd_holdGyro then pcall(function() rd_holdGyro:Destroy() end) rd_holdGyro = nil end
-        local car = rd_myCar or rd_findMyCar()
+    local function startHold()
+        if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+        if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
+        local car = myCar or findMyCar()
         if not car then return end
         local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
         if not vs then return end
@@ -3312,56 +3112,49 @@ do
         local bp = Instance.new("BodyPosition")
         bp.Name = "RGHoldPos"
         bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        bp.P = 4000
-        bp.D = 300
+        bp.P = 4000; bp.D = 300
         bp.Position = curCF.Position
         bp.Parent = vs
-        rd_holdBP = bp
-        local flatRot = rd_flatYawCFrame(curCF)
+        holdBP = bp
+        local flatRot = flatYawCFrame(curCF)
         local bg = Instance.new("BodyGyro")
         bg.Name = "RGHoldGyro"
         bg.MaxTorque = Vector3.new(3e5, 3e5, 3e5)
-        bg.P = 8000
-        bg.D = 1000
+        bg.P = 8000; bg.D = 1000
         bg.CFrame = flatRot
         bg.Parent = vs
-        rd_holdGyro = bg
-        rd_holdActive = true
+        holdGyro = bg
+        holdActive = true
         task.spawn(function()
-            while rd_holdActive and rd_holdBP == bp and bp.Parent do
+            while holdActive and holdBP == bp and bp.Parent do
                 bp.Position = curCF.Position
-                if rd_holdGyro == bg and bg.Parent then
-                    bg.CFrame = flatRot
-                end
+                if holdGyro == bg and bg.Parent then bg.CFrame = flatRot end
                 task.wait(0.1)
             end
         end)
     end
-
-    local function rd_stopHold()
-        rd_holdActive = false
-        if rd_holdBP then pcall(function() rd_holdBP:Destroy() end) rd_holdBP = nil end
-        if rd_holdGyro then pcall(function() rd_holdGyro:Destroy() end) rd_holdGyro = nil end
+    local function stopHold()
+        holdActive = false
+        if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
+        if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
     end
 
-    local function rd_getDriveSeat(car)
+    local function getDriveSeat(car)
         if not car then return nil end
         for _, d in ipairs(car:GetDescendants()) do
             if d:IsA("VehicleSeat") then
                 local n = d.Name:lower()
-                if n:find("drive") or n:find("driver") then
-                    return d
-                end
+                if n:find("drive") or n:find("driver") then return d end
             end
         end
         return car:FindFirstChildWhichIsA("VehicleSeat", true)
     end
 
-    local function rd_forceSeat()
-        local h = rd_hum()
-        local car = rd_myCar or rd_findMyCar()
+    local function forceSeat()
+        local h = hum()
+        local car = myCar or findMyCar()
         if not h or not car then return false end
-        local vs = rd_getDriveSeat(car)
+        local vs = getDriveSeat(car)
         if not vs then return false end
         if h.Sit and h.SeatPart == vs then
             pcall(function() h.AutoRotate = false end)
@@ -3386,10 +3179,10 @@ do
                 if ok then table.insert(disabledList, d) end
             end
         end
-        local hrp = rd_root()
+        local hrp = root()
         if hrp then
             pcall(function() hrp.CFrame = vs.CFrame end)
-            task.wait(RD_SEAT_DELAY)
+            task.wait(SEAT_DELAY)
         end
         pcall(function() vs:Sit(h) end)
         task.wait(0.12)
@@ -3397,7 +3190,7 @@ do
         pcall(function() h.Sit = true end)
         for i = 1, 3 do
             if h.Sit and h.SeatPart == vs then break end
-            local hrpR = rd_root()
+            local hrpR = root()
             if hrpR then
                 pcall(function() hrpR.CFrame = vs.CFrame end)
                 task.wait(0.1)
@@ -3416,53 +3209,82 @@ do
         return h.Sit and h.SeatPart == vs
     end
 
-    local function rd_seatCar(timeout)
+    task.spawn(function()
+        while true do
+            task.wait(0.15)
+            if enabled then
+                local h = hum()
+                local car = myCar or findMyCar()
+                if h and car then
+                    local vs = getDriveSeat(car)
+                    if vs then
+                        local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
+                        local notSeated = not h.Sit
+                        if wrongSeat then
+                            setRgStatus("⚠ Ngồi sai ghế — nhảy ra ngồi lại")
+                            pcall(function() h.Sit = false end)
+                            task.wait(0.25)
+                            for _ = 1, 6 do
+                                if forceSeat() then break end
+                                task.wait(0.25)
+                            end
+                        elseif notSeated and not flying then
+                            forceSeat()
+                        end
+                        pcall(function() h.AutoRotate = false end)
+                    end
+                end
+            end
+        end
+    end)
+
+    local function seatCar(timeout)
         timeout = timeout or 15
         local deadline = os.clock() + timeout
-        while os.clock() < deadline and rd_enabled do
-            local h = rd_hum()
-            local car = rd_findMyCar()
+        while os.clock() < deadline and enabled do
+            local h = hum()
+            local car = findMyCar()
             if h and car then
-                local vs = rd_getDriveSeat(car)
+                local vs = getDriveSeat(car)
                 if h.Sit and h.SeatPart == vs then
-                    rd_myCar = car
+                    myCar = car
                     pcall(function() h.AutoRotate = false end)
                     return true
                 end
-                rd_forceSeat()
+                forceSeat()
             end
             task.wait(0.4)
         end
         return false
     end
 
-    local function rd_ascendToGround(car, target, targetFloor)
+    local function ascendToGround(car, target, targetFloor)
         if not car then return end
-        local realFloor = rd_floorBelow(target) or targetFloor
-        local upTargetY = realFloor + RD_LAND_OFFSET
+        local realFloor = floorBelow(target) or targetFloor
+        local upTargetY = realFloor + LAND_OFFSET
         local cp = car:GetPivot()
-        local flatRot = rd_flatYawCFrame(cp)
+        local flatRot = flatYawCFrame(cp)
         local dest = Vector3.new(target.X, upTargetY, target.Z)
         pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
         task.wait(0.15)
     end
 
-    local function rd_flyTo(target, flyingLabel)
+    local function flyTo(target, flyingLabel)
         flyingLabel = flyingLabel or "bay"
-        rd_stopHold()
-        local h = rd_hum()
-        local car = rd_myCar or rd_findMyCar()
+        stopHold()
+        local h = hum()
+        local car = myCar or findMyCar()
         if not h or not car then return false end
-        if not h.Sit then rd_forceSeat(); task.wait(0.1) end
+        if not h.Sit then forceSeat(); task.wait(0.1) end
         pcall(function() h.AutoRotate = false end)
-        local myChar = rd_char()
-        local targetFloor = rd_floorBelow(target) or target.Y
-        local underY = targetFloor - RD_UNDERGROUND_DEPTH
-        rd_setStatus("◦ Chuẩn bị")
-        rd_unanchorCar(car)
+        local myChar = char()
+        local targetFloor = floorBelow(target) or target.Y
+        local underY = targetFloor - UNDERGROUND_DEPTH
+        setRgStatus("◦ Chuẩn bị")
+        unanchorCar(car)
         task.wait(0.05)
-        rd_claimNetworkOwner(car)
-        rd_attachNpcFollowers(car)
+        claimNetworkOwner(car)
+        attachNpcFollowers(car)
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then
                 pcall(function() p.CanCollide = false end)
@@ -3475,50 +3297,40 @@ do
                 end
             end
         end
-        rd_flying = true
+        flying = true
         local flyStart = os.clock()
         local startPivot = car:GetPivot()
-        local rotOnly = rd_flatYawCFrame(startPivot)
+        local rotOnly = flatYawCFrame(startPivot)
         local curPos = startPivot.Position
-        local downStepY = (underY - curPos.Y) / RD_UNDER_DESCEND
-        for i = 1, RD_UNDER_DESCEND do
+        local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
+        for i = 1, UNDER_DESCEND_STEPS do
             curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
             local cf = CFrame.new(curPos) * rotOnly
             pcall(function() car:PivotTo(cf) end)
-            task.wait(RD_UNDER_STEP_TIME)
+            task.wait(UNDER_STEP_TIME)
         end
-        rd_setStatus("◦ " .. flyingLabel)
+        setRgStatus("◦ " .. flyingLabel)
         local reached = false
         local timedOut = false
         local lastNpcRefresh = 0
         local fakeVelCounter = 0
-        while rd_enabled do
-            local c = rd_myCar or rd_findMyCar()
+        while enabled do
+            local c = myCar or findMyCar()
             if not c then break end
-            if os.clock() - flyStart > RD_FLY_TIMEOUT then
+            if os.clock() - flyStart > FLY_TIMEOUT then
                 timedOut = true
                 break
             end
             local curP = c:GetPivot().Position
             local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
             local dist = flat.Magnitude
-            if dist < RD_ARRIVE_DIST then
-                reached = true
-                break
-            end
+            if dist < ARRIVE_DIST then reached = true; break end
             local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
             local spd
-            if dist >= RD_DECEL_DIST then
-                spd = RD_STEP_DIST
-            else
-                spd = math.max(RD_STEP_DIST * dist / RD_DECEL_DIST, 6)
-            end
-            local step = math.min(spd * RD_TICK, dist, RD_UNDER_STEP_MAX)
-            local nextPos = Vector3.new(
-                curP.X + dir.X * step,
-                underY,
-                curP.Z + dir.Z * step
-            )
+            if dist >= DECEL_DIST then spd = STEP_DIST
+            else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
+            local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+            local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
             pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
             fakeVelCounter = fakeVelCounter + 1
             if fakeVelCounter >= 2 then
@@ -3532,55 +3344,52 @@ do
             end
             if os.clock() - lastNpcRefresh > 0.05 then
                 lastNpcRefresh = os.clock()
-                rd_updateNpcFollowers()
+                updateNpcFollowers()
             end
-            task.wait(RD_TICK)
+            task.wait(TICK)
         end
         if timedOut then
-            rd_flying = false
-            rd_detachNpcFollowers()
-            rd_setStatus("⚠ Bay quá 30s — hủy")
+            flying = false
+            detachNpcFollowers()
+            setRgStatus("⚠ Bay quá 30s — hủy")
             return false
         end
-        car = rd_myCar or rd_findMyCar()
+        car = myCar or findMyCar()
         if car and reached then
-            rd_ascendToGround(car, target, targetFloor)
-            rd_myCar = car
-            rd_startHold()
-            pcall(function() rd_hum().AutoRotate = false end)
+            ascendToGround(car, target, targetFloor)
+            myCar = car
+            startHold()
+            pcall(function() hum().AutoRotate = false end)
         end
-        rd_detachNpcFollowers()
-        rd_flying = false
-        if not h.Sit then rd_forceSeat() end
+        detachNpcFollowers()
+        flying = false
+        if not h.Sit then forceSeat() end
         task.wait(0.1)
-        local h2 = rd_hum()
-        if not h2 or not h2.Sit then
-            rd_forceSeat()
-            task.wait(0.2)
-        end
+        local h2 = hum()
+        if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
         task.wait(0.15)
         return reached
     end
 
-    local function rd_spawnAndSeat()
-        if not rd_SpawnCarEv then return false end
-        if not rd_selectedCar or rd_selectedCar == "" then
-            rd_setStatus("⚠ Chưa chọn xe")
+    local function spawnAndSeat()
+        if not SpawnCarEv then return false end
+        if not selectedCar or selectedCar == "" then
+            setRgStatus("⚠ Chưa chọn xe")
             return false
         end
-        local car = rd_findMyCar()
+        local car = findMyCar()
         if car and car:FindFirstChildWhichIsA("BasePart", true) then
-            rd_setStatus("◦ Xe đã có sẵn")
-            if rd_seatCar(10) then
-                rd_setStatus("◦ Sẵn sàng")
+            setRgStatus("◦ Xe đã có sẵn")
+            if seatCar(10) then
+                setRgStatus("◦ Sẵn sàng")
                 return true
             end
         end
-        rd_setStatus("◦ Đang spawn xe")
-        rd_fire(rd_SpawnCarEv, rd_selectedCar)
+        setRgStatus("◦ Đang spawn xe")
+        fire(SpawnCarEv, selectedCar)
         local deadline = os.clock() + 20
-        while os.clock() < deadline and rd_enabled do
-            car = rd_findMyCar()
+        while os.clock() < deadline and enabled do
+            car = findMyCar()
             if car and car:FindFirstChildWhichIsA("BasePart", true) then
                 local r = car.PrimaryPart or car:FindFirstChildWhichIsA("BasePart", true)
                 if r and r.AssemblyLinearVelocity.Magnitude < 5 then break end
@@ -3588,78 +3397,76 @@ do
             task.wait(0.5)
         end
         if not car then
-            rd_setStatus("⚠ Xe chưa hiện")
+            setRgStatus("⚠ Xe chưa hiện")
             return false
         end
         task.wait(1.5)
         local pivot = car:GetPivot()
-        local flatRot = rd_flatYawCFrame(pivot)
+        local flatRot = flatYawCFrame(pivot)
         pcall(function() car:PivotTo(CFrame.new(pivot.Position) * flatRot) end)
         task.wait(0.1)
-        if rd_seatCar(15) then
-            rd_setStatus("◦ Sẵn sàng")
+        if seatCar(15) then
+            setRgStatus("◦ Sẵn sàng")
             task.wait(1)
             return true
         end
-        rd_setStatus("⚠ Ngồi ghế thất bại")
+        setRgStatus("⚠ Ngồi ghế thất bại")
         return false
     end
 
-    local function rd_resetCharacter()
-        rd_setStatus("◦ Reset nhân vật")
-        local h = rd_hum()
-        if h then
-            pcall(function() h.Health = 0 end)
-        end
+    local function resetCharacter()
+        setRgStatus("◦ Reset nhân vật")
+        local h = hum()
+        if h then pcall(function() h.Health = 0 end) end
         local deadline = os.clock() + 8
         while os.clock() < deadline do
-            local newH = rd_hum()
+            local newH = hum()
             if newH and newH.Health > 0 then break end
             task.wait(0.3)
         end
         task.wait(0.5)
     end
 
-    local function rd_doFullInit()
-        rd_setStatus("◦ Lần đầu — đổi nghề")
-        rd_fire(rd_TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
+    local function doFullInit()
+        setRgStatus("◦ Lần đầu — đổi nghề")
+        fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
         task.wait(3)
-        rd_setStatus("◦ Spawn xe")
-        if not rd_spawnAndSeat() then return false end
-        rd_myCar = rd_findMyCar()
-        rd_setStatus("◦ Bật online")
-        rd_fire(rd_TaxiEvent, "GoOnline")
+        setRgStatus("◦ Spawn xe")
+        if not spawnAndSeat() then return false end
+        myCar = findMyCar()
+        setRgStatus("◦ Bật online")
+        fire(TaxiEvent, "GoOnline")
         task.wait(2)
-        rd_hasInitOnce = true
-        rd_setStatus("◦ Sẵn sàng nhận đơn")
+        hasInitOnce = true
+        setRgStatus("◦ Sẵn sàng nhận đơn")
         return true
     end
 
-    local function rd_doRestartInit()
-        rd_resetCharacter()
+    local function doRestartInit()
+        resetCharacter()
         task.wait(0.5)
-        rd_setStatus("◦ Spawn xe")
-        if not rd_spawnAndSeat() then return false end
-        rd_myCar = rd_findMyCar()
-        rd_setStatus("◦ Tắt online")
-        rd_fire(rd_TaxiEvent, "GoOffline")
+        setRgStatus("◦ Spawn xe")
+        if not spawnAndSeat() then return false end
+        myCar = findMyCar()
+        setRgStatus("◦ Tắt online")
+        fire(TaxiEvent, "GoOffline")
         task.wait(1)
-        rd_setStatus("◦ Bật lại online")
-        rd_fire(rd_TaxiEvent, "GoOnline")
+        setRgStatus("◦ Bật lại online")
+        fire(TaxiEvent, "GoOnline")
         task.wait(2)
-        rd_setStatus("◦ Sẵn sàng nhận đơn")
+        setRgStatus("◦ Sẵn sàng nhận đơn")
         return true
     end
 
-    local function rd_recoverFromTimeout()
-        rd_enabled = false
-        rd_acceptingOrder = false
-        rd_flying = false
-        rd_detachNpcFollowers()
-        rd_stopHold()
-        local car = rd_myCar or rd_findMyCar()
+    local function recoverFromTimeout()
+        enabled = false
+        acceptingOrder = false
+        flying = false
+        detachNpcFollowers()
+        stopHold()
+        local car = myCar or findMyCar()
         if car then
-            rd_unanchorCar(car)
+            unanchorCar(car)
             for _, p in ipairs(car:GetDescendants()) do
                 if p:IsA("BasePart") then
                     pcall(function() p.CanCollide = true end)
@@ -3667,359 +3474,269 @@ do
                 end
             end
         end
-        local c = rd_char()
-        if c then rd_fullCollideOn(c) end
-        rd_orderToken = nil
-        rd_pickupPos = nil
-        rd_dropPos = nil
-        rd_pendingFare = 0
-        rd_myCar = nil
-        rd_resetCharacter()
-        rd_enabled = true
-        rd_farmStart = os.clock()
-        rd_fire(rd_TaxiEvent, "GoOffline")
+        local c = char()
+        if c then fullCollideOn(c) end
+        resetState()
+        resetCharacter()
+        enabled = true
+        farmStartTime = os.time()
+        fire(TaxiEvent, "GoOffline")
         task.wait(1)
-        rd_fire(rd_TaxiEvent, "GoOnline")
+        fire(TaxiEvent, "GoOnline")
         task.wait(1)
-        rd_setStatus("◦ Đã khôi phục — chờ đơn")
+        setRgStatus("◦ Đã khôi phục — chờ đơn")
     end
 
-    local function rd_runTrip()
-        local h = rd_hum()
+    local function runTrip()
+        local h = hum()
         if not h or not h.Sit then
-            rd_setStatus("⚠ Hồi sinh xe")
-            if not rd_spawnAndSeat() then task.wait(5); return end
+            setRgStatus("⚠ Hồi sinh xe")
+            if not spawnAndSeat() then task.wait(5); return end
         end
-        rd_myCar = rd_findMyCar()
+        myCar = findMyCar()
         pcall(function() h.AutoRotate = false end)
-        rd_startHold()
-        if not rd_pickupPos then
-            rd_orderToken = nil
-            rd_dropPos = nil
-            rd_pendingFare = 0
-            rd_acceptingOrder = true
-            rd_setStatus("◦ Chờ đơn")
-            local deadline = os.clock() + RD_ORDER_TIMEOUT
-            while os.clock() < deadline and rd_enabled do
-                if rd_pickupPos then break end
-                if not rd_holdActive then rd_startHold() end
+        startHold()
+        if not pickupPos then
+            orderToken = nil
+            dropPos = nil
+            pendingFare = 0
+            acceptingOrder = true
+            setRgStatus("◦ Chờ đơn")
+            local deadline = os.clock() + ORDER_TIMEOUT
+            while os.clock() < deadline and enabled do
+                if pickupPos then break end
+                if not holdActive then startHold() end
                 task.wait(0.4)
             end
-            rd_acceptingOrder = false
-            if not rd_pickupPos then
-                rd_setStatus("⚠ Không có đơn")
+            acceptingOrder = false
+            if not pickupPos then
+                setRgStatus("⚠ Không có đơn")
                 return
             end
         else
-            rd_acceptingOrder = false
-            rd_setStatus("◦ Đã có đơn — bay luôn")
+            acceptingOrder = false
+            setRgStatus("◦ Đã có đơn — bay luôn")
         end
-        local ok1 = rd_flyTo(rd_pickupPos, "đón khách")
+        local ok1 = flyTo(pickupPos, "đón khách")
         if not ok1 then
-            rd_recoverFromTimeout()
+            recoverFromTimeout()
             return
         end
-        rd_setStatus("◦ Đã tới")
-        rd_forceSeat()
-        rd_setStatus("⌛ Đợi khách lên xe (4s)")
-        task.wait(RD_PICKUP_WAIT)
-        if rd_dropPos then
-            local ok2 = rd_flyTo(rd_dropPos, "đưa khách tới nơi")
+        setRgStatus("◦ Đã tới")
+        forceSeat()
+        setRgStatus("⌛ Đợi khách lên xe (4s)")
+        task.wait(PICKUP_WAIT)
+        if dropPos then
+            local ok2 = flyTo(dropPos, "đưa khách tới nơi")
             if not ok2 then
-                rd_recoverFromTimeout()
+                recoverFromTimeout()
                 return
             end
-            rd_setStatus("◦ Đã tới")
-            rd_forceSeat()
-            rd_setStatus("⌛ Đợi khách xuống xe (5s)")
-            task.wait(RD_DROP_WAIT)
-            rd_stats.trips = rd_stats.trips + 1
-            if rd_pendingFare > 0 then
-                rd_stats.earn = rd_stats.earn + rd_pendingFare
-            end
-            rd_setStatus("✓ Hoàn thành + Rp " .. fmtMoney(rd_pendingFare))
-            refreshStatPanel()
-            task.wait(RD_ACK_DELAY)
-            rd_fire(rd_TaxiEvent, "AckTripComplete")
-            rd_setStatus("✓ Đã báo hoàn thành — chờ đơn mới")
-            rd_pendingFare = 0
-            if rd_stats.trips > 0 and rd_stats.trips % RD_TRIP_MILESTONE == 0 and rd_stats.trips ~= rd_lastMilestone then
-                rd_lastMilestone = rd_stats.trips
-                rd_pickupPos = nil
-                rd_dropPos = nil
-                rd_orderToken = nil
-                rd_setStatus("◦ Đủ " .. RD_TRIP_MILESTONE .. " chuyến — tắt/mở lại online")
-                rd_fire(rd_TaxiEvent, "GoOffline")
+            setRgStatus("◦ Đã tới")
+            forceSeat()
+            setRgStatus("⌛ Đợi khách xuống xe (5s)")
+            task.wait(DROP_WAIT)
+            stats.trips = stats.trips + 1
+            if pendingFare > 0 then stats.earn = stats.earn + pendingFare end
+            setRgStatus("✓ Hoàn thành + Rp " .. formatMoney(pendingFare))
+            task.wait(ACK_DELAY)
+            fire(TaxiEvent, "AckTripComplete")
+            setRgStatus("✓ Đã báo hoàn thành — chờ đơn mới")
+            pendingFare = 0
+            if stats.trips > 0 and stats.trips % TRIP_MILESTONE == 0 and stats.trips ~= lastMilestone then
+                lastMilestone = stats.trips
+                pickupPos = nil
+                dropPos = nil
+                orderToken = nil
+                setRgStatus("◦ Đủ " .. TRIP_MILESTONE .. " chuyến — tắt/mở lại online")
+                fire(TaxiEvent, "GoOffline")
                 task.wait(2)
-                rd_fire(rd_TaxiEvent, "GoOnline")
-                rd_acceptingOrder = true
+                fire(TaxiEvent, "GoOnline")
+                acceptingOrder = true
                 task.wait(1.5)
-                rd_setStatus("◦ Đã mở lại online")
+                setRgStatus("◦ Đã mở lại online")
                 return
             end
         end
-        rd_pickupPos = nil
-        rd_dropPos = nil
-        rd_orderToken = nil
+        pickupPos = nil
+        dropPos = nil
+        orderToken = nil
         task.wait(0.3)
     end
 
-    local rd_loopBusy = false
-    local function rd_startLoop()
-        if rd_loopBusy then return end
-        rd_loopBusy = true
+    local loopBusy = false
+    local function startLoop()
+        if loopBusy then return end
+        loopBusy = true
         task.spawn(function()
-            rd_farmStart = os.clock()
+            farmStartTime = os.time()
+            ridegoStartTime = os.clock()
             local ok
-            if not rd_hasInitOnce then
-                ok = pcall(rd_doFullInit)
-            else
-                ok = pcall(rd_doRestartInit)
-            end
-            rd_initialized = ok
-            if not rd_initialized then
-                rd_loopBusy = false
-                rd_setStatus("⚠ Khởi tạo thất bại")
+            if not hasInitOnce then ok = pcall(doFullInit)
+            else ok = pcall(doRestartInit) end
+            initialized = ok
+            if not initialized then
+                loopBusy = false
+                setRgStatus("⚠ Khởi tạo thất bại")
                 return
             end
-            while rd_enabled do
-                local ok2, err = pcall(rd_runTrip)
-                if not ok2 then rd_setStatus("⚠ Lỗi: " .. tostring(err):sub(1, 40)) end
+            while enabled do
+                local ok2, err = pcall(runTrip)
+                if not ok2 then setRgStatus("⚠ Lỗi: " .. tostring(err):sub(1, 40)) end
                 task.wait(1)
             end
-            rd_loopBusy = false
-            rd_setStatus("◦ TẮT")
+            loopBusy = false
+            setRgStatus("◦ TẮT")
         end)
     end
 
-    -- Car select dialog (dùng ScrollingFrame riêng)
-    local carDialog = Instance.new("Frame", ScreenGui)
-    carDialog.Size = UDim2.new(0, 260, 0, 260)
-    carDialog.Position = UDim2.new(0.5, -130, 0.5, -130)
-    carDialog.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-    carDialog.BackgroundTransparency = 0.1
-    carDialog.BorderSizePixel = 0
-    carDialog.Visible = false
-    carDialog.ZIndex = 30
-    carDialog.Parent = ScreenGui
-    Instance.new("UICorner", carDialog).CornerRadius = UDim.new(0, 10)
-    local cdStroke = Instance.new("UIStroke", carDialog)
-    cdStroke.Color = Color3.fromRGB(255, 140, 40)
-    cdStroke.Thickness = 1.5
-    local cdTitle = Instance.new("TextLabel", carDialog)
-    cdTitle.Size = UDim2.new(1, -40, 0, 28)
-    cdTitle.Position = UDim2.new(0, 10, 0, 4)
-    cdTitle.BackgroundTransparency = 1
-    cdTitle.Text = "🚗 CHỌN XE"
-    cdTitle.TextColor3 = Color3.fromRGB(255, 200, 80)
-    cdTitle.TextSize = 12
-    cdTitle.Font = Enum.Font.GothamBold
-    cdTitle.TextXAlignment = Enum.TextXAlignment.Left
-    cdTitle.ZIndex = 31
-    makeHeaderDraggable(cdTitle, carDialog)
-    local cdClose = Instance.new("TextButton", carDialog)
-    cdClose.Size = UDim2.new(0, 24, 0, 24)
-    cdClose.Position = UDim2.new(1, -30, 0, 6)
-    cdClose.BackgroundTransparency = 1
-    cdClose.Text = "✕"
-    cdClose.TextColor3 = Color3.fromRGB(200, 200, 200)
-    cdClose.TextSize = 13
-    cdClose.Font = Enum.Font.GothamBold
-    cdClose.ZIndex = 31
-    cdClose.Parent = carDialog
-    local cdScroll = Instance.new("ScrollingFrame", carDialog)
-    cdScroll.Size = UDim2.new(1, -20, 1, -44)
-    cdScroll.Position = UDim2.new(0, 10, 0, 36)
-    cdScroll.BackgroundColor3 = Color3.fromRGB(8, 12, 20)
-    cdScroll.BackgroundTransparency = 0.15
-    cdScroll.BorderSizePixel = 0
-    cdScroll.ScrollBarThickness = 4
-    cdScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    cdScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    cdScroll.ZIndex = 31
-    Instance.new("UICorner", cdScroll).CornerRadius = UDim.new(0, 6)
-    local cdList = Instance.new("UIListLayout", cdScroll)
-    cdList.Padding = UDim.new(0, 4)
-    cdList.SortOrder = Enum.SortOrder.LayoutOrder
-    local cdPad = Instance.new("UIPadding", cdScroll)
-    cdPad.PaddingTop = UDim.new(0, 6)
-    cdPad.PaddingLeft = UDim.new(0, 6)
-    cdPad.PaddingRight = UDim.new(0, 6)
-    cdPad.PaddingBottom = UDim.new(0, 6)
+    -- ============ RIDEGO STATUS PANEL (floating, giu nguyen) ============
+    ridegoStatusFrame = Instance.new("Frame")
+    ridegoStatusFrame.Size = UDim2.new(0, 250, 0, 148)
+    ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 210)
+    ridegoStatusFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
+    ridegoStatusFrame.BackgroundTransparency = 0.15
+    ridegoStatusFrame.BorderSizePixel = 0
+    ridegoStatusFrame.Active = true
+    ridegoStatusFrame.Draggable = true
+    ridegoStatusFrame.Visible = false
+    ridegoStatusFrame.ZIndex = 5
+    ridegoStatusFrame.Parent = ScreenGui
+    Instance.new("UICorner", ridegoStatusFrame).CornerRadius = UDim.new(0, 10)
+    local rgStroke = Instance.new("UIStroke", ridegoStatusFrame)
+    rgStroke.Name = "RainbowBorder"
+    rgStroke.Thickness = 2
+    rgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    rgStroke.Color = Color3.fromRGB(255, 140, 40)
 
-    local function rd_updateCarUI()
-        if ridegoCarNameLbl then
-            if rd_selectedCar ~= "" then
-                ridegoCarNameLbl.Text = "🚗 Xe: " .. rd_selectedCar
-            else
-                ridegoCarNameLbl.Text = "🚗 Xe: (chưa chọn)"
+    task.spawn(function()
+        local t = 0
+        while true do
+            task.wait(0.03)
+            t = t + 0.15
+            if rgStroke and rgStroke.Parent then
+                rgStroke.Color = rainbowAt(t)
             end
         end
-        if ridegoCarBtn then
-            ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #rd_carList .. ")"
-        end
-        if activeMode == "ridego" then
-            refreshStatPanel()
-        end
+    end)
+
+    local rgTitle = Instance.new("TextLabel", ridegoStatusFrame)
+    rgTitle.Size = UDim2.new(1, -20, 0, 24)
+    rgTitle.Position = UDim2.new(0, 10, 0, 4)
+    rgTitle.BackgroundTransparency = 1
+    rgTitle.Text = "🚕 RideGo Status"
+    rgTitle.TextColor3 = Color3.fromRGB(255, 140, 40)
+    rgTitle.TextSize = 13
+    rgTitle.Font = Enum.Font.GothamBold
+    rgTitle.TextXAlignment = Enum.TextXAlignment.Left
+    rgTitle.ZIndex = 7
+
+    local function rgLabel(y, color)
+        local l = Instance.new("TextLabel", ridegoStatusFrame)
+        l.Size = UDim2.new(1, -20, 0, 18)
+        l.Position = UDim2.new(0, 10, 0, y)
+        l.BackgroundTransparency = 1
+        l.Text = ""
+        l.TextColor3 = color or Color3.fromRGB(200, 220, 240)
+        l.TextSize = 11
+        l.Font = Enum.Font.GothamMedium
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.TextTruncate = Enum.TextTruncate.AtEnd
+        l.ZIndex = 7
+        return l
     end
 
-    local function rd_renderCarDialog()
-        for _, c in ipairs(cdScroll:GetChildren()) do
-            if c:IsA("GuiObject") then c:Destroy() end
+    ridegoTimeLbl   = rgLabel(32, Color3.fromRGB(200, 220, 240))
+    ridegoTripsLbl  = rgLabel(50, Color3.fromRGB(200, 220, 240))
+    ridegoEarnLbl   = rgLabel(68, Color3.fromRGB(200, 220, 240))
+    ridegoCarLbl    = rgLabel(86, Color3.fromRGB(200, 220, 240))
+    ridegoStatusLbl = rgLabel(110, Color3.fromRGB(200, 220, 240))
+    ridegoCarLbl.Text = "🚗 Xe: (chưa chọn)"
+
+    task.spawn(function()
+        while true do
+            task.wait(0.3)
+            if enabled then
+                local sec = os.time() - farmStartTime
+                ridegoTimeLbl.Text  = "⏱ Thời gian: " .. formatTime(sec)
+                ridegoTripsLbl.Text = "🚕 Chuyến: " .. tostring(stats.trips)
+                ridegoEarnLbl.Text  = "💰 Kiếm: Rp " .. formatMoney(stats.earn)
+                ridegoCarLbl.Text   = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
+                ridegoStatusLbl.Text = "📍 " .. curStatus
+            end
         end
-        cdScroll.CanvasSize = UDim2.new(0, 0, 0, #rd_carList * 32 + 12)
-        if #rd_carList == 0 then
-            local lbl = Instance.new("TextLabel", cdScroll)
-            lbl.Size = UDim2.new(1, -12, 0, 40)
-            lbl.BackgroundTransparency = 1
-            lbl.Text = "Chưa quét xe — bật farm để load"
-            lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
-            lbl.TextSize = 10
-            lbl.Font = Enum.Font.GothamMedium
-            lbl.ZIndex = 32
+    end)
+
+    -- Init scan cars (delay 2s de game load)
+    task.spawn(function()
+        task.wait(2)
+        pcall(scanCars)
+        if #carList > 0 and (not selectedCar or selectedCar == "") then
+            selectedCar = carList[1]
+            ridegoSelectedCar = selectedCar
+        end
+        if ridegoRenderCars then ridegoRenderCars() end
+        if ridegoCarLbl then
+            ridegoCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
+        end
+    end)
+
+    -- ============ RIDEGO FARM SWITCH ============
+    local function stopRidego()
+        enabled = false
+        acceptingOrder = false
+        flying = false
+        resetState()
+        detachNpcFollowers()
+        stopHold()
+        local car = myCar or findMyCar()
+        if car then
+            unanchorCar(car)
+            for _, p in ipairs(car:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.CanCollide = true end)
+                    pcall(function() p.Anchored = false end)
+                end
+            end
+        end
+        local c = char()
+        if c then fullCollideOn(c) end
+        if writefile then pcall(writefile, "ridegoState.txt", "0") end
+        ridegoStatusFrame.Visible = false
+        ridegoSwitch.set(false)
+        setRgStatus("◦ TẮT")
+        task.spawn(function() resetCharacter() end)
+    end
+
+    ridegoSwitch.track.MouseButton1Click:Connect(function()
+        if enabled then
+            stopRidego()
             return
         end
-        for i, name in ipairs(rd_carList) do
-            local btn = Instance.new("TextButton", cdScroll)
-            btn.Size = UDim2.new(1, -12, 0, 28)
-            btn.BackgroundColor3 = (name == rd_selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
-            btn.Text = "  " .. name
-            btn.TextColor3 = Color3.fromRGB(220, 230, 240)
-            btn.TextSize = 10
-            btn.Font = Enum.Font.Code
-            btn.TextXAlignment = Enum.TextXAlignment.Left
-            btn.TextTruncate = Enum.TextTruncate.AtEnd
-            btn.LayoutOrder = i
-            btn.ZIndex = 32
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-            btn.MouseButton1Click:Connect(function()
-                rd_selectedCar = name
-                if writefile then pcall(writefile, "ridegoCar.txt", name) end
-                rd_updateCarUI()
-                rd_renderCarDialog()
-                carDialog.Visible = false
-            end)
-        end
-    end
-
-    cdClose.MouseButton1Click:Connect(function()
-        carDialog.Visible = false
-    end)
-
-    if ridegoCarBtn then
-        ridegoCarBtn.MouseButton1Click:Connect(function()
-            if rd_enabled then return end
-            rd_scanCars()
-            rd_renderCarDialog()
-            carDialog.Visible = not carDialog.Visible
-        end)
-    end
-
-    -- RideGo switch toggle
-    ridegoSwitch.track.MouseButton1Click:Connect(function()
-        if rd_enabled then
-            -- STOP
-            rd_enabled = false
-            rd_acceptingOrder = false
-            rd_flying = false
-            rd_stopHold()
-            rd_detachNpcFollowers()
-            local car = rd_myCar or rd_findMyCar()
-            if car then
-                rd_unanchorCar(car)
-                for _, p in ipairs(car:GetDescendants()) do
-                    if p:IsA("BasePart") then
-                        pcall(function() p.CanCollide = true end)
-                        pcall(function() p.Anchored = false end)
-                    end
-                end
-            end
-            local c = rd_char()
-            if c then rd_fullCollideOn(c) end
-            rd_orderToken = nil
-            rd_pickupPos = nil
-            rd_dropPos = nil
-            rd_pendingFare = 0
-            rd_myCar = nil
-            rd_curStatus = "◦ TẮT"
-            if activeMode == "ridego" then
-                activeMode = nil
-                statPanel.Visible = false
-            end
-            ridegoSwitch.set(false)
-            if writefile then pcall(writefile, "ridegoState.txt", "0") end
-            task.spawn(function() rd_resetCharacter() end)
-        else
-            -- START
-            if not rd_selectedCar or rd_selectedCar == "" then
-                if ridegoNote then
-                    ridegoNote.Text = "⚠ Chọn xe trước khi bật"
-                    task.delay(3, function()
-                        if ridegoNote then ridegoNote.Text = "" end
-                    end)
-                end
-                return
-            end
-            rd_orderToken = nil
-            rd_pickupPos = nil
-            rd_dropPos = nil
-            rd_pendingFare = 0
-            rd_myCar = nil
-            rd_curStatus = "◦ TẮT"
-            rd_enabled = true
-            rd_farmStart = os.clock()
-            rd_stats.trips = 0
-            rd_stats.earn = 0
-            rd_lastMilestone = 0
-            activeMode = "ridego"
-            statPanel.Visible = true
-            refreshStatPanel()
-            ridegoSwitch.set(true)
-            if writefile then pcall(writefile, "ridegoState.txt", "1") end
-            if queue_on_teleport then
-                pcall(queue_on_teleport, [[
+        resetState()
+        enabled = true
+        farmStartTime = os.time()
+        ridegoStartTime = os.clock()
+        stats.trips = 0
+        stats.earn = 0
+        ridegoStatusFrame.Visible = true
+        if writefile then pcall(writefile, "ridegoState.txt", "1") end
+        if queue_on_teleport then
+            pcall(queue_on_teleport, [[
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()
 ]])
-            end
-            rd_scanCars()
-            rd_updateCarUI()
-            rd_startLoop()
         end
+        ridegoSwitch.set(true)
+        startLoop()
     end)
 
-    -- Load car từ file
-    if readfile and isfile and isfile("ridegoCar.txt") then
-        local ok, v = pcall(readfile, "ridegoCar.txt")
-        if ok and v and v ~= "" then
-            rd_selectedCar = v
-        end
-    end
-    rd_updateCarUI()
-
-    -- Auto resume khi vào game (nếu flag = 1)
-    task.spawn(function()
-        local wasRejoin = false
-        if readfile and isfile and isfile("lastRejoin.txt") then
-            local ok, v = pcall(readfile, "lastRejoin.txt")
-            if ok then
-                local t = tonumber(v) or 0
-                if t > 0 and os.time() - t < 120 then wasRejoin = true end
-            end
-        end
-        if not wasRejoin then return end
-        task.wait(20)
-        if readfile and isfile and isfile("ridegoState.txt") then
-            local ok, v = pcall(readfile, "ridegoState.txt")
-            if ok and v == "1" then
-                pcall(function()
-                    firesignal(ridegoSwitch.track.MouseButton1Click)
-                end)
-            end
-        end
-    end)
+    -- Expose stop cho auto-tat khi doi farm khac (neu muon)
+    _G._ridegoStop = stopRidego
 end
 
--- ============ NOI DAY CUOI + LED RGB NUT NOI ============
+-- ============================================================
+-- WIRING CUOI + LED + AUTO REJOIN
+-- ============================================================
 ToggleBtn.MouseButton1Click:Connect(function()
     HubFrame.Visible = not HubFrame.Visible
 end)
@@ -4034,7 +3751,6 @@ bodyOpenBtn.MouseButton1Click:Connect(function()
     if not bodyOn then
         ControlPanel.Visible = false
         BodyManagerFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-        strokeBodyFloat.Color = Color3.fromRGB(0, 230, 180)
     end
     bodyOpenBtn.Text = "🚗 DÀN ÁO: " .. (bodyOn and "ĐANG BẬT" or "ĐANG TẮT")
     bodyOpenBtn.BackgroundColor3 = bodyOn and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 30, 40)
@@ -4044,9 +3760,7 @@ local fcOn = false
 fcOpenBtn.MouseButton1Click:Connect(function()
     fcOn = not fcOn
     FreecamFloatingBtn.Visible = fcOn
-    if not fcOn then
-        freecamMenuFrame.Visible = false
-    end
+    if not fcOn then freecamMenuFrame.Visible = false end
     fcOpenBtn.Text = "📷 FREECAM: " .. (fcOn and "ĐANG BẬT" or "ĐANG TẮT")
     fcOpenBtn.BackgroundColor3 = fcOn and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(30, 30, 40)
 end)
@@ -4057,26 +3771,7 @@ addRGBStroke(BodyManagerFloatingBtn)
 addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 
--- Stat panel rainbow stroke (UIStroke muot)
-local statStroke = Instance.new("UIStroke")
-statStroke.Name = "RainbowBorder"
-statStroke.Thickness = 2
-statStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-statStroke.Transparency = 0
-statStroke.Parent = statPanel
-task.spawn(function()
-    local t = 0
-    while true do
-        t = t + 0.12
-        local pos = t % RN
-        local idx = math.floor(pos) + 1
-        local f = pos - (idx - 1)
-        statStroke.Color = RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
-        task.wait(0.03)
-    end
-end)
-
--- đọc state auto execute + auto rejoin
+-- Auto Execute + Auto Rejoin
 local _autoExecute = false
 local _autoRejoin = false
 if readfile and isfile then
@@ -4090,7 +3785,6 @@ if readfile and isfile then
     end
 end
 
--- Auto Rejoin
 if _autoRejoin then
     task.spawn(function()
         local lastAttempt = 0
@@ -4111,8 +3805,7 @@ if _autoRejoin then
                         for _, d in ipairs(cg:GetDescendants()) do
                             if d:IsA("TextLabel") then
                                 local t = d.Text
-                                if t == "Mất kết nối" or t:find("Disconnected")
-                                   or t == "Kết nối bị mất" then
+                                if t == "Mất kết nối" or t:find("Disconnected") or t == "Kết nối bị mất" then
                                     shouldRejoin = true
                                     return
                                 end
@@ -4122,12 +3815,8 @@ if _autoRejoin then
                 end
                 if shouldRejoin then
                     lastAttempt = os.time()
-                    if writefile then
-                        pcall(writefile, "lastRejoin.txt", tostring(lastAttempt))
-                    end
-                    pcall(function()
-                        game:GetService("TeleportService"):Teleport(game.PlaceId)
-                    end)
+                    if writefile then pcall(writefile, "lastRejoin.txt", tostring(lastAttempt)) end
+                    pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
                 end
             end
         end
@@ -4143,9 +3832,7 @@ task.spawn(function()
             if t > 0 and os.time() - t < 60 then wasRejoin = true end
         end
     end
-    if not wasRejoin then
-        return
-    end
+    if not wasRejoin then return end
     task.wait(15)
 
     local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -4155,47 +3842,32 @@ task.spawn(function()
         if not label then return false end
         local x = label.AbsolutePosition.X + label.AbsoluteSize.X / 2
         local y = label.AbsolutePosition.Y + label.AbsoluteSize.Y / 2
-        if pcall(function()
-            touchpress(x, y)
-            task.wait(0.1)
-            touchrelease(x, y)
-        end) then return true end
+        if pcall(function() touchpress(x, y); task.wait(0.1); touchrelease(x, y) end) then return true end
         local p = label.Parent
         if p and p:IsA("TextButton") then
             if pcall(function() firesignal(p.MouseButton1Click) end) then return true end
         end
         return false
     end
-
     local function findHomePlay()
         local menu = pg:FindFirstChild("mainMenuSystem")
         if not menu then return nil end
-        local base = menu:FindFirstChild("baseFrame")
-        if not base then return nil end
-        local home = base:FindFirstChild("homeFrame")
-        if not home then return nil end
+        local base = menu:FindFirstChild("baseFrame"); if not base then return nil end
+        local home = base:FindFirstChild("homeFrame"); if not home then return nil end
         for _, d in ipairs(home:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
-                return d
-            end
+            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then return d end
         end
         return nil
     end
-
     local function findTeamPlay()
         local menu = pg:FindFirstChild("mainMenuSystem")
         if not menu then return nil end
-        local base = menu:FindFirstChild("baseFrame")
-        if not base then return nil end
-        local play = base:FindFirstChild("playFrame")
-        if not play then return nil end
+        local base = menu:FindFirstChild("baseFrame"); if not base then return nil end
+        local play = base:FindFirstChild("playFrame"); if not play then return nil end
         for _, d in ipairs(play:GetDescendants()) do
             if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
                 local home = base:FindFirstChild("homeFrame")
-                if home and d:IsDescendantOf(home) then
-                else
-                    return d
-                end
+                if not (home and d:IsDescendantOf(home)) then return d end
             end
         end
         return nil
@@ -4222,24 +3894,21 @@ task.spawn(function()
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
     task.wait(10)
 
-    -- auto bật farm nếu flag = "1" — office HOẶC ridego
-    if readfile and isfile then
-        if isfile("farmState.txt") then
-            local ok, v = pcall(readfile, "farmState.txt")
-            if ok and v == "1" then
-                pcall(function()
-                    firesignal(farmSwitch.track.MouseButton1Click)
-                end)
-            end
-        end
-        if isfile("ridegoState.txt") then
-            local ok, v = pcall(readfile, "ridegoState.txt")
-            if ok and v == "1" then
-                task.wait(2)
-                pcall(function()
-                    firesignal(ridegoSwitch.track.MouseButton1Click)
-                end)
-            end
-        end
+    -- Auto bat farm (office HOAC ridego) neu flag = "1"
+    local officeFlag = false
+    local ridegoFlag = false
+    if readfile and isfile and isfile("farmState.txt") then
+        local ok, v = pcall(readfile, "farmState.txt")
+        if ok and v == "1" then officeFlag = true end
+    end
+    if readfile and isfile and isfile("ridegoState.txt") then
+        local ok, v = pcall(readfile, "ridegoState.txt")
+        if ok and v == "1" then ridegoFlag = true end
+    end
+    if officeFlag then
+        pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
+    end
+    if ridegoFlag then
+        pcall(function() firesignal(ridegoSwitch.track.MouseButton1Click) end)
     end
 end)
