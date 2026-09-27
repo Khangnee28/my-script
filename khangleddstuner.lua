@@ -2041,12 +2041,13 @@ do
             btn.LayoutOrder = i
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
             btn.MouseButton1Click:Connect(function()
-                selectedCar = name; ridegoSelectedCar = name
-                if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. name end
-                if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. name end
-                renderRidegoCars()
-                ridegoCarListPanel.Visible = false; ridegoCarOpen = false
-            end)
+    selectedCar = name; ridegoSelectedCar = name
+    if writefile then pcall(writefile, "ridegoCar.txt", name) end
+    if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. name end
+    if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. name end
+    renderRidegoCars()
+    ridegoCarListPanel.Visible = false; ridegoCarOpen = false
+end)
         end
         ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
     end
@@ -2721,7 +2722,7 @@ addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 
 -- ============================================================
--- AUTO REJOIN + POST-TELEPORT: đợi UI load → click CHƠI → vào game → bật farm
+-- AUTO REJOIN + POST-TELEPORT: 10s → CHƠI bước 1 → CHƠI bước 2 → 15s → farm
 -- ============================================================
 local _autoRejoin = false
 if readfile and isfile and isfile("autoRejoin.txt") then
@@ -2773,50 +2774,55 @@ task.spawn(function()
         local ok, v = pcall(readfile, "lastRejoin.txt")
         if ok then
             local t = tonumber(v) or 0
-            -- window 300s (5 phút cho loading)
             if t > 0 and os.time() - t < 300 then wasRejoin = true end
         end
     end
     if not wasRejoin then return end
 
-    -- ========== HELPER: click nút ==========
-    local function clickAt(lbl)
-        if not lbl then return false end
-        local x = lbl.AbsolutePosition.X + lbl.AbsoluteSize.X / 2
-        local y = lbl.AbsolutePosition.Y + lbl.AbsoluteSize.Y / 2
-        if pcall(function()
-            touchpress(x, y); task.wait(0.15); touchrelease(x, y)
-        end) then return true end
-        local p = lbl.Parent
-        if p and p:IsA("TextButton") then
-            if pcall(function() firesignal(p.MouseButton1Click) end) then return true end
-        end
-        return false
-    end
+    -- ========== WAIT 10s: cho menu chinh load UI ==========
+    task.wait(10)
 
-    -- ========== HELPER: tìm nút PLAY/CHƠI theo text ==========
-    local PLAY_TEXTS = { "CHƠI", "PLAY", "Chơi", "Play", "CHOI" }
+    local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not pg then
+        for _ = 1, 30 do
+            task.wait(1)
+            pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            if pg then break end
+        end
+    end
+    if not pg then return end
+
+    -- ========== HELPER ==========
+    local PLAY_TEXTS = { "CHƠI", "PLAY", "Chơi", "Play", "CHOI", "VÀO GAME", "BẮT ĐẦU" }
     local function textMatch(s)
-        if not s then return false end
+        if not s or s == "" then return false end
         for _, t in ipairs(PLAY_TEXTS) do
             if s == t or s:find(t, 1, true) then return true end
         end
         return false
     end
 
-    local function findPlayButton(root)
-        if not root then return nil end
+    -- tim nut PLAY tren toan bo PlayerGui (khong chi homeFrame)
+    -- loc theo vung: neu truyen `frame`, chi tim trong frame do
+    local function findPlayButton(frame)
+        local root = frame or pg
+        -- uu tien TextButton co Text = CHƠI
         for _, d in ipairs(root:GetDescendants()) do
-            if d:IsA("TextButton") or d:IsA("ImageButton") then
-                if d.Visible and d.AbsoluteSize.X > 0 then
-                    -- check text của button
-                    local txt = d:IsA("TextButton") and d.Text or nil
-                    if textMatch(txt) then return d end
-                    -- check text label con (nút có icon ▶ + TextLabel con "CHƠI")
-                    for _, c in ipairs(d:GetDescendants()) do
-                        if c:IsA("TextLabel") and c.Visible and textMatch(c.Text) then
-                            return d
-                        end
+            if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 0 then
+                if textMatch(d.Text) then return d end
+                for _, c in ipairs(d:GetDescendants()) do
+                    if c:IsA("TextLabel") and c.Visible and textMatch(c.Text) then
+                        return d
+                    end
+                end
+            end
+        end
+        -- fallback: ImageButton co TextLabel con
+        for _, d in ipairs(root:GetDescendants()) do
+            if d:IsA("ImageButton") and d.Visible and d.AbsoluteSize.X > 0 then
+                for _, c in ipairs(d:GetDescendants()) do
+                    if c:IsA("TextLabel") and c.Visible and textMatch(c.Text) then
+                        return d
                     end
                 end
             end
@@ -2824,47 +2830,25 @@ task.spawn(function()
         return nil
     end
 
-    -- ========== BƯỚC 1: đợi PlayerGui + mainMenuSystem xuất hiện ==========
-    local pg = nil
-    for i = 1, 90 do
-        pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        if pg then break end
-        task.wait(1)
-    end
-    if not pg then return end
-
-    local menu = nil
-    for i = 1, 90 do
-        menu = pg:FindFirstChild("mainMenuSystem")
-        if menu then break end
-        task.wait(1)
-    end
-    if not menu then return end
-
-    local base = nil
-    for i = 1, 30 do
-        base = menu:FindFirstChild("baseFrame")
-        if base then break end
-        task.wait(1)
-    end
-    if not base then return end
-
-    -- ========== BƯỚC 2: đợi homeFrame xuất hiện + nút CHƠI render ==========
-    local home = nil
-    for i = 1, 60 do
-        home = base:FindFirstChild("homeFrame")
-        if home and home.Visible then
-            task.wait(1)  -- đợi nút render
-            break
-        end
-        task.wait(1)
+    local function clickAt(btn)
+        if not btn then return false end
+        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+        -- uu tien firesignal truoc (chuan nhat)
+        if pcall(function() firesignal(btn.MouseButton1Click) end) then return true end
+        if pcall(function() firesignal(btn.Activated) end) then return true end
+        -- fallback touchpress
+        if pcall(function()
+            touchpress(x, y); task.wait(0.2); touchrelease(x, y)
+        end) then return true end
+        return false
     end
 
-    -- tìm + click nút CHƠI menu chính (retry tối đa 40 lần, mỗi lần 1s)
+    -- ========== BUOC 1: tim + bam CHƠI menu chinh ==========
+    -- retry 40 lan, moi lan 1s
     local btn1 = nil
     for i = 1, 40 do
-        if home then btn1 = findPlayButton(home) end
-        if not btn1 then btn1 = findPlayButton(base) end
+        btn1 = findPlayButton(nil)  -- search ca PlayerGui
         if btn1 then break end
         task.wait(1)
     end
@@ -2872,7 +2856,7 @@ task.spawn(function()
     if btn1 then
         clickAt(btn1)
         task.wait(0.5)
-        -- click thêm 1 lần nữa phòng trường hợp button cần tap 2 lần
+        -- click lan 2 phong button miss
         pcall(function()
             local x = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
             local y = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
@@ -2880,27 +2864,30 @@ task.spawn(function()
         end)
     end
 
-    -- ========== BƯỚC 3: đợi playFrame (menu đội) xuất hiện ==========
-    local play = nil
-    for i = 1, 30 do
-        play = base:FindFirstChild("playFrame")
-        if play and play.Visible then
-            task.wait(2)  -- đợi UI render xong
-            break
+    -- ========== BUOC 2: doi menu doi (2-15s), tim + bam CHƠI lan 2 ==========
+    task.wait(3)  -- cho menu doi hien
+
+    local btn2 = nil
+    -- retry 40 lan
+    for i = 1, 40 do
+        btn2 = findPlayButton(nil)
+        -- phan biet: nut 1 da bi an / nut 2 moi xuat hien
+        -- neu khac nut 1 thi lay
+        if btn2 and btn2 ~= btn1 then break end
+        -- neu giong nut 1 thi co the nut 1 chua an, thu tiep
+        if btn2 == btn1 then
+            -- nut 1 co the van hien, doi them
+            task.wait(1)
+            local tryAgain = findPlayButton(nil)
+            if tryAgain and tryAgain ~= btn1 then
+                btn2 = tryAgain
+                break
+            end
         end
         task.wait(1)
     end
 
-    -- tìm + click nút CHƠI menu đội (retry 40 lần)
-    local btn2 = nil
-    for i = 1, 40 do
-        if play then btn2 = findPlayButton(play) end
-        if not btn2 and base then btn2 = findPlayButton(base) end
-        if btn2 then break end
-        task.wait(1)
-    end
-
-    if btn2 then
+    if btn2 and btn2 ~= btn1 then
         clickAt(btn2)
         task.wait(0.5)
         pcall(function()
@@ -2910,10 +2897,13 @@ task.spawn(function()
         end)
     end
 
-    -- xóa marker
+    -- xoa marker
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
-    -- ========== BƯỚC 4: đọc state farm ==========
+    -- ========== BUOC 3: WAIT 15s cho vao game + load map ==========
+    task.wait(15)
+
+    -- ========== BUOC 4: doc state farm ==========
     local officeFlag, ridegoFlag = false, false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
@@ -2924,35 +2914,33 @@ task.spawn(function()
         if ok and v == "1" then ridegoFlag = true end
     end
 
-    -- đọc xe đã chọn của ridego (nếu có)
-    local savedCar = ""
-    if readfile and isfile and isfile("ridegoCar.txt") then
-        local ok, v = pcall(readfile, "ridegoCar.txt")
-        if ok and v and v ~= "" then savedCar = v:gsub("%s+$", "") end
-    end
-
-    -- ========== BƯỚC 5: đợi map load hẳn ==========
+    -- ========== BUOC 5: doi map san sang roi moi bat farm ==========
     if ridegoFlag then
-        -- đợi TaxiAssets + SpawnCarEvents + Character load
         local rs = game:GetService("ReplicatedStorage")
-        for i = 1, 120 do
-            local ok1 = rs:FindFirstChild("TaxiAssets") ~= nil
-            local ok2 = rs:FindFirstChild("SpawnCarEvents") ~= nil
-            local ok3 = game.Players.LocalPlayer.Character ~= nil
-            if ok1 and ok2 and ok3 then break end
+        for _ = 1, 60 do
+            local c = game.Players.LocalPlayer.Character
+            if rs:FindFirstChild("TaxiAssets") and rs:FindFirstChild("SpawnCarEvents") and c then
+                break
+            end
             task.wait(1)
         end
+        -- doi them cho rider script init xong
         task.wait(5)
 
-        -- restore xe đã chọn vào UI trước khi bật farm
-        if savedCar ~= "" and ridegoPickLbl then
+        -- restore xe tu file
+        local savedCar = ""
+        if readfile and isfile and isfile("ridegoCar.txt") then
+            local ok, v = pcall(readfile, "ridegoCar.txt")
+            if ok and v and v ~= "" then savedCar = v:gsub("[\r\n%s]+$", "") end
+        end
+        if savedCar ~= "" then
             pcall(function()
+                selectedCar = savedCar
                 ridegoSelectedCar = savedCar
-                ridegoPickLbl.Text = "🚗 Xe: " .. savedCar
-                if ridegoStatusCarLbl then
-                    ridegoStatusCarLbl.Text = "🚗 Xe: " .. savedCar
-                end
-                ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #ridegoCarList .. ")"
+                if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. savedCar end
+                if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. savedCar end
+                if ridegoCarBtn then ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #ridegoCarList .. ")" end
+                if renderRidegoCars then renderRidegoCars() end
             end)
         end
         task.wait(2)
@@ -2963,7 +2951,7 @@ task.spawn(function()
             end
         end)
     elseif officeFlag then
-        for i = 1, 120 do
+        for _ = 1, 60 do
             if workspace:FindFirstChild("Computers") then break end
             task.wait(1)
         end
