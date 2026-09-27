@@ -2384,7 +2384,7 @@ end)
         end
     end
     end
-    local function flyTo(target, flyingLabel)
+    
     local function flyTo(target, flyingLabel)
     flyingLabel = flyingLabel or "bay"
     stopHold()
@@ -3114,4 +3114,3 @@ task.spawn(function()
         end)
     end
 end)
-end
