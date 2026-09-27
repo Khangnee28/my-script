@@ -428,7 +428,7 @@ end
 
 -- Tele tam ghe + xich 1 chut ve phia dau xe (forward = -Z local)
 local function getSeatTeleCF(vs)
-    return vs.CFrame * CFrame.new(0, 1, -2)
+    return vs.CFrame
 end
 
 local function forceSeat()
