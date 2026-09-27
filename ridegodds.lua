@@ -1,5 +1,5 @@
 -- ============================================================
--- KHANGLE DDS HUB v24 — RGB DEFAULT + STATUS FIX
+-- KHANGLE DDS HUB v25 — SYNCED HSV RAINBOW
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -58,7 +58,7 @@ local function makeHeaderDraggable(header, frame)
     end)
 end
 
--- ============ THEME + RAINBOW ============
+-- ============ THEME ============
 local HUB_BG    = Color3.fromRGB(10, 14, 22)
 local HUB_SIDE  = Color3.fromRGB(14, 20, 32)
 local CARD_BG   = Color3.fromRGB(18, 26, 40)
@@ -66,23 +66,13 @@ local themeColor = Color3.fromRGB(0, 229, 160)
 local ACCENT2   = Color3.fromRGB(56, 189, 248)
 local TXT_DIM   = Color3.fromRGB(150, 165, 185)
 
-local RAINBOW = {
-    Color3.fromRGB(255, 60, 60), Color3.fromRGB(255, 100, 40), Color3.fromRGB(255, 150, 40),
-    Color3.fromRGB(255, 200, 40), Color3.fromRGB(240, 240, 60), Color3.fromRGB(180, 235, 60),
-    Color3.fromRGB(100, 230, 90), Color3.fromRGB(60, 225, 150), Color3.fromRGB(50, 210, 210),
-    Color3.fromRGB(60, 180, 240), Color3.fromRGB(80, 140, 255), Color3.fromRGB(130, 110, 255),
-    Color3.fromRGB(180, 90, 255), Color3.fromRGB(225, 80, 220), Color3.fromRGB(255, 70, 180),
-    Color3.fromRGB(255, 60, 120),
-}
-local RN = #RAINBOW
-local function rainbowAt(pos)
-    pos = pos % RN
-    local idx = math.floor(pos) + 1
-    local f = pos - (idx - 1)
-    return RAINBOW[idx]:Lerp(RAINBOW[(idx % RN) + 1], f)
+-- ============ HSV RAINBOW (SMOOTH, INFINITE) ============
+-- Dung HSV de co vo han mau, muot hon. Cung 1 ham dung cho menu + floats.
+local function rainbowAt(t)
+    return Color3.fromHSV((t * 0.06) % 1, 1, 1)
 end
 
--- ============ LED STATE (DEFAULT RAINBOW ON) ============
+-- ============ LED STATE (DEFAULT RAINBOW ON, SYNC) ============
 local menuRainbow = true
 local menuFixedColor = Color3.fromRGB(0, 229, 160)
 local floatRainbow = true
@@ -93,7 +83,7 @@ local function addRGBStroke(btn)
     local s = Instance.new("UIStroke", btn)
     s.Name = "RGB"; s.Thickness = 2.4
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Transparency = 0; s.Color = rainbowAt(#floatRGB)
+    s.Transparency = 0; s.Color = rainbowAt(0)
     table.insert(floatRGB, s)
     return s
 end
@@ -141,36 +131,29 @@ local AutoTFloatingBtn = makeFloatBtn("🕹️", Color3.fromRGB(255, 100, 0), 0.
 local BodyManagerFloatingBtn = makeFloatBtn("🚗", Color3.fromRGB(0, 230, 180), 0.66); BodyManagerFloatingBtn.Visible = false
 local FreecamFloatingBtn = makeFloatBtn("📷", Color3.fromRGB(255, 255, 255), 0.79); FreecamFloatingBtn.Visible = false
 
--- MENU RGB LOOP (default chay)
+-- ============ LED MASTER LOOP (SYNCED) ============
+-- 1 loop duy nhat, cung t, cung mau cho menu + tat ca nut noi + status borders
+-- -> khong con lech pha, khong loan mat
 task.spawn(function()
     local t = 0
     while true do
         task.wait(0.03)
         t = t + 0.15
-        if hubStroke and hubStroke.Parent then
-            if menuRainbow then
-                local c = rainbowAt(t)
-                hubStroke.Color = c
-                if hubHeader then hubHeader.TextColor3 = c end
-                if ToggleBtn then ToggleBtn.TextColor3 = c end
-            end
-        end
-    end
-end)
+        local cMenu, cFloat
+        if menuRainbow then cMenu = rainbowAt(t) else cMenu = menuFixedColor end
+        if floatRainbow then cFloat = rainbowAt(t) else cFloat = floatFixedColor end
 
--- FLOAT RGB LOOP (default chay)
-task.spawn(function()
-    local t = 0
-    while true do
-        task.wait(0.03)
-        t = t + 0.15
-        for i, s in ipairs(floatRGB) do
+        -- Menu chinh
+        if hubStroke and hubStroke.Parent then
+            hubStroke.Color = cMenu
+            if hubHeader then hubHeader.TextColor3 = cMenu end
+            if ToggleBtn then ToggleBtn.TextColor3 = cMenu end
+        end
+
+        -- Nut noi
+        for _, s in ipairs(floatRGB) do
             if s and s.Parent then
-                if floatRainbow then
-                    s.Color = rainbowAt(t + i * 0.8)
-                else
-                    s.Color = floatFixedColor
-                end
+                s.Color = cFloat
                 s.Transparency = 0
             end
         end
@@ -191,7 +174,7 @@ do
     Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 10)
     local so = Instance.new("UIStroke", statPanel)
     so.Name = "RainbowBorder"; so.Thickness = 2
-    so.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; so.Color = themeColor
+    so.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; so.Color = rainbowAt(0)
     task.spawn(function()
         local t = 0
         while true do task.wait(0.03); t = t + 0.15
@@ -212,7 +195,6 @@ do
         l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 10
         return l
     end
-    -- BO lblMode, day cac label len
     lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68); lblWork = sl(92)
     lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
 end
@@ -391,14 +373,15 @@ do
     end
 
     addNav("TUNER", "🎛️"); addNav("CHUNG", "🧰")
-    addNav("FARMING", "🌾"); addNav("SETTINGS", "⚙️")
+    addNav("FARMING", "💼")  -- FIX: icon 🌾 -> 💼
+    addNav("SETTINGS", "⚙️")
 
     local tunerPage = pages["TUNER"]
     local chungPage = pages["CHUNG"]
     local farmingPage = pages["FARMING"]
     local settingsPage = pages["SETTINGS"]
 
-    -- ============ COLOR APPLY FUNCTIONS ============
+    -- ============ COLOR APPLY ============
     local function applyMenuColor(c)
         menuRainbow = false
         menuFixedColor = c
@@ -406,9 +389,7 @@ do
         if hubHeader then hubHeader.TextColor3 = c end
         if ToggleBtn then ToggleBtn.TextColor3 = c end
     end
-    local function applyMenuRainbow()
-        menuRainbow = true
-    end
+    local function applyMenuRainbow() menuRainbow = true end
     local function applyFloatColor(c)
         floatRainbow = false
         floatFixedColor = c
@@ -416,9 +397,7 @@ do
             if s and s.Parent then s.Color = c; s.Transparency = 0 end
         end
     end
-    local function applyFloatRainbow()
-        floatRainbow = true
-    end
+    local function applyFloatRainbow() floatRainbow = true end
 
     -- ============== TUNER ==============
     local function createInput(name, dv, posY, pg)
@@ -851,8 +830,8 @@ do
         return box
     end
 
-    -- SECTION 1: MÀU MENU + NÚT NỔI (GỘP)
-    local colorSection = makeSection(1, "🎨 Màu menu + nút nổi", true)
+    -- SECTION 1: MAU MENU + NUT NOI (DEFAULT DONG)
+    local colorSection = makeSection(1, "🎨 Màu menu + nút nổi", false)
     local presetColors = {
         Color3.fromRGB(0, 229, 160), Color3.fromRGB(56, 189, 248), Color3.fromRGB(167, 139, 250),
         Color3.fromRGB(255, 100, 100), Color3.fromRGB(255, 170, 60), Color3.fromRGB(255, 110, 190),
@@ -922,7 +901,7 @@ do
         cb("✔ LED = #" .. up, true)
     end)
 
-    -- SECTION 2: TÊN HIỂN THỊ
+    -- SECTION 2: TEN HIEN THI
     local nameSection = makeSection(2, "👤 Tên hiển thị", false)
     makeToggle(nameSection, 1, false, "👤 ẨN TÊN: BẬT", "👤 ẨN TÊN: TẮT",
         Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70),
@@ -932,7 +911,7 @@ do
         customName = txt; applyCustomName(); cb("✔ đã đổi tên", true)
     end)
 
-    -- SECTION 3: HIỆU NĂNG
+    -- SECTION 3: HIEU NANG
     local perfSection = makeSection(3, "⚡ Hiệu năng", false)
     makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT",
         Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
@@ -1064,7 +1043,8 @@ do
         end
     end)
 
-    HubFrame.Visible = true
+    -- FIX: KHONG tu dong hien menu khi bat script
+    HubFrame.Visible = false
 end
 
 -- ============================================================
@@ -2635,7 +2615,6 @@ do
         end
     end)
 
-    -- FORCE VISIBLE: dung Heartbeat + global
     RunService.Heartbeat:Connect(function()
         if _G._ridegoEnabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
             ridegoStatusFrame.Visible = true
@@ -2682,12 +2661,9 @@ do
 
     ridegoSwitch.track.MouseButton1Click:Connect(function()
         if enabled then stopRidego(); return end
-        -- Set global TRUOC khi lam bat cu thu gi khac (de Heartbeat force visible)
         _G._ridegoEnabled = true
         enabled = true
-        -- Set Visible=true truoc
         ridegoStatusFrame.Visible = true
-        -- Sau do moi lam cac thu khac trong pcall
         pcall(function()
             if _G._officeStop then _G._officeStop(true) end
             resetRidegoState()
