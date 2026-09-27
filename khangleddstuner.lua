@@ -2721,12 +2721,23 @@ addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 
 -- Auto Rejoin
+-- ============================================================
+-- AUTO EXECUTE + AUTO REJOIN (logic gốc khangledds)
+-- ============================================================
+local _autoExecute = false
 local _autoRejoin = false
-if readfile and isfile and isfile("autoRejoin.txt") then
-    local ok, v = pcall(readfile, "autoRejoin.txt")
-    if ok and v == "1" then _autoRejoin = true end
+if readfile and isfile then
+    if isfile("autoExecute.txt") then
+        local ok, v = pcall(readfile, "autoExecute.txt")
+        if ok and v == "1" then _autoExecute = true end
+    end
+    if isfile("autoRejoin.txt") then
+        local ok, v = pcall(readfile, "autoRejoin.txt")
+        if ok and v == "1" then _autoRejoin = true end
+    end
 end
 
+-- Auto Rejoin: cooldown 2 phút + check popup chính xác
 if _autoRejoin then
     task.spawn(function()
         local lastAttempt = 0
@@ -2734,28 +2745,45 @@ if _autoRejoin then
             local ok, v = pcall(readfile, "lastRejoin.txt")
             if ok then lastAttempt = tonumber(v) or 0 end
         end
+
         while true do
             task.wait(3)
-            if os.time() - lastAttempt >= 120 then
+
+            -- cooldown 120s
+            if os.time() - lastAttempt < 120 then
+                -- trong cooldown, bỏ qua
+            else
                 local shouldRejoin = false
-                if not game.Players.LocalPlayer.Character then shouldRejoin = true end
+
+                -- char mất
+                local c = game.Players.LocalPlayer.Character
+                if not c then shouldRejoin = true end
+
+                -- check popup "Mất kết nối" chính xác
                 if not shouldRejoin then
                     pcall(function()
                         local cg = game:GetService("CoreGui")
                         for _, d in ipairs(cg:GetDescendants()) do
                             if d:IsA("TextLabel") then
                                 local t = d.Text
-                                if t == "Mất kết nối" or t:find("Disconnected") or t == "Kết nối bị mất" then
-                                    shouldRejoin = true; return
+                                if t == "Mất kết nối" or t:find("Disconnected")
+                                   or t == "Kết nối bị mất" then
+                                    shouldRejoin = true
+                                    return
                                 end
                             end
                         end
                     end)
                 end
+
                 if shouldRejoin then
                     lastAttempt = os.time()
-                    if writefile then pcall(writefile, "lastRejoin.txt", tostring(lastAttempt)) end
-                    pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
+                    if writefile then
+                        pcall(writefile, "lastRejoin.txt", tostring(lastAttempt))
+                    end
+                    pcall(function()
+                        game:GetService("TeleportService"):Teleport(game.PlaceId)
+                    end)
                 end
             end
         end
@@ -2763,6 +2791,7 @@ if _autoRejoin then
 end
 
 task.spawn(function()
+    -- chỉ chạy auto-PLAY khi vừa rejoin (< 120s)
     local wasRejoin = false
     if readfile and isfile and isfile("lastRejoin.txt") then
         local ok, v = pcall(readfile, "lastRejoin.txt")
@@ -2771,54 +2800,98 @@ task.spawn(function()
             if t > 0 and os.time() - t < 60 then wasRejoin = true end
         end
     end
-    if not wasRejoin then return end
+
+    if not wasRejoin then
+        return
+    end
+
     task.wait(15)
+
     local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if not pg then return end
 
-    local function clickAt(lbl)
-        if not lbl then return false end
-        local x = lbl.AbsolutePosition.X + lbl.AbsoluteSize.X / 2
-        local y = lbl.AbsolutePosition.Y + lbl.AbsoluteSize.Y / 2
-        if pcall(function() touchpress(x, y); task.wait(0.1); touchrelease(x, y) end) then return true end
-        local p = lbl.Parent
+    -- click tại tọa độ textLabel PLAY
+    local function clickAt(label)
+        if not label then return false end
+        local x = label.AbsolutePosition.X + label.AbsoluteSize.X / 2
+        local y = label.AbsolutePosition.Y + label.AbsoluteSize.Y / 2
+
+        if pcall(function()
+            touchpress(x, y)
+            task.wait(0.1)
+            touchrelease(x, y)
+        end) then return true end
+
+        local p = label.Parent
         if p and p:IsA("TextButton") then
             if pcall(function() firesignal(p.MouseButton1Click) end) then return true end
         end
         return false
     end
+
     local function findHomePlay()
-        local menu = pg:FindFirstChild("mainMenuSystem"); if not menu then return nil end
-        local base = menu:FindFirstChild("baseFrame"); if not base then return nil end
-        local home = base:FindFirstChild("homeFrame"); if not home then return nil end
+        local menu = pg:FindFirstChild("mainMenuSystem")
+        if not menu then return nil end
+        local base = menu:FindFirstChild("baseFrame")
+        if not base then return nil end
+        local home = base:FindFirstChild("homeFrame")
+        if not home then return nil end
         for _, d in ipairs(home:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then return d end
-        end
-        return nil
-    end
-    local function findTeamPlay()
-        local menu = pg:FindFirstChild("mainMenuSystem"); if not menu then return nil end
-        local base = menu:FindFirstChild("baseFrame"); if not base then return nil end
-        local play = base:FindFirstChild("playFrame"); if not play then return nil end
-        for _, d in ipairs(play:GetDescendants()) do
             if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
-                local home = base:FindFirstChild("homeFrame")
-                if not (home and d:IsDescendantOf(home)) then return d end
+                return d
             end
         end
         return nil
     end
-    local l1 = nil
-    for i = 1, 8 do l1 = findHomePlay(); if l1 then break end; task.wait(1) end
-    if l1 then clickAt(l1) end
+
+    local function findTeamPlay()
+        local menu = pg:FindFirstChild("mainMenuSystem")
+        if not menu then return nil end
+        local base = menu:FindFirstChild("baseFrame")
+        if not base then return nil end
+        local play = base:FindFirstChild("playFrame")
+        if not play then return nil end
+        for _, d in ipairs(play:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Text == "PLAY" and d.Visible and d.AbsoluteSize.X > 0 then
+                local home = base:FindFirstChild("homeFrame")
+                if home and d:IsDescendantOf(home) then
+                    -- skip
+                else
+                    return d
+                end
+            end
+        end
+        return nil
+    end
+
+    -- LẦN 1: click PLAY trong homeFrame
+    local lbl1 = nil
+    for i = 1, 8 do
+        lbl1 = findHomePlay()
+        if lbl1 then break end
+        task.wait(1)
+    end
+    if lbl1 then clickAt(lbl1) end
+
     task.wait(3)
-    local l2 = nil
-    for i = 1, 8 do l2 = findTeamPlay(); if l2 then break end; task.wait(1) end
-    if l2 then clickAt(l2) end
+
+    -- LẦN 2: click PLAY trong playFrame
+    local lbl2 = nil
+    for i = 1, 8 do
+        lbl2 = findTeamPlay()
+        if lbl2 then break end
+        task.wait(1)
+    end
+    if lbl2 then clickAt(lbl2) end
+
+    -- xóa marker để lần load script sau không click PLAY nữa
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+
     task.wait(10)
 
-    local officeFlag, ridegoFlag = false, false
+    -- đọc flag farm office + ridego
+    local officeFlag = false
+    local ridegoFlag = false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
         if ok and v == "1" then officeFlag = true end
@@ -2827,6 +2900,15 @@ task.spawn(function()
         local ok, v = pcall(readfile, "ridegoState.txt")
         if ok and v == "1" then ridegoFlag = true end
     end
-    if officeFlag then pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
-    elseif ridegoFlag then pcall(function() firesignal(ridegoSwitch.track.MouseButton1Click) end) end
+
+    -- bật farm theo state đã lưu
+    if officeFlag then
+        pcall(function()
+            firesignal(farmSwitch.track.MouseButton1Click)
+        end)
+    elseif ridegoFlag then
+        pcall(function()
+            firesignal(ridegoSwitch.track.MouseButton1Click)
+        end)
+    end
 end)
