@@ -2577,7 +2577,50 @@ do
             setRgStatus("◦ TẮT")
         end)
     end
-
+    -- ============ RIDEGO STATUS PANEL (tao trong KHOI 6) ============
+ridegoStatusFrame = Instance.new("Frame", ScreenGui)
+ridegoStatusFrame.Size = UDim2.new(0, 250, 0, 148)
+ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 20)
+ridegoStatusFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
+ridegoStatusFrame.BackgroundTransparency = 0.15
+ridegoStatusFrame.BorderSizePixel = 0
+ridegoStatusFrame.Active = true
+ridegoStatusFrame.Draggable = true
+ridegoStatusFrame.Visible = false
+ridegoStatusFrame.ZIndex = 30
+Instance.new("UICorner", ridegoStatusFrame).CornerRadius = UDim.new(0, 10)
+local rgStroke = Instance.new("UIStroke", ridegoStatusFrame)
+rgStroke.Name = "RainbowBorder"
+rgStroke.Thickness = 2
+rgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+task.spawn(function()
+    local t = 0
+    while true do
+        task.wait(0.03); t = t + 0.15
+        if rgStroke and rgStroke.Parent then rgStroke.Color = rainbowAt(t) end
+    end
+end)
+local rgTitle = Instance.new("TextLabel", ridegoStatusFrame)
+rgTitle.Size = UDim2.new(1, -20, 0, 24); rgTitle.Position = UDim2.new(0, 10, 0, 4)
+rgTitle.BackgroundTransparency = 1; rgTitle.Text = "🚕 RideGo Status"
+rgTitle.TextColor3 = Color3.fromRGB(255, 140, 40); rgTitle.TextSize = 13
+rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 31
+local function rgLabel(y)
+    local l = Instance.new("TextLabel", ridegoStatusFrame)
+    l.Size = UDim2.new(1, -20, 0, 18); l.Position = UDim2.new(0, 10, 0, y)
+    l.BackgroundTransparency = 1; l.Text = ""
+    l.TextColor3 = Color3.fromRGB(200, 220, 240); l.TextSize = 11
+    l.Font = Enum.Font.GothamMedium; l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 31
+    return l
+end
+ridegoTimeLbl = rgLabel(32)
+ridegoTripsLbl = rgLabel(50)
+ridegoEarnLbl = rgLabel(68)
+ridegoStatusCarLbl = rgLabel(86)
+ridegoStatusLbl = rgLabel(110)
+ridegoStatusCarLbl.Text = "🚗 Xe: (chưa chọn)"
+ 
     -- ============ RENDER CAR LIST vao HUB UI ============
     local function renderRidegoCars()
         if not ridegoCarListWrap then return end
