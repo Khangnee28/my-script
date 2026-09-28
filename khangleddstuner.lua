@@ -15,15 +15,7 @@ local camera = workspace.CurrentCamera
 
 local function checkFarmOK() return workspace:FindFirstChild("Computers") ~= nil end
 
-pcall(function()
-    Lighting.GlobalShadows = true
-    Lighting.Brightness = 2
-    Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
-    if not Lighting:FindFirstChild("KhangLeBloom") then
-        local b = Instance.new("BloomEffect", Lighting)
-        b.Name = "KhangLeBloom"; b.Intensity = 0.4; b.Threshold = 0.8
-    end
-end)
+
 
 local parent = nil
 pcall(function() parent = gethui and gethui() or CoreGui end)
@@ -793,23 +785,58 @@ do
 
     local perfSection = makeSection(3, "⚡ Hiệu năng", false)
     makeToggle(perfSection, 1, false, "⚡ TỐI ƯU FPS: BẬT", "⚡ TỐI ƯU FPS: TẮT",
-        Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
-        optFPS = v
-        if v then
-            pcall(function() Lighting.GlobalShadows = false end); bloomSet(false); sunSet(false)
-            pcall(function() workspace.StreamingEnabled = true end); setQualityLevel(4)
-        else
-            pcall(function() Lighting.GlobalShadows = true end); pcall(function() Lighting.Brightness = 2 end)
-            bloomSet(true, 0.4, 0.8); setQualityLevel(nil)
-        end
-    end)
-    makeToggle(perfSection, 2, false, "🎨 CHẤT LƯỢNG CAO: BẬT", "🎨 CHẤT LƯỢNG CAO: TẮT",
-        Color3.fromRGB(160, 100, 200), Color3.fromRGB(60, 60, 70), function(v)
-        if v then
-            pcall(function() Lighting.GlobalShadows = true end); pcall(function() Lighting.Brightness = 3 end)
-            bloomSet(true, 0.6, 0.7); sunSet(true, 0.3); setQualityLevel(10)
-        else bloomSet(true, 0.4, 0.8); sunSet(false); setQualityLevel(nil) end
-    end)
+    Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
+    optFPS = v
+    if v then
+        -- TAT HET EFFECT NANG + HA QUALITY XUONG MIN
+        pcall(function() Lighting.GlobalShadows = false end)
+        pcall(function() Lighting.Brightness = 1 end)
+        pcall(function() Lighting.EnvironmentDiffuseScale = 0 end)
+        pcall(function() Lighting.EnvironmentSpecularScale = 0 end)
+        pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(80, 80, 80) end)
+        bloomSet(false)
+        sunSet(false)
+        pcall(function() workspace.StreamingEnabled = true end)
+        setQualityLevel(1)
+    else
+        -- RESTORE mac dinh
+        pcall(function() Lighting.GlobalShadows = true end)
+        pcall(function() Lighting.Brightness = 2 end)
+        pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
+        pcall(function() Lighting.EnvironmentSpecularScale = 1 end)
+        pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120) end)
+        bloomSet(true, 0.3, 0.9)
+        sunSet(false)
+        setQualityLevel(nil)
+    end
+end)
+
+makeToggle(perfSection, 2, false, "🎨 CHẤT LƯỢNG CAO: BẬT", "🎨 CHẤT LƯỢNG CAO: TẮT",
+    Color3.fromRGB(160, 100, 200), Color3.fromRGB(60, 60, 70), function(v)
+    if v then
+        -- BAT HET EFFECT DEP + GIU SANG
+        pcall(function() Lighting.GlobalShadows = true end)
+        pcall(function() Lighting.Brightness = 2.5 end)
+        pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
+        pcall(function() Lighting.EnvironmentSpecularScale = 1 end)
+        pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140) end)
+        pcall(function() Lighting.Ambient = Color3.fromRGB(120, 120, 120) end)
+        bloomSet(true, 0.5, 0.75)
+        sunSet(true, 0.2)
+        pcall(function() workspace.StreamingEnabled = false end)
+        setQualityLevel(10)
+    else
+        -- RESTORE mac dinh
+        pcall(function() Lighting.GlobalShadows = true end)
+        pcall(function() Lighting.Brightness = 2 end)
+        pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
+        pcall(function() Lighting.EnvironmentSpecularScale = 1 end)
+        pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120) end)
+        bloomSet(true, 0.3, 0.9)
+        sunSet(false)
+        setQualityLevel(nil)
+    end
+end)
     makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT",
         Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
         function(v) perfOn = v; perfFrame.Visible = v end)
