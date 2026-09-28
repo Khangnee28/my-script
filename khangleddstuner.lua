@@ -1903,33 +1903,54 @@ do
     end)
 end
 
----- ============================================================
--- KHOI 6: RIDEGO FARM
+-- ============================================================
+-- KHOI 6: RIDEGO FARM (logic gốc v27.6)
 -- ============================================================
 do
-    local STEP_DIST = 250; local LAND_OFFSET = 8; local ARRIVE_DIST = 8
-    local ORDER_TIMEOUT = 60; local PICKUP_WAIT = 4; local DROP_WAIT = 5
-    local ACK_DELAY = 3; local DECEL_DIST = 200; local TICK = 0.05
-    local UNDERGROUND_DEPTH = 200; local UNDER_STEP_MAX = 50; local UNDER_DESCEND_STEPS = 12
-    local UNDER_STEP_TIME = 0.03; local TRIP_MILESTONE = 10; local FLY_TIMEOUT = 30; local SEAT_DELAY = 0.5
+    -- ============ CONFIG (nguyên gốc) ============
+    local STEP_DIST           = 250
+    local LAND_OFFSET         = 8
+    local ARRIVE_DIST         = 8
+    local ORDER_TIMEOUT       = 60
+    local PICKUP_WAIT         = 4
+    local DROP_WAIT           = 5
+    local ACK_DELAY           = 3
+    local DECEL_DIST          = 200
+    local TICK                = 0.05
+    local UNDERGROUND_DEPTH   = 200
+    local UNDER_STEP_MAX      = 50
+    local UNDER_DESCEND_STEPS = 12
+    local UNDER_STEP_TIME     = 0.03
+    local TRIP_MILESTONE      = 10
+    local FLY_TIMEOUT         = 30
+    local SEAT_DELAY          = 0.5
 
-    local enabled = false
+    -- ============ STATE ============
+    local enabled     = false
     local hasInitOnce = false
-    local orderToken, pickupPos, dropPos, pendingFare = nil, nil, nil, 0
-    local myCar, selectedCar = nil, ""
-    local carList = {}
-    local stats = { trips = 0, earn = 0 }
-    local curStatus = "◦ TẮT"
-    local holdActive, holdBP, holdGyro = false, nil, nil
-    local flying, acceptingOrder = false, false
-    local farmStartTime, lastMilestone = 0, 0
+    local orderToken  = nil
+    local pickupPos   = nil
+    local dropPos     = nil
+    local pendingFare = 0
+    local myCar       = nil
+    local selectedCar = ""
+    local carList     = {}
+    local stats       = { trips = 0, earn = 0 }
+    local curStatus   = "◦ TẮT"
+    local holdActive  = false
+    local holdBP      = nil
+    local holdGyro    = nil
+    local flying      = false
+    local acceptingOrder = false
+    local farmStartTime  = 0
+    local lastMilestone = 0
 
     local function setRgStatus(s)
         curStatus = s
         if ridegoStatusLbl then ridegoStatusLbl.Text = "📍 " .. s end
     end
 
-    local function resetRidegoState()
+    local function resetState()
         orderToken = nil; pickupPos = nil; dropPos = nil; pendingFare = 0
         myCar = nil; curStatus = "◦ TẮT"; flying = false; acceptingOrder = false
         farmStartTime = 0; lastMilestone = 0; holdActive = false
@@ -1937,6 +1958,7 @@ do
         if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
     end
 
+    -- ============ REMOTES ============
     local lp = LocalPlayer
     local rs = ReplicatedStorage
     local JobEvents = rs:WaitForChild("JobEvents", 10)
@@ -1954,6 +1976,7 @@ do
     local InitCarData
     if DealershipEvents then InitCarData = DealershipEvents:FindFirstChild("InitializeCarData") end
 
+    -- ============ HELPERS ============
     local function char() return lp.Character end
     local function root() local c = char(); return c and c:FindFirstChild("HumanoidRootPart") end
     local function hum() local c = char(); return c and c:FindFirstChildOfClass("Humanoid") end
@@ -1985,6 +2008,7 @@ do
         return CFrame.Angles(0, yaw, 0)
     end
 
+    -- ============ TAXI EVENT ============
     if TaxiEvent then
         TaxiEvent.OnClientEvent:Connect(function(action, data)
             if type(data) ~= "table" then return end
@@ -1999,6 +2023,7 @@ do
         end)
     end
 
+    -- ============ SCAN CARS ============
     local function scanCars()
         carList = {}
         if not InitCarData then return carList end
@@ -2017,51 +2042,7 @@ do
         return carList
     end
 
-    local function renderRidegoCars()
-        if not ridegoCarListWrap then return end
-        for _, c in ipairs(ridegoCarListWrap:GetChildren()) do
-            if c:IsA("GuiObject") then c:Destroy() end
-        end
-        ridegoCarListWrap.CanvasSize = UDim2.new(0, 0, 0, #carList * 28 + 8)
-        if #carList == 0 then
-            local lbl = Instance.new("TextLabel", ridegoCarListWrap)
-            lbl.Size = UDim2.new(1, -8, 0, 40); lbl.BackgroundTransparency = 1
-            lbl.Text = "Chưa quét xe"; lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
-            lbl.TextSize = 10; lbl.Font = Enum.Font.GothamMedium
-            ridegoCarBtn.Text = "🚗 CHỌN XE (0)"
-            return
-        end
-        for i, name in ipairs(carList) do
-            local btn = Instance.new("TextButton", ridegoCarListWrap)
-            btn.Size = UDim2.new(1, -8, 0, 24)
-            btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
-            btn.Text = "  " .. name
-            btn.TextColor3 = (name == selectedCar) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 230, 240)
-            btn.TextSize = 10; btn.Font = Enum.Font.Code
-            btn.TextXAlignment = Enum.TextXAlignment.Left
-            btn.TextTruncate = Enum.TextTruncate.AtEnd
-            btn.LayoutOrder = i
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-            btn.MouseButton1Click:Connect(function()
-                selectedCar = name
-                ridegoSelectedCar = name
-                if writefile then pcall(writefile, "ridegoCar.txt", name) end
-                if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. name end
-                if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. name end
-                renderRidegoCars()
-                ridegoCarListPanel.Visible = false
-                ridegoCarOpen = false
-            end)
-        end
-        ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
-    end
-
-    ridegoCarBtn.MouseButton1Click:Connect(function()
-        if enabled then return end
-        ridegoCarOpen = not ridegoCarOpen
-        ridegoCarListPanel.Visible = ridegoCarOpen
-    end)
-
+    -- ============ FIND CAR ============
     local function findMyCar()
         local c = char()
         if c then
@@ -2070,32 +2051,32 @@ do
         end
         local pname = lp.Name:lower()
         for _, d in ipairs(workspace:GetDescendants()) do
-            if d:IsA("Model") and d.Name:lower():find(pname, 1, true) and d:FindFirstChildWhichIsA("VehicleSeat", true) then
-                return d
-            end
+            if d:IsA("Model") and d.Name:lower():find(pname, 1, true) and d:FindFirstChildWhichIsA("VehicleSeat", true) then return d end
         end
         return nil
     end
+
+    -- ============ RAYCAST ============
     local function makeRayParams()
-        local p = RaycastParams.new()
-        p.FilterType = Enum.RaycastFilterType.Exclude
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
         local ign = {}
         local c = char(); if c then table.insert(ign, c) end
-        local car = myCar or findMyCar()
-        if car then table.insert(ign, car) end
-        p.FilterDescendantsInstances = ign
-        p.IgnoreWater = true
-        return p
+        local car = myCar or findMyCar(); if car then table.insert(ign, car) end
+        params.FilterDescendantsInstances = ign
+        params.IgnoreWater = true
+        return params
     end
     local function floorBelow(pos)
         if not pos then return nil end
-        local p = makeRayParams()
-        local o = Vector3.new(pos.X, pos.Y + 4, pos.Z)
-        local hit = workspace:Raycast(o, Vector3.new(0, -800, 0), p)
+        local params = makeRayParams()
+        local origin = Vector3.new(pos.X, pos.Y + 4, pos.Z)
+        local hit = workspace:Raycast(origin, Vector3.new(0, -800, 0), params)
         if hit then return hit.Position.Y end
         return nil
     end
 
+    -- ============ NPC FOLLOWERS ============
     local npcFollowers = {}
     local npcRenderConn = nil
     local function safeRefreshNpc()
@@ -2183,6 +2164,7 @@ do
         npcFollowers = {}
     end
 
+    -- ============ NETWORK OWNER ============
     local function claimNetworkOwner(inst)
         if not inst then return end
         if inst:IsA("BasePart") and not inst.Anchored then pcall(function() inst:SetNetworkOwner(lp) end) end
@@ -2204,34 +2186,32 @@ do
         end
     end
 
-    -- HOLD: BodyPosition tai VI TRI HIEN TAI + BodyGyro giu huong
+    -- ============ HOLD (nguyên gốc) ============
     local function startHold()
         if holdBP then pcall(function() holdBP:Destroy() end) holdBP = nil end
         if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
         local car = myCar or findMyCar(); if not car then return end
         local vs = car:FindFirstChildWhichIsA("VehicleSeat", true); if not vs then return end
-        local anchorPos = vs.Position
-        local flatRot = flatYawCFrame(vs.CFrame)
+        local curCF = vs.CFrame
         local bp = Instance.new("BodyPosition")
         bp.Name = "RGHoldPos"
-        bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-        bp.P = 8000; bp.D = 1000
-        bp.Position = anchorPos
-        bp.Parent = vs
-        holdBP = bp
+        bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bp.P = 4000; bp.D = 300
+        bp.Position = curCF.Position
+        bp.Parent = vs; holdBP = bp
+        local flatRot = flatYawCFrame(curCF)
         local bg = Instance.new("BodyGyro")
         bg.Name = "RGHoldGyro"
-        bg.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
-        bg.P = 12000; bg.D = 800
+        bg.MaxTorque = Vector3.new(3e5, 3e5, 3e5)
+        bg.P = 8000; bg.D = 1000
         bg.CFrame = flatRot
-        bg.Parent = vs
-        holdGyro = bg
+        bg.Parent = vs; holdGyro = bg
         holdActive = true
         task.spawn(function()
             while holdActive and holdBP == bp and bp.Parent do
-                bp.Position = anchorPos
+                bp.Position = curCF.Position
                 if holdGyro == bg and bg.Parent then bg.CFrame = flatRot end
-                task.wait(0.05)
+                task.wait(0.1)
             end
         end)
     end
@@ -2241,6 +2221,7 @@ do
         if holdGyro then pcall(function() holdGyro:Destroy() end) holdGyro = nil end
     end
 
+    -- ============ DRIVE SEAT ============
     local function getDriveSeat(car)
         if not car then return nil end
         for _, d in ipairs(car:GetDescendants()) do
@@ -2252,6 +2233,7 @@ do
         return car:FindFirstChildWhichIsA("VehicleSeat", true)
     end
 
+    -- ============ FORCE SEAT (nguyên gốc) ============
     local function forceSeat()
         local h = hum(); local car = myCar or findMyCar()
         if not h or not car then return false end
@@ -2286,6 +2268,29 @@ do
         return h.Sit and h.SeatPart == vs
     end
 
+    -- ============ WATCHDOG (nguyên gốc) ============
+    task.spawn(function()
+        while true do
+            task.wait(0.15)
+            if enabled then
+                local h = hum(); local car = myCar or findMyCar()
+                if h and car then
+                    local vs = getDriveSeat(car)
+                    if vs then
+                        local wrongSeat = h.Sit and h.SeatPart and h.SeatPart ~= vs
+                        local notSeated = not h.Sit
+                        if wrongSeat then
+                            setRgStatus("⚠ Ngồi sai ghế — nhảy ra ngồi lại")
+                            pcall(function() h.Sit = false end); task.wait(0.25)
+                            for _ = 1, 6 do if forceSeat() then break end; task.wait(0.25) end
+                        elseif notSeated and not flying then forceSeat() end
+                        pcall(function() h.AutoRotate = false end)
+                    end
+                end
+            end
+        end
+    end)
+
     local function seatCar(timeout)
         timeout = timeout or 15
         local deadline = os.clock() + timeout
@@ -2293,11 +2298,7 @@ do
             local h = hum(); local car = findMyCar()
             if h and car then
                 local vs = getDriveSeat(car)
-                if h.Sit and h.SeatPart == vs then
-                    myCar = car
-                    pcall(function() h.AutoRotate = false end)
-                    return true
-                end
+                if h.Sit and h.SeatPart == vs then myCar = car; pcall(function() h.AutoRotate = false end); return true end
                 forceSeat()
             end
             task.wait(0.4)
@@ -2305,161 +2306,102 @@ do
         return false
     end
 
-    local function flyTo(target, flyingLabel)
-    flyingLabel = flyingLabel or "bay"
-    stopHold()
-    local h = hum(); local car = myCar or findMyCar()
-    if not h or not car then return false end
-    if not h.Sit then forceSeat(); task.wait(0.1) end
-    pcall(function() h.AutoRotate = false end)
-
-    local myChar = char()
-    local hrp = root()
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-
-    local targetFloor = floorBelow(target) or target.Y
-    local underY = targetFloor - UNDERGROUND_DEPTH
-    setRgStatus("◦ Chuẩn bị")
-
-    claimNetworkOwner(car)
-    attachNpcFollowers(car)
-
-    -- ANCHOR TOAN BO XE + HRP de PivotTo khong pha weld
-    local anchoredParts = {}
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then
-            anchoredParts[p] = p.Anchored
-            pcall(function() p.Anchored = true end)
-            pcall(function() p.CanCollide = false end)
-        end
-    end
-    if myChar then
-        for _, p in ipairs(myChar:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.Anchored = true end)
-                pcall(function() p.CanCollide = false end)
-            end
-        end
-    end
-
-    flying = true
-    local flyStart = os.clock()
-    local startPivot = car:GetPivot()
-    local rotOnly = flatYawCFrame(startPivot)
-    local curPos = startPivot.Position
-
-    -- DESCEND
-    local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
-    for i = 1, UNDER_DESCEND_STEPS do
-        curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        local cf = CFrame.new(curPos) * rotOnly
-        pcall(function() car:PivotTo(cf) end)
-        task.wait(UNDER_STEP_TIME)
-    end
-
-    setRgStatus("◦ " .. flyingLabel)
-    local reached = false; local timedOut = false
-    local lastNpcRefresh = 0
-
-    while enabled do
-        local c = myCar or findMyCar(); if not c then break end
-        if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
-        local curP = c:GetPivot().Position
-        local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
-        local dist = flat.Magnitude
-        if dist < ARRIVE_DIST then reached = true; break end
-        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-        local spd
-        if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
-        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
-        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-        local nextCF = CFrame.new(nextPos) * rotOnly
-        pcall(function() c:PivotTo(nextCF) end)
-        if os.clock() - lastNpcRefresh > 0.05 then lastNpcRefresh = os.clock(); updateNpcFollowers() end
-        task.wait(TICK)
-    end
-
-    if timedOut then
-        -- rollback anchored
-        for p, was in pairs(anchoredParts) do
-            if p and p.Parent then pcall(function() p.Anchored = was end) end
-        end
-        if myChar then
-            for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then pcall(function() p.Anchored = false end) end
-            end
-        end
-        flying = false
-        detachNpcFollowers()
-        setRgStatus("⚠ Bay quá 30s — hủy")
-        return false
-    end
-
-    -- ASCEND
-    car = myCar or findMyCar()
-    if car and reached then
+    -- ============ ASCEND (nguyên gốc) ============
+    local function ascendToGround(car, target, targetFloor)
+        if not car then return end
         local realFloor = floorBelow(target) or targetFloor
         local upTargetY = realFloor + LAND_OFFSET
-        local upCF = CFrame.new(Vector3.new(target.X, upTargetY, target.Z)) * rotOnly
-        pcall(function() car:PivotTo(upCF) end)
-        task.wait(0.25)
+        local cp = car:GetPivot()
+        local flatRot = flatYawCFrame(cp)
+        local dest = Vector3.new(target.X, upTargetY, target.Z)
+        pcall(function() car:PivotTo(CFrame.new(dest) * flatRot) end)
+        task.wait(0.15)
+    end
 
-        -- TELE HRP vao seat
-        local finalVs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        if hrp and finalVs then
-            pcall(function() hrp.CFrame = finalVs.CFrame end)
-        end
-        task.wait(0.1)
-
-        myCar = car
-
-        -- UNANCHOR XE (tra ve trang thai cu)
-        for p, was in pairs(anchoredParts) do
-            if p and p.Parent then pcall(function() p.Anchored = was end) end
-        end
-        -- UNANCHOR CHAR
-        if myChar then
-            for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then pcall(function() p.Anchored = false end) end
-            end
-        end
-        task.wait(0.1)
-
-        -- BAT CanCollide
+    -- ============ FLY TO (nguyên gốc v27.6) ============
+    local function flyTo(target, flyingLabel)
+        flyingLabel = flyingLabel or "bay"
+        stopHold()
+        local h = hum(); local car = myCar or findMyCar()
+        if not h or not car then return false end
+        if not h.Sit then forceSeat(); task.wait(0.1) end
+        pcall(function() h.AutoRotate = false end)
+        local myChar = char()
+        local targetFloor = floorBelow(target) or target.Y
+        local underY = targetFloor - UNDERGROUND_DEPTH
+        setRgStatus("◦ Chuẩn bị")
+        unanchorCar(car); task.wait(0.05)
+        claimNetworkOwner(car); attachNpcFollowers(car)
         for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+            if p:IsA("BasePart") then pcall(function() p.CanCollide = false end) end
         end
         if myChar then
             for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+                if p:IsA("BasePart") then pcall(function() p.CanCollide = false end) end
             end
         end
-        task.wait(0.1)
-
-        -- Sit lai
-        local hh = hum()
-        if hh and finalVs then
-            pcall(function() finalVs:Sit(hh) end)
-            task.wait(0.15)
-            pcall(function() hh.Sit = true end)
-            pcall(function() hh.AutoRotate = false end)
+        flying = true
+        local flyStart = os.clock()
+        local startPivot = car:GetPivot()
+        local rotOnly = flatYawCFrame(startPivot)
+        local curPos = startPivot.Position
+        local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
+        for i = 1, UNDER_DESCEND_STEPS do
+            curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
+            pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
+            task.wait(UNDER_STEP_TIME)
         end
-        task.wait(0.2)
-
-        startHold()
+        setRgStatus("◦ " .. flyingLabel)
+        local reached = false; local timedOut = false
+        local lastNpcRefresh = 0; local fakeVelCounter = 0
+        while enabled do
+            local c = myCar or findMyCar(); if not c then break end
+            if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
+            local curP = c:GetPivot().Position
+            local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
+            local dist = flat.Magnitude
+            if dist < ARRIVE_DIST then reached = true; break end
+            local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+            local spd
+            if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
+            local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+            local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
+            pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
+            fakeVelCounter = fakeVelCounter + 1
+            if fakeVelCounter >= 2 then
+                fakeVelCounter = 0
+                local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+                for _, p in ipairs(c:GetDescendants()) do
+                    if p:IsA("BasePart") then pcall(function() p.AssemblyLinearVelocity = fakeV end) end
+                end
+            end
+            if os.clock() - lastNpcRefresh > 0.05 then lastNpcRefresh = os.clock(); updateNpcFollowers() end
+            task.wait(TICK)
+        end
+        if timedOut then
+            flying = false
+            detachNpcFollowers()
+            setRgStatus("⚠ Bay quá 30s — hủy")
+            return false
+        end
+        car = myCar or findMyCar()
+        if car and reached then
+            ascendToGround(car, target, targetFloor)
+            myCar = car
+            startHold()
+            pcall(function() hum().AutoRotate = false end)
+        end
+        detachNpcFollowers()
+        flying = false
+        if not h.Sit then forceSeat() end
+        task.wait(0.1)
+        local h2 = hum()
+        if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
+        task.wait(0.15)
+        return reached
     end
 
-    detachNpcFollowers()
-    flying = false
-    if not enabled then return false end
-    if not h.Sit then forceSeat() end
-    task.wait(0.1)
-    local h2 = hum()
-    if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
-    task.wait(0.15)
-    return reached
-    end
-
+    -- ============ SPAWN + SEAT (nguyên gốc) ============
     local function spawnAndSeat()
         if not SpawnCarEv then return false end
         if not selectedCar or selectedCar == "" then setRgStatus("⚠ Chưa chọn xe"); return false end
@@ -2488,6 +2430,7 @@ do
         setRgStatus("⚠ Ngồi ghế thất bại"); return false
     end
 
+    -- ============ RESET CHAR (nguyên gốc) ============
     local function resetCharacter()
         setRgStatus("◦ Reset nhân vật")
         local h = hum(); if h then pcall(function() h.Health = 0 end) end
@@ -2499,11 +2442,11 @@ do
         task.wait(0.5)
     end
 
+    -- ============ INIT (nguyên gốc) ============
     local function doFullInit()
         setRgStatus("◦ Lần đầu — đổi nghề")
         fire(TeamChangeRequest, "RideGO Driver", 11378976, 1, 0, "Detector")
         task.wait(3)
-        if not enabled then return false end
         setRgStatus("◦ Spawn xe")
         if not spawnAndSeat() then return false end
         myCar = findMyCar()
@@ -2512,11 +2455,8 @@ do
         setRgStatus("◦ Sẵn sàng nhận đơn")
         return true
     end
-
     local function doRestartInit()
-        -- BO resetCharacter()
-        task.wait(0.5)
-        if not enabled then return false end
+        resetCharacter(); task.wait(0.5)
         setRgStatus("◦ Spawn xe")
         if not spawnAndSeat() then return false end
         myCar = findMyCar()
@@ -2526,7 +2466,7 @@ do
         return true
     end
 
-    -- recoverFromTimeout: BO resetCharacter
+    -- ============ RECOVER (nguyên gốc) ============
     local function recoverFromTimeout()
         acceptingOrder = false; flying = false
         detachNpcFollowers(); stopHold()
@@ -2541,7 +2481,8 @@ do
             end
         end
         local c = char(); if c then fullCollideOn(c) end
-        resetRidegoState()
+        resetState()
+        resetCharacter()
         if not enabled then return end
         farmStartTime = os.time()
         fire(TaxiEvent, "GoOffline"); task.wait(1)
@@ -2549,6 +2490,7 @@ do
         setRgStatus("◦ Đã khôi phục — chờ đơn")
     end
 
+    -- ============ TRIP (nguyên gốc) ============
     local function runTrip()
         local h = hum()
         if not h or not h.Sit then
@@ -2612,6 +2554,7 @@ do
         task.wait(0.3)
     end
 
+    -- ============ LOOP (nguyên gốc) ============
     local loopBusy = false
     local function startLoop()
         if loopBusy then return end
@@ -2635,63 +2578,50 @@ do
         end)
     end
 
-    -- STATUS PANEL
-    ridegoStatusFrame = Instance.new("Frame", ScreenGui)
-    ridegoStatusFrame.Size = UDim2.new(0, 250, 0, 148)
-    ridegoStatusFrame.Position = UDim2.new(0, 76, 0.5, 20)
-    ridegoStatusFrame.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-    ridegoStatusFrame.BackgroundTransparency = 0.15
-    ridegoStatusFrame.BorderSizePixel = 0
-    ridegoStatusFrame.Active = true; ridegoStatusFrame.Draggable = true
-    ridegoStatusFrame.Visible = false; ridegoStatusFrame.ZIndex = 30
-    Instance.new("UICorner", ridegoStatusFrame).CornerRadius = UDim.new(0, 10)
-    local rgStroke = Instance.new("UIStroke", ridegoStatusFrame)
-    rgStroke.Name = "RainbowBorder"; rgStroke.Thickness = 2
-    rgStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    task.spawn(function()
-        local t = 0
-        while true do task.wait(0.03); t = t + 0.15
-            if rgStroke and rgStroke.Parent then rgStroke.Color = rainbowAt(t) end
+    -- ============ RENDER CAR LIST vao HUB UI ============
+    local function renderRidegoCars()
+        if not ridegoCarListWrap then return end
+        for _, c in ipairs(ridegoCarListWrap:GetChildren()) do
+            if c:IsA("GuiObject") then c:Destroy() end
         end
-    end)
-    local rgTitle = Instance.new("TextLabel", ridegoStatusFrame)
-    rgTitle.Size = UDim2.new(1, -20, 0, 24); rgTitle.Position = UDim2.new(0, 10, 0, 4)
-    rgTitle.BackgroundTransparency = 1; rgTitle.Text = "🚕 RideGo Status"
-    rgTitle.TextColor3 = Color3.fromRGB(255, 140, 40); rgTitle.TextSize = 13
-    rgTitle.Font = Enum.Font.GothamBold; rgTitle.TextXAlignment = Enum.TextXAlignment.Left; rgTitle.ZIndex = 31
-    local function rgLabel(y)
-        local l = Instance.new("TextLabel", ridegoStatusFrame)
-        l.Size = UDim2.new(1, -20, 0, 18); l.Position = UDim2.new(0, 10, 0, y)
-        l.BackgroundTransparency = 1; l.Text = ""
-        l.TextColor3 = Color3.fromRGB(200, 220, 240); l.TextSize = 11
-        l.Font = Enum.Font.GothamMedium; l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 31
-        return l
+        ridegoCarListWrap.CanvasSize = UDim2.new(0, 0, 0, #carList * 28 + 8)
+        if #carList == 0 then
+            local lbl = Instance.new("TextLabel", ridegoCarListWrap)
+            lbl.Size = UDim2.new(1, -8, 0, 40); lbl.BackgroundTransparency = 1
+            lbl.Text = "Chưa quét xe"; lbl.TextColor3 = Color3.fromRGB(150, 160, 180)
+            lbl.TextSize = 10; lbl.Font = Enum.Font.GothamMedium
+            ridegoCarBtn.Text = "🚗 CHỌN XE (0)"
+            return
+        end
+        for i, name in ipairs(carList) do
+            local btn = Instance.new("TextButton", ridegoCarListWrap)
+            btn.Size = UDim2.new(1, -8, 0, 24)
+            btn.BackgroundColor3 = (name == selectedCar) and Color3.fromRGB(0, 150, 120) or Color3.fromRGB(30, 38, 54)
+            btn.Text = "  " .. name
+            btn.TextColor3 = (name == selectedCar) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 230, 240)
+            btn.TextSize = 10; btn.Font = Enum.Font.Code
+            btn.TextXAlignment = Enum.TextXAlignment.Left; btn.TextTruncate = Enum.TextTruncate.AtEnd
+            btn.LayoutOrder = i
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+            btn.MouseButton1Click:Connect(function()
+                selectedCar = name; ridegoSelectedCar = name
+                if writefile then pcall(writefile, "ridegoCar.txt", name) end
+                if ridegoPickLbl then ridegoPickLbl.Text = "🚗 Xe: " .. name end
+                if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. name end
+                renderRidegoCars()
+                ridegoCarListPanel.Visible = false; ridegoCarOpen = false
+            end)
+        end
+        ridegoCarBtn.Text = "🚗 CHỌN XE (" .. #carList .. ")"
     end
-    ridegoTimeLbl = rgLabel(32); ridegoTripsLbl = rgLabel(50); ridegoEarnLbl = rgLabel(68)
-    ridegoStatusCarLbl = rgLabel(86); ridegoStatusLbl = rgLabel(110)
-    ridegoStatusCarLbl.Text = "🚗 Xe: (chưa chọn)"
 
-    task.spawn(function()
-        while true do
-            task.wait(0.3)
-            if enabled then
-                local sec = os.time() - farmStartTime
-                ridegoTimeLbl.Text = "⏱ Thời gian: " .. formatTime(sec)
-                ridegoTripsLbl.Text = "🚕 Chuyến: " .. tostring(stats.trips)
-                ridegoEarnLbl.Text = "💰 Kiếm: Rp " .. formatMoney(stats.earn)
-                if selectedCar ~= "" then ridegoStatusCarLbl.Text = "🚗 Xe: " .. selectedCar end
-                ridegoStatusLbl.Text = "📍 " .. curStatus
-            end
-        end
+    ridegoCarBtn.MouseButton1Click:Connect(function()
+        if enabled then return end
+        ridegoCarOpen = not ridegoCarOpen
+        ridegoCarListPanel.Visible = ridegoCarOpen
     end)
 
-    RunService.Heartbeat:Connect(function()
-        if _G._ridegoEnabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
-            ridegoStatusFrame.Visible = true
-        end
-    end)
-
+    -- ============ SCAN INIT ============
     task.spawn(function()
         task.wait(2)
         pcall(scanCars)
@@ -2702,14 +2632,9 @@ do
         end
         if savedCar ~= "" and #carList > 0 then
             local found = false
-            for _, n in ipairs(carList) do
-                if n == savedCar then found = true; break end
-            end
-            if found then
-                selectedCar = savedCar; ridegoSelectedCar = savedCar
-            elseif not selectedCar or selectedCar == "" then
-                selectedCar = carList[1]; ridegoSelectedCar = selectedCar
-            end
+            for _, n in ipairs(carList) do if n == savedCar then found = true; break end end
+            if found then selectedCar = savedCar; ridegoSelectedCar = savedCar
+            elseif not selectedCar or selectedCar == "" then selectedCar = carList[1]; ridegoSelectedCar = selectedCar end
         elseif #carList > 0 and (not selectedCar or selectedCar == "") then
             selectedCar = carList[1]; ridegoSelectedCar = selectedCar
         end
@@ -2718,8 +2643,29 @@ do
         if ridegoStatusCarLbl then ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)") end
     end)
 
-    -- stopRidego: BO resetCharacter
-    local function stopRidego(forceClose)
+    -- ============ STATUS UPDATER vao HUB ============
+    task.spawn(function()
+        while true do
+            task.wait(0.3)
+            if enabled then
+                local sec = os.time() - farmStartTime
+                if ridegoTimeLbl then ridegoTimeLbl.Text = "⏱ Thời gian: " .. formatTime(sec) end
+                if ridegoTripsLbl then ridegoTripsLbl.Text = "🚕 Chuyến: " .. tostring(stats.trips) end
+                if ridegoEarnLbl then ridegoEarnLbl.Text = "💰 Kiếm: Rp " .. formatMoney(stats.earn) end
+                if ridegoStatusCarLbl and selectedCar ~= "" then ridegoStatusCarLbl.Text = "🚗 Xe: " .. selectedCar end
+                if ridegoStatusLbl then ridegoStatusLbl.Text = "📍 " .. curStatus end
+            end
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if _G._ridegoEnabled and ridegoStatusFrame and not ridegoStatusFrame.Visible then
+            ridegoStatusFrame.Visible = true
+        end
+    end)
+
+    -- ============ STOP ============
+    local function stopRidego()
         enabled = false
         _G._ridegoEnabled = false
         acceptingOrder = false; flying = false
@@ -2735,17 +2681,18 @@ do
             end
         end
         local c = char(); if c then fullCollideOn(c) end
-        resetRidegoState()
+        resetState()
         if writefile then pcall(writefile, "ridegoState.txt", "0") end
         if ridegoStatusFrame then ridegoStatusFrame.Visible = false end
         if ridegoSwitch then ridegoSwitch.set(false) end
         if ridegoCarListPanel then ridegoCarListPanel.Visible = false end
         ridegoCarOpen = false
         setRgStatus("◦ TẮT")
-        -- BO task.spawn(function() resetCharacter() end)
+        task.spawn(function() resetCharacter() end)
     end
     _G._ridegoStop = stopRidego
 
+    -- ============ SWITCH ============
     ridegoSwitch.track.MouseButton1Click:Connect(function()
         if enabled then stopRidego(); return end
         _G._ridegoEnabled = true
@@ -2753,7 +2700,7 @@ do
         ridegoStatusFrame.Visible = true
         pcall(function()
             if _G._officeStop then _G._officeStop(true) end
-            resetRidegoState()
+            resetState()
             farmStartTime = os.time()
             stats.trips = 0; stats.earn = 0
             ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
@@ -2773,7 +2720,7 @@ do
         end)
     end)
 end
--- ============================================================
+    -- ============================================================
 -- WIRING CUOI
 -- ============================================================
 ToggleBtn.MouseButton1Click:Connect(function() HubFrame.Visible = not HubFrame.Visible end)
