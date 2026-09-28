@@ -2392,6 +2392,12 @@ if fakeVelCounter >= 2 then
             updateNpcFollowers()
         end
         task.wait(TICK)
+            -- Tele HRP theo seat moi tick - giu char dinh chat
+local hrpNow = root()
+local vsNow = c:FindFirstChildWhichIsA("VehicleSeat", true)
+if hrpNow and vsNow and vsNow.Parent then
+    pcall(function() hrpNow.CFrame = vsNow.CFrame end)
+            end
     end
 
     if timedOut then
