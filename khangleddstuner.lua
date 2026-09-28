@@ -2322,10 +2322,33 @@ do
         flyWeld.Parent = hrp
     end
 
+    -- Weld khach vao seat cua ho
+    local guestWelds = {}
+    for _, d in ipairs(car:GetDescendants()) do
+        if d:IsA("VehicleSeat") and d.Occupant then
+            local gh = d.Occupant
+            if gh and gh.Parent and gh.Parent ~= myChar then
+                local ghrp = gh.Parent:FindFirstChild("HumanoidRootPart")
+                if ghrp then
+                    local gw = Instance.new("Weld")
+                    gw.Name = "RG_GuestWeld"
+                    gw.Part0 = d
+                    gw.Part1 = ghrp
+                    gw.Parent = ghrp
+                    table.insert(guestWelds, gw)
+                end
+            end
+        end
+    end
+
     local targetFloor = floorBelow(target) or target.Y
     local startPivot = car:GetPivot()
     local startPos = startPivot.Position
-    local skyY = math.max(startPos.Y, target.Y) + 200
+
+    -- Y CAP o 18 (duoi nguong 22)
+    local flightY = math.max(startPos.Y, targetFloor) + 5
+    if flightY > 18 then flightY = 18 end
+    if flightY < 5 then flightY = 5 end
 
     setRgStatus("◦ Chuẩn bị")
     unanchorCar(car)
@@ -2333,32 +2356,46 @@ do
     claimNetworkOwner(car)
     attachNpcFollowers(car)
 
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then pcall(function() p.CanCollide = false end) end
-    end
-    if myChar then
-        for _, p in ipairs(myChar:GetDescendants()) do
-            if p:IsA("BasePart") then pcall(function() p.CanCollide = false end) end
+    -- NOCLIP: xe + char + khach
+    local function setNoclip(on)
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.CanCollide = not on end) end
+        end
+        if myChar then
+            for _, p in ipairs(myChar:GetDescendants()) do
+                if p:IsA("BasePart") then pcall(function() p.CanCollide = not on end) end
+            end
+        end
+        for _, d in ipairs(car:GetDescendants()) do
+            if d:IsA("VehicleSeat") and d.Occupant then
+                local gh = d.Occupant
+                if gh and gh.Parent and gh.Parent ~= myChar then
+                    for _, p in ipairs(gh.Parent:GetDescendants()) do
+                        if p:IsA("BasePart") then pcall(function() p.CanCollide = not on end) end
+                    end
+                end
+            end
         end
     end
+    setNoclip(true)
 
     flying = true
     local flyStart = os.clock()
     local rotOnly = flatYawCFrame(startPivot)
 
-    -- ASCEND len skyY bang BodyPosition
+    -- Ascend len flightY bang BodyPosition (chi Y)
     if vs then
         local bp = Instance.new("BodyPosition")
-        bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bp.MaxForce = Vector3.new(0, 1e6, 0)
         bp.P = 8000; bp.D = 1000
-        bp.Position = Vector3.new(startPos.X, skyY, startPos.Z)
+        bp.Position = Vector3.new(startPos.X, flightY, startPos.Z)
         bp.Parent = vs
         local bg = Instance.new("BodyGyro")
         bg.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
         bg.P = 10000; bg.D = 800
         bg.CFrame = rotOnly
         bg.Parent = vs
-        task.wait(0.5)
+        task.wait(0.4)
         pcall(function() bp:Destroy() end)
         pcall(function() bg:Destroy() end)
         task.wait(0.1)
@@ -2369,7 +2406,7 @@ do
     local timedOut = false
     local lastNpcRefresh = 0
 
-    -- BAY NGANG BANG BODYVELOCITY THAT
+    -- Bay ngang bang BodyVelocity THAT, giu Y
     while enabled do
         local c = myCar or findMyCar()
         if not c then break end
@@ -2385,21 +2422,18 @@ do
         if dist >= DECEL_DIST then spd = STEP_DIST
         else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
 
-        -- BodyVelocity + BodyPosition + BodyGyro (update moi tick)
         local liveVs = c:FindFirstChildWhichIsA("VehicleSeat", true)
         if liveVs then
-            local oldBV = liveVs:FindFirstChild("RG_FlyBV")
-            if oldBV then oldBV:Destroy() end
-            local oldBP = liveVs:FindFirstChild("RG_FlyBP")
-            if oldBP then oldBP:Destroy() end
-            local oldBG = liveVs:FindFirstChild("RG_FlyBG")
-            if oldBG then oldBG:Destroy() end
+            for _, name in ipairs({"RG_FlyBV", "RG_FlyBP", "RG_FlyBG"}) do
+                local o = liveVs:FindFirstChild(name)
+                if o then o:Destroy() end
+            end
 
             local bp = Instance.new("BodyPosition")
             bp.Name = "RG_FlyBP"
-            bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-            bp.P = 4000; bp.D = 500
-            bp.Position = Vector3.new(curP.X, skyY, curP.Z)
+            bp.MaxForce = Vector3.new(0, 1e6, 0)
+            bp.P = 8000; bp.D = 1000
+            bp.Position = Vector3.new(curP.X, flightY, curP.Z)
             bp.Parent = liveVs
 
             local bv = Instance.new("BodyVelocity")
@@ -2428,45 +2462,45 @@ do
     local liveVs2 = car and car:FindFirstChildWhichIsA("VehicleSeat", true)
     if liveVs2 then
         for _, name in ipairs({"RG_FlyBV", "RG_FlyBP", "RG_FlyBG"}) do
-            local obj = liveVs2:FindFirstChild(name)
-            if obj then obj:Destroy() end
+            local o = liveVs2:FindFirstChild(name)
+            if o then o:Destroy() end
         end
     end
 
     if timedOut then
         flying = false
         if flyWeld then pcall(function() flyWeld:Destroy() end) end
+        for _, gw in ipairs(guestWelds) do pcall(function() gw:Destroy() end) end
         detachNpcFollowers()
-        setRgStatus("◦ Bay timeout — thử lại")
+        setNoclip(false)
+        setRgStatus("◦ Bay timeout")
         return false
     end
 
-    -- HA XUONG
+    -- Ha xuong
     car = myCar or findMyCar()
     if car and reached then
         local realFloor = floorBelow(target) or targetFloor
         local upTargetY = realFloor + LAND_OFFSET
-        local vs2 = car:FindFirstChildWhichIsA("VehicleSeat", true)
+        local vs3 = car:FindFirstChildWhichIsA("VehicleSeat", true)
 
-        if vs2 then
+        if vs3 then
             local bp2 = Instance.new("BodyPosition")
-            bp2.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bp2.MaxForce = Vector3.new(0, 1e6, 0)
             bp2.P = 8000; bp2.D = 1000
             bp2.Position = Vector3.new(target.X, upTargetY, target.Z)
-            bp2.Parent = vs2
-            local bg2 = Instance.new("BodyGyro")
-            bg2.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
-            bg2.P = 10000; bg2.D = 800
-            bg2.CFrame = rotOnly
-            bg2.Parent = vs2
-            task.wait(0.5)
-            pcall(function() bp2:Destroy() end)
-            pcall(function() bg2:Destroy() end)
+            bp2.Parent = vs3
+            task.wait(0.4)
+            bp2:Destroy()
         end
-
         task.wait(0.2)
 
         if flyWeld then pcall(function() flyWeld:Destroy() end) flyWeld = nil end
+        for _, gw in ipairs(guestWelds) do pcall(function() gw:Destroy() end) end
+        guestWelds = {}
+        task.wait(0.1)
+
+        setNoclip(false)
         task.wait(0.1)
 
         local hh = hum()
@@ -2476,18 +2510,7 @@ do
             pcall(function() hh:ChangeState(Enum.HumanoidStateType.Seated) end)
         end
 
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
-        end
-        if myChar then
-            for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
-            end
-        end
-        task.wait(0.1)
-
         myCar = car
-
         local finalVs = getDriveSeat(car)
         if hh and finalVs and not hh.Sit then
             pcall(function() finalVs:Sit(hh) end)
@@ -2499,6 +2522,8 @@ do
         startHold()
     else
         if flyWeld then pcall(function() flyWeld:Destroy() end) end
+        for _, gw in ipairs(guestWelds) do pcall(function() gw:Destroy() end) end
+        setNoclip(false)
     end
 
     detachNpcFollowers()
