@@ -2310,25 +2310,22 @@ do
     local hrp = root()
     local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
 
-    -- ============ WELD HRP VAO SEAT (cung) ============
+    -- Weld HRP vao seat
     local flyWeld = nil
     if hrp and vs then
-        -- Set HRP vao seat truoc
         pcall(function() hrp.CFrame = vs.CFrame end)
         task.wait(0.05)
-        -- Tao Weld cung
         flyWeld = Instance.new("Weld")
         flyWeld.Name = "RG_FlyWeld"
         flyWeld.Part0 = vs
         flyWeld.Part1 = hrp
-        flyWeld.C0 = CFrame.new(0, 0, 0)
-        flyWeld.C1 = CFrame.new(0, 0, 0)
         flyWeld.Parent = hrp
-        task.wait(0.05)
     end
 
     local targetFloor = floorBelow(target) or target.Y
-    local underY = targetFloor - UNDERGROUND_DEPTH
+    local startPivot = car:GetPivot()
+    local startPos = startPivot.Position
+    local skyY = math.max(startPos.Y, target.Y) + 200
 
     setRgStatus("◦ Chuẩn bị")
     unanchorCar(car)
@@ -2347,70 +2344,93 @@ do
 
     flying = true
     local flyStart = os.clock()
-    local startPivot = car:GetPivot()
     local rotOnly = flatYawCFrame(startPivot)
-    local curPos = startPivot.Position
 
-    -- DESCEND
-    local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
-    for i = 1, UNDER_DESCEND_STEPS do
-        curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
-        task.wait(UNDER_STEP_TIME)
+    -- ASCEND len skyY bang BodyPosition
+    if vs then
+        local bp = Instance.new("BodyPosition")
+        bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bp.P = 8000; bp.D = 1000
+        bp.Position = Vector3.new(startPos.X, skyY, startPos.Z)
+        bp.Parent = vs
+        local bg = Instance.new("BodyGyro")
+        bg.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
+        bg.P = 10000; bg.D = 800
+        bg.CFrame = rotOnly
+        bg.Parent = vs
+        task.wait(0.5)
+        pcall(function() bp:Destroy() end)
+        pcall(function() bg:Destroy() end)
+        task.wait(0.1)
     end
 
     setRgStatus("◦ " .. flyingLabel)
     local reached = false
     local timedOut = false
     local lastNpcRefresh = 0
-    local fakeVelCounter = 0
 
+    -- BAY NGANG BANG BODYVELOCITY THAT
     while enabled do
         local c = myCar or findMyCar()
         if not c then break end
-        if os.clock() - flyStart > FLY_TIMEOUT then
-            timedOut = true
-            break
-        end
+        if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
 
         local curP = c:GetPivot().Position
         local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
         local dist = flat.Magnitude
-
-        if dist < ARRIVE_DIST then
-            reached = true
-            break
-        end
+        if dist < ARRIVE_DIST then reached = true; break end
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-
         local spd
-        if dist >= DECEL_DIST then
-            spd = STEP_DIST
-        else
-            spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
+        if dist >= DECEL_DIST then spd = STEP_DIST
+        else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
+
+        -- BodyVelocity + BodyPosition + BodyGyro (update moi tick)
+        local liveVs = c:FindFirstChildWhichIsA("VehicleSeat", true)
+        if liveVs then
+            local oldBV = liveVs:FindFirstChild("RG_FlyBV")
+            if oldBV then oldBV:Destroy() end
+            local oldBP = liveVs:FindFirstChild("RG_FlyBP")
+            if oldBP then oldBP:Destroy() end
+            local oldBG = liveVs:FindFirstChild("RG_FlyBG")
+            if oldBG then oldBG:Destroy() end
+
+            local bp = Instance.new("BodyPosition")
+            bp.Name = "RG_FlyBP"
+            bp.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            bp.P = 4000; bp.D = 500
+            bp.Position = Vector3.new(curP.X, skyY, curP.Z)
+            bp.Parent = liveVs
+
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "RG_FlyBV"
+            bv.MaxForce = Vector3.new(1e6, 0, 1e6)
+            bv.Velocity = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+            bv.P = 5000
+            bv.Parent = liveVs
+
+            local bg = Instance.new("BodyGyro")
+            bg.Name = "RG_FlyBG"
+            bg.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
+            bg.P = 10000; bg.D = 800
+            bg.CFrame = rotOnly
+            bg.Parent = liveVs
         end
 
-        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
-        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-        pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
-
-        fakeVelCounter = fakeVelCounter + 1
-        if fakeVelCounter >= 2 then
-            fakeVelCounter = 0
-            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
-            for _, p in ipairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
-                end
-            end
-        end
-
-        if os.clock() - lastNpcRefresh > 0.05 then
+        if os.clock() - lastNpcRefresh > 0.1 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
         end
-        task.wait(TICK)
+        task.wait(0.05)
+    end
+
+    -- Cleanup constraints
+    local liveVs2 = car and car:FindFirstChildWhichIsA("VehicleSeat", true)
+    if liveVs2 then
+        for _, name in ipairs({"RG_FlyBV", "RG_FlyBP", "RG_FlyBG"}) do
+            local obj = liveVs2:FindFirstChild(name)
+            if obj then obj:Destroy() end
+        end
     end
 
     if timedOut then
@@ -2421,51 +2441,41 @@ do
         return false
     end
 
-    -- ZERO VELOCITY
+    -- HA XUONG
     car = myCar or findMyCar()
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.AssemblyLinearVelocity = Vector3.zero end)
-                pcall(function() p.AssemblyAngularVelocity = Vector3.zero end)
-            end
-        end
-    end
-    task.wait(0.2)
-
-    -- ASCEND
     if car and reached then
         local realFloor = floorBelow(target) or targetFloor
         local upTargetY = realFloor + LAND_OFFSET
-        local curP2 = car:GetPivot().Position
+        local vs2 = car:FindFirstChildWhichIsA("VehicleSeat", true)
 
-        local ascendSteps = 15
-        local upStepY = (upTargetY - curP2.Y) / ascendSteps
-        for i = 1, ascendSteps do
-            curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
-            pcall(function() car:PivotTo(CFrame.new(curP2) * rotOnly) end)
-            task.wait(0.05)
+        if vs2 then
+            local bp2 = Instance.new("BodyPosition")
+            bp2.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bp2.P = 8000; bp2.D = 1000
+            bp2.Position = Vector3.new(target.X, upTargetY, target.Z)
+            bp2.Parent = vs2
+            local bg2 = Instance.new("BodyGyro")
+            bg2.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
+            bg2.P = 10000; bg2.D = 800
+            bg2.CFrame = rotOnly
+            bg2.Parent = vs2
+            task.wait(0.5)
+            pcall(function() bp2:Destroy() end)
+            pcall(function() bg2:Destroy() end)
         end
 
-        task.wait(0.3)
+        task.wait(0.2)
 
-        -- XOA FLY WELD
-        if flyWeld then
-            pcall(function() flyWeld:Destroy() end)
-            flyWeld = nil
-        end
+        if flyWeld then pcall(function() flyWeld:Destroy() end) flyWeld = nil end
         task.wait(0.1)
 
-        -- RESET HUMANOID STATE ve Running truoc khi bat CanCollide
         local hh = hum()
         if hh then
             pcall(function() hh:ChangeState(Enum.HumanoidStateType.Running) end)
             task.wait(0.05)
             pcall(function() hh:ChangeState(Enum.HumanoidStateType.Seated) end)
-            task.wait(0.05)
         end
 
-        -- BAT CanCollide
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
         end
@@ -2477,11 +2487,9 @@ do
         task.wait(0.1)
 
         myCar = car
-        pcall(function() hum().AutoRotate = false end)
 
-        -- Sit lai
         local finalVs = getDriveSeat(car)
-        if hh and finalVs then
+        if hh and finalVs and not hh.Sit then
             pcall(function() finalVs:Sit(hh) end)
             task.wait(0.15)
             pcall(function() hh.Sit = true end)
@@ -2499,11 +2507,7 @@ do
     task.wait(0.1)
 
     local h2 = hum()
-    if not h2 or not h2.Sit then
-        forceSeat()
-        task.wait(0.2)
-    end
-
+    if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
     task.wait(0.15)
     return reached
     end
