@@ -1922,7 +1922,7 @@ do
     local UNDER_DESCEND_STEPS = 12
     local UNDER_STEP_TIME     = 0.03
     local TRIP_MILESTONE      = 10
-    local FLY_TIMEOUT         = 30
+    local FLY_TIMEOUT         = 9999
     local SEAT_DELAY          = 0.5
 
     -- ============ STATE ============
@@ -2568,16 +2568,16 @@ end
             acceptingOrder = false; setRgStatus("◦ Đã có đơn — bay luôn")
         end
         local ok1 = flyTo(pickupPos, "đón khách")
-        if not enabled then return end
-        if not ok1 then recoverFromTimeout(); return end
+if not enabled then return end
+if not ok1 then return end
         setRgStatus("◦ Đã tới"); forceSeat()
         setRgStatus("⌛ Đợi khách lên xe (4s)")
         task.wait(PICKUP_WAIT)
         if not enabled then return end
         if dropPos then
             local ok2 = flyTo(dropPos, "đưa khách tới nơi")
-            if not enabled then return end
-            if not ok2 then recoverFromTimeout(); return end
+if not enabled then return end
+if not ok2 then return end
             setRgStatus("◦ Đã tới"); forceSeat()
             setRgStatus("⌛ Đợi khách xuống xe (5s)")
             task.wait(DROP_WAIT)
