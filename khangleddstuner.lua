@@ -1886,13 +1886,15 @@ task.spawn(function()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
 
         local function textIsPlay(s)
-            if not s or s == "" then return false end
-            local u = s:upper()
-            return u == "CHƠI" or u == "CHOI"
-                or u == "PLAY" or u == "START"
-                or u:find("CHƠI") or u:find("PLAY")
-                or u:find("CHOI") or u:find("BẮT ĐẦU")
-        end
+    if not s or s == "" then return false end
+    s = s:gsub("%s+", "")
+    local u = s:upper()
+    return u == "CHƠI" or u == "CHOI"
+        or u == "PLAY" or u == "START"
+        or u == "BẮTĐẦU"
+        or u:find("CHƠI") or u:find("PLAY")
+        or u:find("CHOI") or u:find("BẮTĐẦU")
+end
 
         for _, d in ipairs(pg:GetDescendants()) do
             if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then
