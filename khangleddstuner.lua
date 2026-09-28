@@ -2456,7 +2456,7 @@ do
         return true
     end
     local function doRestartInit()
-        resetCharacter(); task.wait(0.5)
+        task.wait(0.5)
         setRgStatus("◦ Spawn xe")
         if not spawnAndSeat() then return false end
         myCar = findMyCar()
@@ -2482,7 +2482,7 @@ do
         end
         local c = char(); if c then fullCollideOn(c) end
         resetState()
-        resetCharacter()
+    
         if not enabled then return end
         farmStartTime = os.time()
         fire(TaxiEvent, "GoOffline"); task.wait(1)
@@ -2688,7 +2688,7 @@ do
         if ridegoCarListPanel then ridegoCarListPanel.Visible = false end
         ridegoCarOpen = false
         setRgStatus("◦ TẮT")
-        task.spawn(function() resetCharacter() end)
+        
     end
     _G._ridegoStop = stopRidego
 
