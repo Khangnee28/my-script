@@ -2345,25 +2345,25 @@ do
 
     -- BAY NGANG - bo fake velocity, tang tick
     while enabled do
-        local c = myCar or findMyCar(); if not c then break end
-        if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
-        local curP = c:GetPivot().Position
-        local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
-        local dist = flat.Magnitude
-        if dist < ARRIVE_DIST then reached = true; break end
-        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-        local spd
-        if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
-        local step = math.min(spd * 0.08, dist, UNDER_STEP_MAX)
-        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-        pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
+    local c = myCar or findMyCar(); if not c then break end
+    if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
+    local curP = c:GetPivot().Position
+    local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
+    local dist = flat.Magnitude
+    if dist < ARRIVE_DIST then reached = true; break end
+    local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+    local spd
+    if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
+    local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+    local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
+    pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
-        if os.clock() - lastNpcRefresh > 0.1 then
-            lastNpcRefresh = os.clock()
-            updateNpcFollowers()
-        end
-        task.wait(0.08)
+    if os.clock() - lastNpcRefresh > 0.05 then
+        lastNpcRefresh = os.clock()
+        updateNpcFollowers()
     end
+    task.wait(TICK)
+end
 
     if timedOut then
         flying = false
