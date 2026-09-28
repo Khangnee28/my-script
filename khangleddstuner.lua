@@ -2310,6 +2310,23 @@ do
     local hrp = root()
     local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
 
+    -- ============ WELD HRP VAO SEAT (cung) ============
+    local flyWeld = nil
+    if hrp and vs then
+        -- Set HRP vao seat truoc
+        pcall(function() hrp.CFrame = vs.CFrame end)
+        task.wait(0.05)
+        -- Tao Weld cung
+        flyWeld = Instance.new("Weld")
+        flyWeld.Name = "RG_FlyWeld"
+        flyWeld.Part0 = vs
+        flyWeld.Part1 = hrp
+        flyWeld.C0 = CFrame.new(0, 0, 0)
+        flyWeld.C1 = CFrame.new(0, 0, 0)
+        flyWeld.Parent = hrp
+        task.wait(0.05)
+    end
+
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
@@ -2338,11 +2355,7 @@ do
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
     for i = 1, UNDER_DESCEND_STEPS do
         curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        local cf = CFrame.new(curPos) * rotOnly
-        pcall(function() car:PivotTo(cf) end)
-        if hrp and vs and vs.Parent then
-            pcall(function() hrp.CFrame = vs.CFrame end)
-        end
+        pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
         task.wait(UNDER_STEP_TIME)
     end
 
@@ -2371,7 +2384,6 @@ do
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- TOC DO linear (dung goc v27.6)
         local spd
         if dist >= DECEL_DIST then
             spd = STEP_DIST
@@ -2383,7 +2395,6 @@ do
         local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
         pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
-        -- FAKE VELOCITY cho TAT CA parts (nhu goc)
         fakeVelCounter = fakeVelCounter + 1
         if fakeVelCounter >= 2 then
             fakeVelCounter = 0
@@ -2395,13 +2406,6 @@ do
             end
         end
 
-        -- TELE HRP THEO SEAT MOI TICK - giu char dinh chat
-        local hrpNow = root()
-        local vsNow = c:FindFirstChildWhichIsA("VehicleSeat", true)
-        if hrpNow and vsNow and vsNow.Parent then
-            pcall(function() hrpNow.CFrame = vsNow.CFrame end)
-        end
-
         if os.clock() - lastNpcRefresh > 0.05 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
@@ -2411,41 +2415,57 @@ do
 
     if timedOut then
         flying = false
+        if flyWeld then pcall(function() flyWeld:Destroy() end) end
         detachNpcFollowers()
         setRgStatus("◦ Bay timeout — thử lại")
         return false
     end
 
-    -- ZERO VELOCITY chi PrimaryPart (khong loop toan bo)
+    -- ZERO VELOCITY
     car = myCar or findMyCar()
-    if car and car.PrimaryPart then
-        pcall(function() car.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end)
-        pcall(function() car.PrimaryPart.AssemblyAngularVelocity = Vector3.zero end)
+    if car then
+        for _, p in ipairs(car:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() p.AssemblyLinearVelocity = Vector3.zero end)
+                pcall(function() p.AssemblyAngularVelocity = Vector3.zero end)
+            end
+        end
     end
-    task.wait(0.15)
+    task.wait(0.2)
 
     -- ASCEND
     if car and reached then
-        local vs2 = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        local hrp2 = root()
         local realFloor = floorBelow(target) or targetFloor
         local upTargetY = realFloor + LAND_OFFSET
         local curP2 = car:GetPivot().Position
 
-        local ascendSteps = 20
+        local ascendSteps = 15
         local upStepY = (upTargetY - curP2.Y) / ascendSteps
         for i = 1, ascendSteps do
             curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
-            local cf = CFrame.new(curP2) * rotOnly
-            pcall(function() car:PivotTo(cf) end)
-            if hrp2 and vs2 and vs2.Parent then
-                pcall(function() hrp2.CFrame = vs2.CFrame end)
-            end
+            pcall(function() car:PivotTo(CFrame.new(curP2) * rotOnly) end)
             task.wait(0.05)
         end
 
-        task.wait(0.2)
+        task.wait(0.3)
 
+        -- XOA FLY WELD
+        if flyWeld then
+            pcall(function() flyWeld:Destroy() end)
+            flyWeld = nil
+        end
+        task.wait(0.1)
+
+        -- RESET HUMANOID STATE ve Running truoc khi bat CanCollide
+        local hh = hum()
+        if hh then
+            pcall(function() hh:ChangeState(Enum.HumanoidStateType.Running) end)
+            task.wait(0.05)
+            pcall(function() hh:ChangeState(Enum.HumanoidStateType.Seated) end)
+            task.wait(0.05)
+        end
+
+        -- BAT CanCollide
         for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
         end
@@ -2459,9 +2479,9 @@ do
         myCar = car
         pcall(function() hum().AutoRotate = false end)
 
-        local hh = hum()
+        -- Sit lai
         local finalVs = getDriveSeat(car)
-        if hh and finalVs and not hh.Sit then
+        if hh and finalVs then
             pcall(function() finalVs:Sit(hh) end)
             task.wait(0.15)
             pcall(function() hh.Sit = true end)
@@ -2469,6 +2489,8 @@ do
         task.wait(0.1)
 
         startHold()
+    else
+        if flyWeld then pcall(function() flyWeld:Destroy() end) end
     end
 
     detachNpcFollowers()
