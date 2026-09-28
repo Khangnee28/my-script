@@ -2397,15 +2397,6 @@ end)
     local hrp = root()
     local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
 
-    -- ANCHOR HRP truoc khi bay - giu char khong bi eject/rớt
-    local wasHrpAnchored = false
-    if hrp then
-        pcall(function()
-            wasHrpAnchored = hrp.Anchored
-            hrp.Anchored = true
-        end)
-    end
-
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
     setRgStatus("◦ Chuẩn bị")
@@ -2424,97 +2415,115 @@ end)
     local startPivot = car:GetPivot()
     local rotOnly = flatYawCFrame(startPivot)
     local curPos = startPivot.Position
+
+    -- DESCEND: tele HRP TRUOC roi PivotTo XE SAU (khong anchor HRP)
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
     for i = 1, UNDER_DESCEND_STEPS do
         curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
-        -- TELE HRP theo seat moi step - giu khoang cach char-xe < 5 studs
-        if hrp and vs and vs.Parent then
-            pcall(function() hrp.CFrame = vs.CFrame end)
-        end
+        local cf = CFrame.new(curPos) * rotOnly
+        if hrp then pcall(function() hrp.CFrame = cf end) end
+        pcall(function() car:PivotTo(cf) end)
         task.wait(UNDER_STEP_TIME)
     end
-        setRgStatus("◦ " .. flyingLabel)
-local reached = false; local timedOut = false
-local lastNpcRefresh = 0; local fakeVelCounter = 0
-while enabled do
-    local c = myCar or findMyCar(); if not c then break end
-    if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
-    local curP = c:GetPivot().Position
-    local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
-    local dist = flat.Magnitude
-    if dist < ARRIVE_DIST then reached = true; break end
-    local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
-    local spd
-    if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
-    local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
-    local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-    pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
 
-    -- TELE HRP theo seat moi tick
-    local liveVs = c:FindFirstChildWhichIsA("VehicleSeat", true)
-    if hrp and liveVs then
-        pcall(function() hrp.CFrame = liveVs.CFrame end)
+    setRgStatus("◦ " .. flyingLabel)
+    local reached = false; local timedOut = false
+    local lastNpcRefresh = 0; local fakeVelCounter = 0
+
+    while enabled do
+        local c = myCar or findMyCar(); if not c then break end
+        if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
+        local curP = c:GetPivot().Position
+        local flat = Vector3.new(target.X - curP.X, 0, target.Z - curP.Z)
+        local dist = flat.Magnitude
+        if dist < ARRIVE_DIST then reached = true; break end
+        local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
+        local spd
+        if dist >= DECEL_DIST then spd = STEP_DIST else spd = math.max(STEP_DIST * dist / DECEL_DIST, 6) end
+        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
+        local nextCF = CFrame.new(nextPos) * rotOnly
+
+        -- TELE HRP TRUOC, PivotTo XE SAU - char luon o dung cho truoc khi Roblox sync
+        if hrp then pcall(function() hrp.CFrame = nextCF end) end
+        pcall(function() c:PivotTo(nextCF) end)
+
+        fakeVelCounter = fakeVelCounter + 1
+        if fakeVelCounter >= 2 then
+            fakeVelCounter = 0
+            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") then pcall(function() p.AssemblyLinearVelocity = fakeV end) end
+            end
+        end
+        if os.clock() - lastNpcRefresh > 0.05 then lastNpcRefresh = os.clock(); updateNpcFollowers() end
+        task.wait(TICK)
     end
 
-    fakeVelCounter = fakeVelCounter + 1
-    if fakeVelCounter >= 2 then
-        fakeVelCounter = 0
-        local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
-        for _, p in ipairs(c:GetDescendants()) do
-            if p:IsA("BasePart") then pcall(function() p.AssemblyLinearVelocity = fakeV end) end
+    if timedOut then
+        flying = false
+        detachNpcFollowers()
+        setRgStatus("⚠ Bay quá 30s — hủy")
+        return false
+    end
+
+    -- ASCEND: tele HRP + PivotTo XE len mat dat CUNG LUC
+    car = myCar or findMyCar()
+    if car and reached then
+        local realFloor = floorBelow(target) or targetFloor
+        local upTargetY = realFloor + LAND_OFFSET
+        local upCF = CFrame.new(Vector3.new(target.X, upTargetY, target.Z)) * rotOnly
+
+        -- Tele HRP TRUOC
+        if hrp then pcall(function() hrp.CFrame = upCF end) end
+        -- PivotTo XE SAU
+        pcall(function() car:PivotTo(upCF) end)
+        task.wait(0.3)
+
+        -- Sit lai
+        local hh = hum()
+        local finalVs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+        if hh and finalVs then
+            pcall(function() finalVs:Sit(hh) end)
+            task.wait(0.15)
+            pcall(function() hh.Sit = true end)
+            pcall(function() hh.AutoRotate = false end)
+        end
+
+        myCar = car
+        startHold()
+    end
+
+    if not enabled then
+        flying = false
+        detachNpcFollowers()
+        return false
+    end
+
+    detachNpcFollowers()
+    flying = false
+
+    -- Bat CanCollide lai SAU khi da o dung vi tri
+    task.wait(0.15)
+    local c2 = myCar or findMyCar()
+    if c2 then
+        for _, p in ipairs(c2:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
         end
     end
-    if os.clock() - lastNpcRefresh > 0.05 then lastNpcRefresh = os.clock(); updateNpcFollowers() end
-    task.wait(TICK)
-end
-        if timedOut then
-    flying = false
-    -- unanchor HRP truoc khi return
-    if hrp then pcall(function() hrp.Anchored = wasHrpAnchored end) end
-    detachNpcFollowers()
-    setRgStatus("⚠ Bay quá 30s — hủy")
-    return false
-end
+    local c3 = char()
+    if c3 then
+        for _, p in ipairs(c3:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+        end
+    end
 
--- LUON chồi lên trước khi check enabled
-car = myCar or findMyCar()
-if car and reached then
-    ascendToGround(car, target, targetFloor)
-    myCar = car
-    startHold()
-    pcall(function() hum().AutoRotate = false end)
-end
-
--- FORCE SIT lại trước khi unanchor HRP (đảm bảo char dính vào seat)
-local hh = hum()
-local finalVs = car and car:FindFirstChildWhichIsA("VehicleSeat", true)
-if hh and finalVs then
-    pcall(function() finalVs:Sit(hh) end)
-    task.wait(0.15)
-    pcall(function() hh.Sit = true end)
+    if not h.Sit then forceSeat() end
     task.wait(0.1)
-end
-
--- UNANCHOR HRP sau khi đã sit chắc
-if hrp then pcall(function() hrp.Anchored = wasHrpAnchored end) end
-task.wait(0.1)
-
--- Sau khi đã chồi lên an toàn mới check enabled
-if not enabled then
-    flying = false
-    detachNpcFollowers()
-    return false
-end
-
-detachNpcFollowers()
-flying = false
-if not h.Sit then forceSeat() end
-task.wait(0.1)
-local h2 = hum()
-if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
-task.wait(0.15)
-return reached
+    local h2 = hum()
+    if not h2 or not h2.Sit then forceSeat(); task.wait(0.2) end
+    task.wait(0.15)
+    return reached
     end
 
     local function spawnAndSeat()
