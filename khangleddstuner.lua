@@ -2364,37 +2364,29 @@ do
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
-        -- TOC DO: giam gap khi gan toi
-        local spd
-        if dist >= DECEL_DIST then
-            spd = STEP_DIST
-        elseif dist > 80 then
-            spd = math.max(STEP_DIST * dist / DECEL_DIST, 40)
-        elseif dist > 40 then
-            spd = math.max(40 * (dist - 40) / 40 + 15, 15)
-        else
-            spd = math.max(dist * 1.2, 6)
+-- TOC DO: cong thuc goc v27.6 (linear, khong tier)
+local spd
+if dist >= DECEL_DIST then
+    spd = STEP_DIST
+else
+    spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
+end
+
+local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+
+local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
+pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
+
+fakeVelCounter = fakeVelCounter + 1
+if fakeVelCounter >= 2 then
+    fakeVelCounter = 0
+    local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+    for _, p in ipairs(c:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.AssemblyLinearVelocity = fakeV end)
         end
-
-        -- STEP: giam manh khi dist nho
-        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
-        if dist < 30 then step = math.min(step, dist * 0.35) end
-
-        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-        pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
-
-        -- FAKE VELOCITY: scale theo spd hien tai (giam dan khi gan)
-        fakeVelCounter = fakeVelCounter + 1
-        if fakeVelCounter >= 2 then
-            fakeVelCounter = 0
-            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
-            for _, p in ipairs(c:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
-                end
+    end
             end
-        end
-
         if os.clock() - lastNpcRefresh > 0.05 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
