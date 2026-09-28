@@ -1942,7 +1942,7 @@ end
         return nil
     end
 
-    task.wait(15)
+    task.wait(10)
 
     -- BUOC 1: click CHƠI menu chinh
     local btn1 = nil
@@ -1963,73 +1963,54 @@ end
     end
 
     
-    -- ========== BUOC 2: doi menu doi, click nut CHƠI lan 2 ==========
--- Doi menu chinh CHƠI an di (hoac destroy) => da sang menu doi
-local waitStart = os.clock()
-while os.clock() - waitStart < 15 do
-    if not btn1 or not btn1.Parent or not btn1.Visible then break end
-    task.wait(0.3)
-end
-task.wait(2)
+        -- ========== BUOC 2: doi 5s cho menu doi render, fire remote menuToggleRequest ==========
+    task.wait(5)
 
--- Tim nut CHƠI menu doi (khong so sanh voi btn1)
-local btn2 = nil
-for i = 1, 30 do
-    local b = findPlayBtn()
-    if b and b.Visible and b.AbsoluteSize.X > 40 and b.AbsoluteSize.Y > 20 then
-        btn2 = b
-        break
+    local fired = false
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        local remote = rs:FindFirstChild("menuToggleRequest") or rs:WaitForChild("menuToggleRequest", 5)
+        if remote then
+            remote:FireServer()
+            fired = true
+        end
+    end)
+    if not fired then
+        -- Fallback: click nut CHƠI menu doi neu remote fail
+        for i = 1, 20 do
+            local b = findPlayBtn()
+            if b and b.Visible and b.AbsoluteSize.X > 40 then
+                pcall(function() firesignal(b.MouseButton1Click) end)
+                task.wait(0.3)
+                local bx = b.AbsolutePosition.X + b.AbsoluteSize.X / 2
+                local by = b.AbsolutePosition.Y + b.AbsoluteSize.Y / 2
+                pcall(function() touchpress(bx, by); task.wait(0.2); touchrelease(bx, by) end)
+                break
+            end
+            task.wait(1)
+        end
     end
-    task.wait(1)
-end
 
-if btn2 then
-    -- Multi-method click: firesignal + touchpress + VIM mouse
-    local x2 = btn2.AbsolutePosition.X + btn2.AbsoluteSize.X / 2
-    local y2 = btn2.AbsolutePosition.Y + btn2.AbsoluteSize.Y / 2
-
-    pcall(function() firesignal(btn2.MouseButton1Click) end)
-    task.wait(0.2)
-
-    pcall(function()
-        touchpress(x2, y2); task.wait(0.15); touchrelease(x2, y2)
-    end)
-    task.wait(0.2)
-
-    pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(x2, y2, 0, true, game, 1)
-        task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(x2, y2, 0, false, game, 1)
-    end)
-
-elseif btn1 then
-    -- Fallback: click lai toa do nut cu
-    local x1 = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
-    local y1 = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
-    pcall(function()
-        touchpress(x1, y1); task.wait(0.2); touchrelease(x1, y1)
-    end)
-end
-
+    -- Xoa marker rejoin
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
-    -- BUOC 3: doi 15s
-    task.wait(15)
+    -- ========== BUOC 3: doi 10s cho vao han game ==========
+    task.wait(10)
 
-    -- BUOC 4: doc state office
+    -- ========== BUOC 4: doc state farm office ==========
     local officeFlag = false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
         if ok and v == "1" then officeFlag = true end
     end
 
-    -- BUOC 5: doi map + bat office farm
+    -- ========== BUOC 5: doi map load + bat office ==========
     if officeFlag then
         for _ = 1, 60 do
             if workspace:FindFirstChild("Computers") then break end
             task.wait(1)
         end
-        task.wait(5)
+        task.wait(3)
         pcall(function()
             if farmSwitch and farmSwitch.track then
                 firesignal(farmSwitch.track.MouseButton1Click)
@@ -2037,3 +2018,4 @@ end
         end)
     end
 end)
+            
