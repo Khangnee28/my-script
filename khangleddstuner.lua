@@ -2694,30 +2694,37 @@ do
 
     -- ============ SWITCH ============
     ridegoSwitch.track.MouseButton1Click:Connect(function()
-        if enabled then stopRidego(); return end
-        _G._ridegoEnabled = true
-        enabled = true
-        ridegoStatusFrame.Visible = true
-        pcall(function()
-            if _G._officeStop then _G._officeStop(true) end
-            resetState()
-            farmStartTime = os.time()
-            stats.trips = 0; stats.earn = 0
-            ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
-            ridegoTripsLbl.Text = "🚕 Chuyến: 0"
-            ridegoEarnLbl.Text = "💰 Kiếm: Rp 0"
-            ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
-            ridegoStatusLbl.Text = "📍 ◦ Đang khởi động"
-            if writefile then
-                pcall(writefile, "ridegoState.txt", "1")
-                pcall(writefile, "farmState.txt", "0")
-            end
-            if queue_on_teleport then
-                pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
-            end
-            ridegoSwitch.set(true)
-            startLoop()
-        end)
+    ridegoSwitch.track.MouseButton1Click:Connect(function()
+    if enabled then stopRidego(); return end
+    _G._ridegoEnabled = true
+    enabled = true
+    ridegoStatusFrame.Visible = true
+
+    if _G._officeStop then pcall(_G._officeStop, true) end
+
+    resetState()
+    farmStartTime = os.time()
+    stats.trips = 0
+    stats.earn = 0
+
+    ridegoTimeLbl.Text = "⏱ Thời gian: 00:00:00"
+    ridegoTripsLbl.Text = "🚕 Chuyến: 0"
+    ridegoEarnLbl.Text = "💰 Kiếm: Rp 0"
+    ridegoStatusCarLbl.Text = "🚗 Xe: " .. ((selectedCar ~= "" and selectedCar) or "(chưa chọn)")
+    ridegoStatusLbl.Text = "📍 ◦ Đang khởi động"
+
+    if writefile then
+        pcall(writefile, "ridegoState.txt", "1")
+        pcall(writefile, "farmState.txt", "0")
+    end
+
+    if queue_on_teleport then
+        pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+    end
+
+    ridegoSwitch.set(true)
+    startLoop()
+end)
     end)
 end
     -- ============================================================
