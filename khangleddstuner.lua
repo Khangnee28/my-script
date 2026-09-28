@@ -2297,7 +2297,6 @@ do
         task.wait(0.15)
     end
 
-    -- ============ FLY TO (nguyên gốc v27.6) ============
     local function flyTo(target, flyingLabel)
     flyingLabel = flyingLabel or "bay"
     stopHold()
@@ -2308,6 +2307,9 @@ do
     pcall(function() h.AutoRotate = false end)
 
     local myChar = char()
+    local hrp = root()
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+
     local targetFloor = floorBelow(target) or target.Y
     local underY = targetFloor - UNDERGROUND_DEPTH
 
@@ -2332,10 +2334,15 @@ do
     local rotOnly = flatYawCFrame(startPivot)
     local curPos = startPivot.Position
 
+    -- DESCEND
     local downStepY = (underY - curPos.Y) / UNDER_DESCEND_STEPS
     for i = 1, UNDER_DESCEND_STEPS do
         curPos = Vector3.new(curPos.X, curPos.Y + downStepY, curPos.Z)
-        pcall(function() car:PivotTo(CFrame.new(curPos) * rotOnly) end)
+        local cf = CFrame.new(curPos) * rotOnly
+        pcall(function() car:PivotTo(cf) end)
+        if hrp and vs and vs.Parent then
+            pcall(function() hrp.CFrame = vs.CFrame end)
+        end
         task.wait(UNDER_STEP_TIME)
     end
 
@@ -2364,40 +2371,42 @@ do
 
         local dir = (dist > 0.01) and flat.Unit or Vector3.new(1, 0, 0)
 
--- TOC DO: cong thuc goc v27.6 (linear, khong tier)
-local spd
-if dist >= DECEL_DIST then
-    spd = STEP_DIST
-else
-    spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
-end
-
-local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
-
-local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
-pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
-
-fakeVelCounter = fakeVelCounter + 1
-if fakeVelCounter >= 2 then
-    fakeVelCounter = 0
-    local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
-    for _, p in ipairs(c:GetDescendants()) do
-        if p:IsA("BasePart") then
-            pcall(function() p.AssemblyLinearVelocity = fakeV end)
+        -- TOC DO linear (dung goc v27.6)
+        local spd
+        if dist >= DECEL_DIST then
+            spd = STEP_DIST
+        else
+            spd = math.max(STEP_DIST * dist / DECEL_DIST, 6)
         end
-    end
+
+        local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
+        local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
+        pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
+
+        -- FAKE VELOCITY cho TAT CA parts (nhu goc)
+        fakeVelCounter = fakeVelCounter + 1
+        if fakeVelCounter >= 2 then
+            fakeVelCounter = 0
+            local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+            for _, p in ipairs(c:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
+                end
             end
+        end
+
+        -- TELE HRP THEO SEAT MOI TICK - giu char dinh chat
+        local hrpNow = root()
+        local vsNow = c:FindFirstChildWhichIsA("VehicleSeat", true)
+        if hrpNow and vsNow and vsNow.Parent then
+            pcall(function() hrpNow.CFrame = vsNow.CFrame end)
+        end
+
         if os.clock() - lastNpcRefresh > 0.05 then
             lastNpcRefresh = os.clock()
             updateNpcFollowers()
         end
         task.wait(TICK)
-            -- Tele HRP theo seat moi tick - giu char dinh chat
-local hrpNow = root()
-local vsNow = c:FindFirstChildWhichIsA("VehicleSeat", true)
-if hrpNow and vsNow and vsNow.Parent then
-    pcall(function() hrpNow.CFrame = vsNow.CFrame end)
-            end
     end
 
     if timedOut then
@@ -2407,68 +2416,61 @@ if hrpNow and vsNow and vsNow.Parent then
         return false
     end
 
-    -- ============ ZERO VELOCITY TRUOC ASCEND ============
+    -- ZERO VELOCITY chi PrimaryPart (khong loop toan bo)
     car = myCar or findMyCar()
-    if car then
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then
-                pcall(function() p.AssemblyLinearVelocity = Vector3.zero end)
-                pcall(function() p.AssemblyAngularVelocity = Vector3.zero end)
+    if car and car.PrimaryPart then
+        pcall(function() car.PrimaryPart.AssemblyLinearVelocity = Vector3.zero end)
+        pcall(function() car.PrimaryPart.AssemblyAngularVelocity = Vector3.zero end)
+    end
+    task.wait(0.15)
+
+    -- ASCEND
+    if car and reached then
+        local vs2 = car:FindFirstChildWhichIsA("VehicleSeat", true)
+        local hrp2 = root()
+        local realFloor = floorBelow(target) or targetFloor
+        local upTargetY = realFloor + LAND_OFFSET
+        local curP2 = car:GetPivot().Position
+
+        local ascendSteps = 20
+        local upStepY = (upTargetY - curP2.Y) / ascendSteps
+        for i = 1, ascendSteps do
+            curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
+            local cf = CFrame.new(curP2) * rotOnly
+            pcall(function() car:PivotTo(cf) end)
+            if hrp2 and vs2 and vs2.Parent then
+                pcall(function() hrp2.CFrame = vs2.CFrame end)
             end
+            task.wait(0.05)
         end
-    end
-    task.wait(0.2)
 
-    -- ============ ASCEND BANG PIVOTTO TUNG BUOC + TELE HRP ============
-if car and reached then
-    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-    local hrp = root()
-    local realFloor = floorBelow(target) or targetFloor
-    local upTargetY = realFloor + LAND_OFFSET
-    local curP2 = car:GetPivot().Position
+        task.wait(0.2)
 
-    -- 20 buoc nho, moi buoc tele HRP theo seat
-    local ascendSteps = 20
-    local upStepY = (upTargetY - curP2.Y) / ascendSteps
-    for i = 1, ascendSteps do
-        curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
-        local cf = CFrame.new(curP2) * rotOnly
-        pcall(function() car:PivotTo(cf) end)
-        -- Tele HRP theo seat ngay lap tuc -> char dinh chat vao xe
-        if hrp and vs and vs.Parent then
-            pcall(function() hrp.CFrame = vs.CFrame end)
-        end
-        task.wait(0.05)
-    end
-
-    task.wait(0.2)
-
-    -- BAT CanCollide=true sau khi len mat dat
-    for _, p in ipairs(car:GetDescendants()) do
-        if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
-    end
-    if myChar then
-        for _, p in ipairs(myChar:GetDescendants()) do
+        for _, p in ipairs(car:GetDescendants()) do
             if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
         end
-    end
-    task.wait(0.1)
-
-    myCar = car
-    pcall(function() hum().AutoRotate = false end)
-
-    -- Sit lai neu bi out
-    local hh = hum()
-    local finalVs = getDriveSeat(car)
-    if hh and finalVs and not hh.Sit then
-        pcall(function() finalVs:Sit(hh) end)
-        task.wait(0.15)
-        pcall(function() hh.Sit = true end)
-    end
-    task.wait(0.1)
-
-    startHold()
+        if myChar then
+            for _, p in ipairs(myChar:GetDescendants()) do
+                if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+            end
         end
+        task.wait(0.1)
+
+        myCar = car
+        pcall(function() hum().AutoRotate = false end)
+
+        local hh = hum()
+        local finalVs = getDriveSeat(car)
+        if hh and finalVs and not hh.Sit then
+            pcall(function() finalVs:Sit(hh) end)
+            task.wait(0.15)
+            pcall(function() hh.Sit = true end)
+        end
+        task.wait(0.1)
+
+        startHold()
+    end
+
     detachNpcFollowers()
     flying = false
     if not h.Sit then forceSeat() end
@@ -2482,7 +2484,7 @@ if car and reached then
 
     task.wait(0.15)
     return reached
-end
+    end
     -- ============ SPAWN + SEAT (nguyên gốc) ============
     local function spawnAndSeat()
         if not SpawnCarEv then return false end
