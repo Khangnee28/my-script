@@ -2395,26 +2395,47 @@ end
         return false
     end
 
-    -- ASCEND TUNG BUOC - khong nhay 200 studs 1 phat
-    car = myCar or findMyCar()
-    if car and reached then
-        local realFloor = floorBelow(target) or targetFloor
-        local upTargetY = realFloor + LAND_OFFSET
-        local curP2 = car:GetPivot().Position
-        local upStepY = (upTargetY - curP2.Y) / UNDER_DESCEND_STEPS
-        for i = 1, UNDER_DESCEND_STEPS do
-            curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
-            pcall(function() car:PivotTo(CFrame.new(curP2) * rotOnly) end)
-            task.wait(0.05)
+    -- ZERO VELOCITY truoc ascend
+car = myCar or findMyCar()
+if car then
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.AssemblyLinearVelocity = Vector3.zero end)
+            pcall(function() p.AssemblyAngularVelocity = Vector3.zero end)
         end
-
-        -- Settle o mat dat
-        task.wait(0.3)
-        myCar = car
-        pcall(function() hum().AutoRotate = false end)
     end
+end
+task.wait(0.1)
 
-    detachNpcFollowers()
+if car and reached then
+    ascendToGround(car, target, targetFloor)
+    task.wait(0.2)
+
+    -- ZERO VELOCITY lai sau ascend
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function() p.AssemblyLinearVelocity = Vector3.zero end)
+            pcall(function() p.AssemblyAngularVelocity = Vector3.zero end)
+        end
+    end
+    task.wait(0.1)
+
+    myCar = car
+    pcall(function() hum().AutoRotate = false end)
+
+    -- Sit lai truoc khi startHold
+    local hh = hum()
+    local vs = getDriveSeat(car)
+    if hh and vs and not hh.Sit then
+        pcall(function() vs:Sit(hh) end)
+        task.wait(0.15)
+        pcall(function() hh.Sit = true end)
+    end
+    task.wait(0.1)
+
+    startHold()
+end
+        detachNpcFollowers()
     flying = false
     if not h.Sit then forceSeat() end
     task.wait(0.15)
