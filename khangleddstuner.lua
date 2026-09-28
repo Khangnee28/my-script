@@ -2343,8 +2343,9 @@ do
     local reached = false; local timedOut = false
     local lastNpcRefresh = 0
 
-    -- BAY NGANG - bo fake velocity, tang tick
-    while enabled do
+    
+    local fakeVelCounter = 0
+while enabled do
     local c = myCar or findMyCar(); if not c then break end
     if os.clock() - flyStart > FLY_TIMEOUT then timedOut = true; break end
     local curP = c:GetPivot().Position
@@ -2357,6 +2358,28 @@ do
     local step = math.min(spd * TICK, dist, UNDER_STEP_MAX)
     local nextPos = Vector3.new(curP.X + dir.X * step, underY, curP.Z + dir.Z * step)
     pcall(function() c:PivotTo(CFrame.new(nextPos) * rotOnly) end)
+
+    -- FAKE VELOCITY: chi set cho PrimaryPart + part co khoi luong lon nhat
+    fakeVelCounter = fakeVelCounter + 1
+    if fakeVelCounter >= 2 then
+        fakeVelCounter = 0
+        local fakeV = Vector3.new(dir.X * spd, 0, dir.Z * spd)
+        local primary = c.PrimaryPart
+        if primary then
+            pcall(function() primary.AssemblyLinearVelocity = fakeV end)
+        end
+        -- Du phong neu khong co PrimaryPart
+        if not primary then
+            local found = false
+            for _, p in ipairs(c:GetChildren()) do
+                if p:IsA("BasePart") then
+                    pcall(function() p.AssemblyLinearVelocity = fakeV end)
+                    found = true
+                    break
+                end
+            end
+        end
+    end
 
     if os.clock() - lastNpcRefresh > 0.05 then
         lastNpcRefresh = os.clock()
