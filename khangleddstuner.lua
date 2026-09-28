@@ -2421,72 +2421,56 @@ do
     end
     task.wait(0.2)
 
-    -- ============ ASCEND BANG BODYPOSITION (nang tu tu) ============
-    if car and reached then
-        local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
-        local realFloor = floorBelow(target) or targetFloor
-        local upTargetY = realFloor + LAND_OFFSET
+    -- ============ ASCEND BANG PIVOTTO TUNG BUOC + TELE HRP ============
+if car and reached then
+    local vs = car:FindFirstChildWhichIsA("VehicleSeat", true)
+    local hrp = root()
+    local realFloor = floorBelow(target) or targetFloor
+    local upTargetY = realFloor + LAND_OFFSET
+    local curP2 = car:GetPivot().Position
 
-        if vs then
-            -- BodyPosition nang xe len tu tu, khong PivotTo
-            local bp = Instance.new("BodyPosition")
-            bp.Name = "RGAscend"
-            bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-            bp.P = 4000
-            bp.D = 700
-            bp.Position = Vector3.new(target.X, upTargetY, target.Z)
-            bp.Parent = vs
-
-            local bg = Instance.new("BodyGyro")
-            bg.Name = "RGAscendGyro"
-            bg.MaxTorque = Vector3.new(6e5, 6e5, 6e5)
-            bg.P = 10000
-            bg.D = 500
-            bg.CFrame = rotOnly
-            bg.Parent = vs
-
-            -- Cho BodyPosition nang len mat dat
-            task.wait(0.35)
-
-            -- Cho them neu chua len du
-            local checkP = car:GetPivot().Position
-            if (upTargetY - checkP.Y) > 10 then
-                task.wait(0.35)
-            end
-
-            -- Tat BodyPosition ascend
-            pcall(function() bp:Destroy() end)
-            pcall(function() bg:Destroy() end)
-            task.wait(0.1)
+    -- 20 buoc nho, moi buoc tele HRP theo seat
+    local ascendSteps = 20
+    local upStepY = (upTargetY - curP2.Y) / ascendSteps
+    for i = 1, ascendSteps do
+        curP2 = Vector3.new(target.X, curP2.Y + upStepY, target.Z)
+        local cf = CFrame.new(curP2) * rotOnly
+        pcall(function() car:PivotTo(cf) end)
+        -- Tele HRP theo seat ngay lap tuc -> char dinh chat vao xe
+        if hrp and vs and vs.Parent then
+            pcall(function() hrp.CFrame = vs.CFrame end)
         end
-
-        -- BAT CanCollide=true sau khi len mat dat
-        for _, p in ipairs(car:GetDescendants()) do
-            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
-        end
-        if myChar then
-            for _, p in ipairs(myChar:GetDescendants()) do
-                if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
-            end
-        end
-        task.wait(0.1)
-
-        myCar = car
-        pcall(function() hum().AutoRotate = false end)
-
-        -- Sit lai neu bi out
-        local hh = hum()
-        local finalVs = getDriveSeat(car)
-        if hh and finalVs and not hh.Sit then
-            pcall(function() finalVs:Sit(hh) end)
-            task.wait(0.15)
-            pcall(function() hh.Sit = true end)
-        end
-        task.wait(0.1)
-
-        startHold()
+        task.wait(0.05)
     end
 
+    task.wait(0.2)
+
+    -- BAT CanCollide=true sau khi len mat dat
+    for _, p in ipairs(car:GetDescendants()) do
+        if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+    end
+    if myChar then
+        for _, p in ipairs(myChar:GetDescendants()) do
+            if p:IsA("BasePart") then pcall(function() p.CanCollide = true end) end
+        end
+    end
+    task.wait(0.1)
+
+    myCar = car
+    pcall(function() hum().AutoRotate = false end)
+
+    -- Sit lai neu bi out
+    local hh = hum()
+    local finalVs = getDriveSeat(car)
+    if hh and finalVs and not hh.Sit then
+        pcall(function() finalVs:Sit(hh) end)
+        task.wait(0.15)
+        pcall(function() hh.Sit = true end)
+    end
+    task.wait(0.1)
+
+    startHold()
+        end
     detachNpcFollowers()
     flying = false
     if not h.Sit then forceSeat() end
