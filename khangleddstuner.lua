@@ -1960,35 +1960,54 @@ task.spawn(function()
         end)
     end
 
-    -- BUOC 2: doi menu doi (5s), click CHƠI lan 2 - FIX
-    task.wait(5)
+    
+    -- ========== BUOC 2: doi menu doi, click nut CHƠI lan 2 ==========
+-- Doi menu chinh CHƠI an di (hoac destroy) => da sang menu doi
+local waitStart = os.clock()
+while os.clock() - waitStart < 15 do
+    if not btn1 or not btn1.Parent or not btn1.Visible then break end
+    task.wait(0.3)
+end
+task.wait(2)
 
-    local btn2 = nil
-    for i = 1, 30 do
-        local b = findPlayBtn()
-        if b and b.Visible and b.AbsoluteSize.X > 40 then
-            btn2 = b
-            break
-        end
-        task.wait(1)
+-- Tim nut CHƠI menu doi (khong so sanh voi btn1)
+local btn2 = nil
+for i = 1, 30 do
+    local b = findPlayBtn()
+    if b and b.Visible and b.AbsoluteSize.X > 40 and b.AbsoluteSize.Y > 20 then
+        btn2 = b
+        break
     end
+    task.wait(1)
+end
 
-    if btn2 then
-        clickBtn(btn2)
-        task.wait(0.5)
-        pcall(function()
-            local x = btn2.AbsolutePosition.X + btn2.AbsoluteSize.X / 2
-            local y = btn2.AbsolutePosition.Y + btn2.AbsoluteSize.Y / 2
-            touchpress(x, y); task.wait(0.2); touchrelease(x, y)
-        end)
-    elseif btn1 then
-        -- Fallback: click lai toa do nut cu
-        pcall(function()
-            local x = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
-            local y = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
-            touchpress(x, y); task.wait(0.2); touchrelease(x, y)
-        end)
-    end
+if btn2 then
+    -- Multi-method click: firesignal + touchpress + VIM mouse
+    local x2 = btn2.AbsolutePosition.X + btn2.AbsoluteSize.X / 2
+    local y2 = btn2.AbsolutePosition.Y + btn2.AbsoluteSize.Y / 2
+
+    pcall(function() firesignal(btn2.MouseButton1Click) end)
+    task.wait(0.2)
+
+    pcall(function()
+        touchpress(x2, y2); task.wait(0.15); touchrelease(x2, y2)
+    end)
+    task.wait(0.2)
+
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x2, y2, 0, true, game, 1)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(x2, y2, 0, false, game, 1)
+    end)
+
+elseif btn1 then
+    -- Fallback: click lai toa do nut cu
+    local x1 = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
+    local y1 = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
+    pcall(function()
+        touchpress(x1, y1); task.wait(0.2); touchrelease(x1, y1)
+    end)
+end
 
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
