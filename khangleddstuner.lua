@@ -2008,34 +2008,48 @@ end
         pcall(function() touchpress(x1, y1); task.wait(0.2); touchrelease(x1, y1) end)
     end
 
- 
-    -- ========== BUOC 2: doi menu doi render xong moi fire ==========
--- Doi 3s co ban
-task.wait(5)
+     -- Doi them 3s cho menu render xong
+    task.wait(3)
 
+    -- ==== PLAYREADY GATE ====
+    local playReady = false
+    for i = 1, 40 do
+        pcall(function()
+            local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+            local menu = pg and pg:FindFirstChild("mainMenuSystem")
+            local base = menu and menu:FindFirstChild("baseFrame")
+            local play = base and base:FindFirstChild("playFrame")
+            if play and play.Visible and play.AbsoluteSize.X > 40 then
+                playReady = true
+            end
+        end)
+        if playReady then break end
+        task.wait(0.5)
+    end
 
--- Fire remote 3 args
-for i = 1, 3 do
+    print("[Rejoin] playReady:", playReady)
+
+    if not playReady then
+        print("[Rejoin] playFrame khong hien — abort")
+        if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+        return
+    end
+    -- ==== HET GATE ====
+
+    task.wait(3)
+
+    -- Fire menuToggleRequest mot phat
     pcall(function()
-        local rs = game:GetService("ReplicatedStorage")
-        local remote = rs:FindFirstChild("menuToggleRequest")
-        if not remote then
-            remote = rs:WaitForChild("menuToggleRequest", 2)
-        end
-        if remote then
-            remote:FireServer()
-            task.wait(0.15)
-            remote:FireServer(true)
-            task.wait(0.15)
-            remote:FireServer(1)
-        end
+        game:GetService("ReplicatedStorage"):WaitForChild("menuToggleRequest", 5):FireServer()
     end)
-    task.wait(0.4)
-end
 
-if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+    -- Doi 15s vao han game
+    task.wait(15)
 
-task.wait(15)  
+    if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+
+    
+    
         -- ========== BUOC 4: doc state farm office ==========
     local officeFlag = false
     if readfile and isfile and isfile("farmState.txt") then
@@ -2052,7 +2066,7 @@ task.wait(15)
         task.wait(5)
         pcall(function()
             if farmSwitch and farmSwitch.track then
-                firesignal(farmSwitch.track.MouseButton1Click)
+                firesignal(farmSwitch.track.MouseButton1Cick)
             end
         end)
     end
