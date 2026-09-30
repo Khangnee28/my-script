@@ -2011,28 +2011,8 @@ end
  
     -- ========== BUOC 2: doi menu doi render xong moi fire ==========
 -- Doi 3s co ban
-task.wait(3)
+task.wait(5)
 
--- Check playFrame visible that su (max 15s)
-local playReady = false
-for i = 1, 15 do
-    pcall(function()
-        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        local menu = pg and pg:FindFirstChild("mainMenuSystem")
-        local base = menu and menu:FindFirstChild("baseFrame")
-        local play = base and base:FindFirstChild("playFrame")
-        if play and play.Visible then
-            playReady = true
-        end
-    end)
-    if playReady then break end
-    task.wait(1)
-end
-
-print("[Rejoin] playFrame ready:", playReady)
-
--- Doi them 2s cho server sync
-task.wait(2)
 
 -- Fire remote 3 args
 for i = 1, 3 do
