@@ -2115,23 +2115,7 @@ local function makeBlob(color, size, pos, zIdx)
     return b
 end
 
-local blob1 = makeBlob(C.accent1, 260, UDim2.new(0.5, -270, 0.5, -180), 0)
-local blob2 = makeBlob(C.accent2, 220, UDim2.new(0.5, 60, 0.5, 20), 0)
-local blob3 = makeBlob(C.accent3, 200, UDim2.new(0.5, -100, 0.5, 100), 0)
 
-task.spawn(function()
-    while gui.Parent do
-        local t1 = TweenService:Create(blob1, TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.75 })
-        local t2 = TweenService:Create(blob2, TweenInfo.new(4.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.72 })
-        local t3 = TweenService:Create(blob3, TweenInfo.new(3.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.78 })
-        t1:Play(); t2:Play(); t3:Play()
-        task.wait(3.5)
-        TweenService:Create(blob1, TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.88 }):Play()
-        TweenService:Create(blob2, TweenInfo.new(4.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.9 }):Play()
-        TweenService:Create(blob3, TweenInfo.new(3.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { BackgroundTransparency = 0.86 }):Play()
-        task.wait(3.5)
-    end
-end)
 
 
 
@@ -2176,7 +2160,8 @@ for row = 1, 10 do
 end
 
 local topGlow = Instance.new("Frame")
-topGlow.Size = UDim2.new(1, 0, 0, 3)
+topGlow.Size = UDim2.new(1, -40, 0, 3)
+topGlow.Position = UDim2.new(0, 20, 0, 0)
 topGlow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 topGlow.BorderSizePixel = 0
 topGlow.ZIndex = 4
