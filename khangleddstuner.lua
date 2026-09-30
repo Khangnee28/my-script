@@ -1969,41 +1969,70 @@ end
         return nil
     end
 
-    task.wait(10)
+        -- ========== BUOC 1: doi 12s cho menu chinh render ==========
+    task.wait(12)
 
-    -- BUOC 1: click CHƠI menu chinh
+    -- Doi PlayerGui san sang
+    local pg1 = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    for _ = 1, 30 do
+        if pg1 then break end
+        task.wait(1)
+        pg1 = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    end
+    if not pg1 then return end
+
+    -- Doi mainMenuSystem xuat hien
+    for _ = 1, 30 do
+        if pg1:FindFirstChild("mainMenuSystem") then break end
+        task.wait(1)
+    end
+
+    -- Doi them 3s cho menu render xong
+    task.wait(3)
+
+    -- Tim nut CHƠI menu chinh
     local btn1 = nil
-    local t0 = os.clock()
-    while os.clock() - t0 < 30 do
+    for i = 1, 40 do
         btn1 = findPlayBtn()
-        if btn1 then break end
+        if btn1 and btn1.Visible and btn1.AbsoluteSize.X > 40 then break end
         task.wait(1)
     end
+
     if btn1 then
-        clickBtn(btn1)
-        task.wait(1)
-        pcall(function()
-            local x = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
-            local y = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
-            touchpress(x, y); task.wait(0.2); touchrelease(x, y)
-        end)
+        -- Click 1
+        pcall(function() firesignal(btn1.MouseButton1Click) end)
+        task.wait(0.5)
+        -- Click 2 phong miss
+        local x1 = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
+        local y1 = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
+        pcall(function() touchpress(x1, y1); task.wait(0.2); touchrelease(x1, y1) end)
     end
 
-    
-        -- ========== BUOC 2: doi 5s cho menu doi render, fire remote menuToggleRequest ==========
-    task.wait(5)
+    -- ========== BUOC 2: doi 8s cho menu doi render ==========
+    task.wait(8)
 
+    -- Doi btn1 bien mat (menu doi thay the)
+    for _ = 1, 20 do
+        if not btn1 or not btn1.Parent or not btn1.Visible then break end
+        task.wait(0.5)
+    end
+    task.wait(2)
+
+    -- Fire remote menuToggleRequest
     local fired = false
     pcall(function()
         local rs = game:GetService("ReplicatedStorage")
-        local remote = rs:FindFirstChild("menuToggleRequest") or rs:WaitForChild("menuToggleRequest", 5)
+        local remote = rs:FindFirstChild("menuToggleRequest")
+        if not remote then
+            remote = rs:WaitForChild("menuToggleRequest", 5)
+        end
         if remote then
             remote:FireServer()
             fired = true
         end
     end)
     if not fired then
-        -- Fallback: click nut CHƠI menu doi neu remote fail
+        -- Fallback: click nut CHƠI menu doi
         for i = 1, 20 do
             local b = findPlayBtn()
             if b and b.Visible and b.AbsoluteSize.X > 40 then
@@ -2018,11 +2047,11 @@ end
         end
     end
 
-    -- Xoa marker rejoin
+    -- Xoa marker
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
-    -- ========== BUOC 3: doi 10s cho vao han game ==========
-    task.wait(10)
+    -- ========== BUOC 3: doi 15s cho vao han game ==========
+    task.wait(15)
 
     -- ========== BUOC 4: doc state farm office ==========
     local officeFlag = false
@@ -2031,13 +2060,13 @@ end
         if ok and v == "1" then officeFlag = true end
     end
 
-    -- ========== BUOC 5: doi map load + bat office ==========
+    -- ========== BUOC 5: doi map + bat office farm ==========
     if officeFlag then
         for _ = 1, 60 do
             if workspace:FindFirstChild("Computers") then break end
             task.wait(1)
         end
-        task.wait(3)
+        task.wait(5)
         pcall(function()
             if farmSwitch and farmSwitch.track then
                 firesignal(farmSwitch.track.MouseButton1Click)
@@ -2045,4 +2074,3 @@ end
         end)
     end
 end)
-            
