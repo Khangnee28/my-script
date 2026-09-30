@@ -2059,7 +2059,7 @@ local function load_token()
     if readfile and isfile and isfile(TOKEN_FILE) then
         local ok, data = pcall(readfile, TOKEN_FILE)
         if ok then
-            local ok2, j = pcall(HttpService:JSONDecode, HttpService, data)
+            local ok2, j = pcall(HttpService.JSONDecode, HttpService, data)
             if ok2 and j.hwid == HWID then return j.token end
         end
     end
