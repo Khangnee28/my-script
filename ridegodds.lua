@@ -2160,8 +2160,8 @@ for row = 1, 10 do
 end
 
 local topGlow = Instance.new("Frame")
-topGlow.Size = UDim2.new(1, 0, 0, 3)
-topGlow.Position = UDim2.new(0, 0, 0, 0)
+topGlow.Size = UDim2.new(1, -36, 0, 3)
+topGlow.Position = UDim2.new(0, 18, 0, 0)
 topGlow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 topGlow.BorderSizePixel = 0
 topGlow.ZIndex = 4
@@ -2174,8 +2174,8 @@ tgGrad.Color = ColorSequence.new({
 })
 tgGrad.Transparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.04, 0),
-    NumberSequenceKeypoint.new(0.96, 0),
+    NumberSequenceKeypoint.new(0.12, 0),
+    NumberSequenceKeypoint.new(0.88, 0),
     NumberSequenceKeypoint.new(1, 1),
 })
 tgGrad.Parent = topGlow
