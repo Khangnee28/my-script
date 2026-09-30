@@ -2009,9 +2009,32 @@ end
     end
 
  
-    -- ========== BUOC 2: doi 1.5s, fire remote 3 args ==========
-task.wait(1.5)
+    -- ========== BUOC 2: doi menu doi render xong moi fire ==========
+-- Doi 3s co ban
+task.wait(3)
 
+-- Check playFrame visible that su (max 15s)
+local playReady = false
+for i = 1, 15 do
+    pcall(function()
+        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        local menu = pg and pg:FindFirstChild("mainMenuSystem")
+        local base = menu and menu:FindFirstChild("baseFrame")
+        local play = base and base:FindFirstChild("playFrame")
+        if play and play.Visible then
+            playReady = true
+        end
+    end)
+    if playReady then break end
+    task.wait(1)
+end
+
+print("[Rejoin] playFrame ready:", playReady)
+
+-- Doi them 2s cho server sync
+task.wait(2)
+
+-- Fire remote 3 args
 for i = 1, 3 do
     pcall(function()
         local rs = game:GetService("ReplicatedStorage")
@@ -2032,8 +2055,8 @@ end
 
 if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
-task.wait(15)
-    -- ========== BUOC 4: doc state farm office ==========
+task.wait(15)  
+        -- ========== BUOC 4: doc state farm office ==========
     local officeFlag = false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
