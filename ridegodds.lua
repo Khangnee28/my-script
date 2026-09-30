@@ -2133,15 +2133,7 @@ task.spawn(function()
     end
 end)
 
-local shadow = Instance.new("Frame")
-shadow.Size = UDim2.new(0, 400, 0, 320)
-shadow.Position = UDim2.new(0.5, -200, 0.5, -160)
-shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-shadow.BackgroundTransparency = 1
-shadow.BorderSizePixel = 0
-shadow.ZIndex = 1
-shadow.Parent = gui
-Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 26)
+
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 400, 0, 320)
@@ -2242,29 +2234,20 @@ task.spawn(function()
         Position = UDim2.new(0.5, -220, 0.5, -175),
         BackgroundTransparency = 0,
     }):Play()
-    TweenService:Create(shadow, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0, 470, 0, 380),
-        Position = UDim2.new(0.5, -235, 0.5, -190),
-        BackgroundTransparency = 0.7,
-    }):Play()
+    
     task.wait(0.5)
     TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, 440, 0, 340),
         Position = UDim2.new(0.5, -220, 0.5, -170),
     }):Play()
-    TweenService:Create(shadow, TweenInfo.new(0.35), {
-        Size = UDim2.new(0, 460, 0, 360),
-        Position = UDim2.new(0.5, -230, 0.5, -180),
-        BackgroundTransparency = 0.75,
-    }):Play()
+    
 end)
 
 do
     local drag, ds, sp
     frame.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            drag, ds, sp = true, i.Position, frame.Position
-            i.Changed:Connect(function()
+            drag, ds, sp = true, i.Position, frame.Posit    i.Changed:Connect(function()
                 if i.UserInputState == Enum.UserInputState.End then drag = false end
             end)
         end
@@ -2637,7 +2620,7 @@ end)
 
 close.MouseButton1Click:Connect(function()
     TweenService:Create(frame, TweenInfo.new(0.2), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
-    TweenService:Create(shadow, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
+    
     TweenService:Create(overlay, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
     task.wait(0.2)
     gui:Destroy()
@@ -2681,7 +2664,7 @@ local function launch()
     if running then return end
     running = true
     TweenService:Create(frame, TweenInfo.new(0.25), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
-    TweenService:Create(shadow, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+    
     TweenService:Create(overlay, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
     task.wait(0.25)
     gui:Destroy()
