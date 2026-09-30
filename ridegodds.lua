@@ -2480,6 +2480,9 @@ btn.AutoButtonColor = false
 btn.ClipsDescendants = true
 btn.ZIndex = 5
 btn.Parent = frame
+btn.TextStrokeTransparency = 0
+btn.TextStrokeColor3 = Color3.fromRGB(30, 10, 80)
+btn.TextSize = 16
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
 
 local btnGrad = Instance.new("UIGradient")
