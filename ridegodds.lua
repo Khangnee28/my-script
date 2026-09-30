@@ -2481,8 +2481,9 @@ btn.ClipsDescendants = true
 btn.ZIndex = 5
 btn.Parent = frame
 btn.TextStrokeTransparency = 0
-btn.TextStrokeColor3 = Color3.fromRGB(30, 10, 80)
-btn.TextSize = 16
+btn.TextStrokeColor3 = Color3.fromRGB(15, 5, 45)
+btn.TextSize = 17
+btn.Font = Enum.Font.GothamBlack
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
 
 local btnGrad = Instance.new("UIGradient")
