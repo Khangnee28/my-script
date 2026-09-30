@@ -2160,8 +2160,8 @@ for row = 1, 10 do
 end
 
 local topGlow = Instance.new("Frame")
-topGlow.Size = UDim2.new(1, -40, 0, 3)
-topGlow.Position = UDim2.new(0, 20, 0, 0)
+topGlow.Size = UDim2.new(1, 0, 0, 3)
+topGlow.Position = UDim2.new(0, 0, 0, 0)
 topGlow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 topGlow.BorderSizePixel = 0
 topGlow.ZIndex = 4
@@ -2172,16 +2172,14 @@ tgGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0.5, C.accent2),
     ColorSequenceKeypoint.new(1, C.accent3),
 })
+tgGrad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(0.04, 0),
+    NumberSequenceKeypoint.new(0.96, 0),
+    NumberSequenceKeypoint.new(1, 1),
+})
 tgGrad.Parent = topGlow
 
-task.spawn(function()
-    local rot = 0
-    while gui.Parent do
-        rot = (rot + 90) % 360
-        tgGrad.Rotation = rot
-        task.wait(2)
-    end
-end)
 
 local progBar = Instance.new("Frame")
 progBar.Size = UDim2.new(0, 0, 0, 2)
@@ -2285,11 +2283,15 @@ badgeShine.Parent = badge
 task.spawn(function()
     while gui.Parent do
         badgeShine.Position = UDim2.new(0, -40, 0, -10)
+        badgeShine.BackgroundTransparency = 1
         task.wait(2.5)
+        badgeShine.BackgroundTransparency = 0.4
         TweenService:Create(badgeShine, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, 70, 0, -10),
         }):Play()
-        task.wait(1)
+        task.wait(0.9)
+        badgeShine.BackgroundTransparency = 1
+        task.wait(0.1)
     end
 end)
 
