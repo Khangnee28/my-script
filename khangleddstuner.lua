@@ -2009,77 +2009,30 @@ end
     end
 
  
-    -- ========== BUOC 2: doi menu doi visible THAT, fire remote ==========
--- Doi playFrame (menu doi) xuat hien + visible
-local playFrameVisible = false
-for i = 1, 30 do
+    -- ========== BUOC 2: doi 1.5s, fire remote 3 args ==========
+task.wait(1.5)
+
+for i = 1, 3 do
     pcall(function()
-        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        local menu = pg and pg:FindFirstChild("mainMenuSystem")
-        local base = menu and menu:FindFirstChild("baseFrame")
-        local play = base and base:FindFirstChild("playFrame")
-        if play and play.Visible then
-            playFrameVisible = true
-        end
-    end)
-    if playFrameVisible then break end
-    task.wait(1)
-end
-
--- Neu khong thay playFrame, van tiep tuc fallback
-print("[Rejoin] playFrame visible:", playFrameVisible)
-
--- Doi them 2s cho server side sync
-task.wait(2)
-
--- Fire remote menuToggleRequest — RETRY 5 LAN
-local remoteFired = false
-for attempt = 1, 5 do
-    local ok = pcall(function()
         local rs = game:GetService("ReplicatedStorage")
         local remote = rs:FindFirstChild("menuToggleRequest")
         if not remote then
-            remote = rs:WaitForChild("menuToggleRequest", 3)
+            remote = rs:WaitForChild("menuToggleRequest", 2)
         end
         if remote then
             remote:FireServer()
-            return true
+            task.wait(0.15)
+            remote:FireServer(true)
+            task.wait(0.15)
+            remote:FireServer(1)
         end
-        return false
     end)
-    print("[Rejoin] remote attempt " .. attempt .. ":", ok)
-    if ok then
-        remoteFired = true
-        -- Cho server xu ly
-        task.wait(0.8)
-    else
-        task.wait(1)
-    end
+    task.wait(0.4)
 end
 
--- Fallback: neu remote khong fire duoc, click UI
-if not remoteFired then
-    print("[Rejoin] remote fail -> fallback click UI")
-    for i = 1, 20 do
-        local b = findPlayBtn()
-        if b and b.Visible and b.AbsoluteSize.X > 40 then
-            pcall(function() firesignal(b.MouseButton1Click) end)
-            task.wait(0.3)
-            local bx = b.AbsolutePosition.X + b.AbsoluteSize.X / 2
-            local by = b.AbsolutePosition.Y + b.AbsoluteSize.Y / 2
-            pcall(function() touchpress(bx, by); task.wait(0.2); touchrelease(bx, by) end)
-            break
-        end
-        task.wait(1)
-    end
-end
-
--- Xoa marker rejoin
 if writefile then pcall(writefile, "lastRejoin.txt", "0") end
 
--- ========== BUOC 3: doi 15s vao han game ==========
 task.wait(15)
-
     -- ========== BUOC 4: doc state farm office ==========
     local officeFlag = false
     if readfile and isfile and isfile("farmState.txt") then
