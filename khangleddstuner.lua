@@ -1895,130 +1895,65 @@ task.spawn(function()
     end
     if not wasRejoin then return end
 
-    local function clickBtn(btn)
-        if not btn then return false end
-        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
-        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-        if pcall(function() firesignal(btn.MouseButton1Click) end) then return true end
-        if pcall(function() firesignal(btn.Activated) end) then return true end
-        if pcall(function()
-            touchpress(x, y); task.wait(0.2); touchrelease(x, y)
-        end) then return true end
-        return false
+    -- Cho game load xong
+    repeat task.wait(1) until game:IsLoaded()
+    task.wait(3)
+
+    local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    for _ = 1, 30 do
+        if pg then break end
+        task.wait(1)
+        pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
     end
+    if not pg then return end
 
+    for _ = 1, 30 do
+        if pg:FindFirstChild("mainMenuSystem") then break end
+        task.wait(1)
+    end
+    task.wait(3)
+
+    -- Tim nut CHOI
     local function findPlayBtn()
-        local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-        if not pg then return nil end
-        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
-
-        local function textIsPlay(s)
-    if not s or s == "" then return false end
-    s = s:gsub("%s+", "")
-    local u = s:upper()
-    return u == "CHƠI" or u == "CHOI"
-        or u == "PLAY" or u == "START"
-        or u == "BẮTĐẦU"
-        or u:find("CHƠI") or u:find("PLAY")
-        or u:find("CHOI") or u:find("BẮTĐẦU")
-end
-
-        for _, d in ipairs(pg:GetDescendants()) do
+        local p = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if not p then return nil end
+        local menu = p:FindFirstChild("mainMenuSystem")
+        local base = menu and menu:FindFirstChild("baseFrame")
+        local play = base and base:FindFirstChild("playFrame")
+        if play then
+            for _, d in ipairs(play:GetDescendants()) do
+                if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then
+                    return d
+                end
+            end
+        end
+        for _, d in ipairs(p:GetDescendants()) do
             if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then
-                if textIsPlay(d.Text) then return d end
+                local u = (d.Text or ""):upper():gsub("%s+", "")
+                if u == "CHƠI" or u == "CHOI" or u == "PLAY" then return d end
             end
         end
-
-        for _, d in ipairs(pg:GetDescendants()) do
-            if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible and d.AbsoluteSize.X > 40 then
-                for _, c in ipairs(d:GetDescendants()) do
-                    if c:IsA("TextLabel") and c.Visible and textIsPlay(c.Text) then
-                        return d
-                    end
-                end
-            end
-        end
-
-        local best, bestScore = nil, 0
-        for _, d in ipairs(pg:GetDescendants()) do
-            if (d:IsA("TextButton") or d:IsA("ImageButton")) and d.Visible then
-                local sz = d.AbsoluteSize
-                local ap = d.AbsolutePosition
-                if sz.X > 150 and sz.Y > 40 then
-                    local cx = ap.X + sz.X / 2
-                    local cy = ap.Y + sz.Y / 2
-                    local inCenterX = cx > vp.X * 0.25 and cx < vp.X * 0.75
-                    local inBottomY = cy > vp.Y * 0.45 and cy < vp.Y * 0.92
-                    if inCenterX and inBottomY then
-                        local score = 1
-                        if d.BackgroundColor3.G > 0.5 and d.BackgroundColor3.R < 0.5 then
-                            score = score + 5
-                        end
-                        for _, c in ipairs(d:GetDescendants()) do
-                            if c:IsA("TextLabel") and c.Text ~= "" then
-                                score = score + 3
-                                break
-                            end
-                        end
-                        if score > bestScore then bestScore = score; best = d end
-                    end
-                end
-            end
-        end
-        if best and bestScore >= 4 then return best end
         return nil
     end
 
-        -- ========== BUOC 1: doi 12s cho menu chinh render ==========
-    task.wait(12)
-
-    -- Doi PlayerGui san sang
-    local pg1 = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    for _ = 1, 30 do
-        if pg1 then break end
-        task.wait(1)
-        pg1 = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    end
-    if not pg1 then return end
-
-    -- Doi mainMenuSystem xuat hien
-    for _ = 1, 30 do
-        if pg1:FindFirstChild("mainMenuSystem") then break end
-        task.wait(1)
-    end
-
-    -- Doi them 3s cho menu render xong
-    task.wait(3)
-
-    -- Tim nut CHƠI menu chinh
     local btn1 = nil
-    for i = 1, 40 do
+    for _ = 1, 40 do
         btn1 = findPlayBtn()
-        if btn1 and btn1.Visible and btn1.AbsoluteSize.X > 40 then break end
+        if btn1 then break end
         task.wait(1)
     end
 
     if btn1 then
-        -- Click 1
         pcall(function() firesignal(btn1.MouseButton1Click) end)
-        task.wait(0.5)
-        -- Click 2 phong miss
-        local x1 = btn1.AbsolutePosition.X + btn1.AbsoluteSize.X / 2
-        local y1 = btn1.AbsolutePosition.Y + btn1.AbsoluteSize.Y / 2
-        pcall(function() touchpress(x1, y1); task.wait(0.2); touchrelease(x1, y1) end)
     end
 
-     -- Doi them 3s cho menu render xong
-    task.wait(3)
-
-    -- ==== PLAYREADY GATE ====
+    -- Doi menu render xong (playReady)
     local playReady = false
-    for i = 1, 40 do
+    for _ = 1, 40 do
         pcall(function()
-            local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            local menu = pg and pg:FindFirstChild("mainMenuSystem")
-            local base = menu and menu:FindFirstChild("baseFrame")
-            local play = base and base:FindFirstChild("playFrame")
+            local m = pg:FindFirstChild("mainMenuSystem")
+            local b = m and m:FindFirstChild("baseFrame")
+            local play = b and b:FindFirstChild("playFrame")
             if play and play.Visible and play.AbsoluteSize.X > 40 then
                 playReady = true
             end
@@ -2026,48 +1961,39 @@ end
         if playReady then break end
         task.wait(0.5)
     end
-
     print("[Rejoin] playReady:", playReady)
 
-    if not playReady then
-        print("[Rejoin] playFrame khong hien — abort")
-        if writefile then pcall(writefile, "lastRejoin.txt", "0") end
-        return
-    end
-    -- ==== HET GATE ====
-
-    task.wait(3)
-
     -- Fire menuToggleRequest mot phat
+    task.wait(2)
     pcall(function()
         game:GetService("ReplicatedStorage"):WaitForChild("menuToggleRequest", 5):FireServer()
     end)
+    print("[Rejoin] fired menuToggle")
 
     -- Doi 15s vao han game
     task.wait(15)
 
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
+    print("[Rejoin] Computers:", workspace:FindFirstChild("Computers") ~= nil)
 
-    
-    
-        -- ========== BUOC 4: doc state farm office ==========
+    -- Bat farm neu co flag
     local officeFlag = false
     if readfile and isfile and isfile("farmState.txt") then
         local ok, v = pcall(readfile, "farmState.txt")
         if ok and v == "1" then officeFlag = true end
     end
 
-    -- ========== BUOC 5: doi map + bat office farm ==========
     if officeFlag then
         for _ = 1, 60 do
             if workspace:FindFirstChild("Computers") then break end
             task.wait(1)
         end
-        task.wait(5)
+        task.wait(3)
         pcall(function()
-            if farmSwitch and farmSwitch.track then
-                firesignal(farmSwitch.track.MouseButton1Cick)
+            if farmSwitch and farmSwitch.track and not farmOffice then
+                firesignal(farmSwitch.track.MouseButton1Click)
             end
         end)
+        print("[Rejoin] farm toggled")
     end
 end)
