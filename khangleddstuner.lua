@@ -1970,8 +1970,8 @@ task.spawn(function()
     end)
     print("[Rejoin] fired menuToggle")
 
-    -- Doi 15s vao han game
-    task.wait(15)
+    -- Doi 10s vao han game
+    task.wait(10)
 
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
     print("[Rejoin] Computers:", workspace:FindFirstChild("Computers") ~= nil)
