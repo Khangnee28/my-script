@@ -2174,8 +2174,8 @@ tgGrad.Color = ColorSequence.new({
 })
 tgGrad.Transparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.16, 0),
-NumberSequenceKeypoint.new(0.84, 0),
+    NumberSequenceKeypoint.new(0.18, 0),
+NumberSequenceKeypoint.new(0.82, 0),
     NumberSequenceKeypoint.new(1, 1),
 })
 tgGrad.Parent = topGlow
