@@ -2691,7 +2691,7 @@ local function do_auth(key)
         save_token(token)
         end_progress(true)
         burst(220, 216, C.ok)
-        set_status("License hop le", C.ok)
+        set_status("License hợp lệ", C.ok)
         set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
         start_heartbeat()
         task.wait(0.9)
@@ -2727,11 +2727,11 @@ btn.MouseButton1Click:Connect(function()
     if running then return end
     local key = box.Text:gsub("%s+", ""):upper()
     if #key < 10 then
-        set_status("Key qua ngan", C.err)
+        set_status("Key quá ngắn", C.err)
         return
     end
     set_btn("ĐANG KIỂM TRA...", GRAD_LOAD)
-    set_status("Dang xac thuc...", C.text_dim)
+    set_status("Đang xác thực...", C.text_dim)
     start_progress()
     task.spawn(do_auth, key)
 end)
@@ -2743,7 +2743,7 @@ end)
 task.spawn(function()
     local saved = load_token()
     if not saved then return end
-    set_btn("DANG TU DONG DANG NHAP...", GRAD_LOAD)
+    set_btn("DANG TỰ ĐỘNG ĐĂNG NHẬP...", GRAD_LOAD)
     set_status("Dang kiem tra phien cu...", C.text_dim)
     start_progress()
     local code = http_post("/heartbeat", {}, {
@@ -2753,7 +2753,7 @@ task.spawn(function()
     if code == 200 then
         token = saved
         end_progress(true)
-        set_status("Auto-login thanh cong", C.ok)
+        set_status("Auto-login thành công", C.ok)
         set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
         start_heartbeat()
         task.wait(0.6)
