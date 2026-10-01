@@ -2161,20 +2161,7 @@ end
 
 
 
-local progBar = Instance.new("Frame")
-progBar.Size = UDim2.new(0, 0, 0, 2)
-progBar.Position = UDim2.new(0, 0, 0, 3)
-progBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-progBar.BorderSizePixel = 0
-progBar.ZIndex = 5
-progBar.Visible = false
-progBar.Parent = frame
-local progGrad = Instance.new("UIGradient")
-progGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.accent2),
-    ColorSequenceKeypoint.new(1, C.accent3),
-})
-progGrad.Parent = progBar
+
 
 local stroke = Instance.new("UIStroke", frame)
 stroke.Color = C.card_edge
