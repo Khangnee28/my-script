@@ -2171,8 +2171,8 @@ topStrip.Parent = frame
 
 for i = 1, TOP_DOTS do
     local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(1 / TOP_DOTS, -2, 0, 3)
-    dot.Position = UDim2.new((i - 1) / TOP_DOTS, 1, 0, 0)
+    dot.Size = UDim2.new(1 / TOP_DOTS, 0, 0, 3)
+dot.Position = UDim2.new((i - 1) / TOP_DOTS, 0, 0, 0)
     dot.BackgroundColor3 = C.accent1
     dot.BackgroundTransparency = 0.9
     dot.BorderSizePixel = 0
@@ -2185,7 +2185,7 @@ end
 task.spawn(function()
     local wave = 0
     while gui.Parent do
-        wave = wave + 0.06
+        wave = wave + 0.025
         for i = 1, TOP_DOTS do
             local phase = ((i - 1) / TOP_DOTS - wave) % 1
             if phase < 0 then phase = phase + 1 end
@@ -2194,7 +2194,7 @@ task.spawn(function()
             topDots[i].BackgroundColor3 = mixed
             topDots[i].BackgroundTransparency = 1 - brightness * 0.85
         end
-        task.wait(0.04)
+        task.wait(0.05)
     end
 end)
 -- ============ END TOP LED ============
