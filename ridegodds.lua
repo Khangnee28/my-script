@@ -2159,96 +2159,46 @@ for row = 1, 10 do
     end
 end
 
--- ============ TOP BAR NEON FLOW ============
-local topGlow = Instance.new("Frame")
-topGlow.Size = UDim2.new(1, 0, 0, 2)
-topGlow.Position = UDim2.new(0, 0, 0, 0)
-topGlow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-topGlow.BorderSizePixel = 0
-topGlow.ZIndex = 4
-topGlow.Parent = frame
-local tgGrad = Instance.new("UIGradient")
-tgGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.accent1),
-    ColorSequenceKeypoint.new(0.5, C.accent2),
-    ColorSequenceKeypoint.new(1, C.accent3),
-})
-tgGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.08, 0),
-    NumberSequenceKeypoint.new(0.92, 0),
-    NumberSequenceKeypoint.new(1, 1),
-})
-tgGrad.Parent = topGlow
+-- ============ TOP LED STRIP ============
+local TOP_DOTS = 20
+local topDots = {}
+local topStrip = Instance.new("Frame")
+topStrip.Size = UDim2.new(1, -40, 0, 3)
+topStrip.Position = UDim2.new(0, 20, 0, 0)
+topStrip.BackgroundTransparency = 1
+topStrip.ZIndex = 4
+topStrip.Parent = frame
 
--- Lớp 2: glow mờ tỏa xuống dưới
-local topGlowSoft = Instance.new("Frame")
-topGlowSoft.Size = UDim2.new(1, -40, 0, 8)
-topGlowSoft.Position = UDim2.new(0, 20, 0, 0)
-topGlowSoft.BackgroundColor3 = C.accent1
-topGlowSoft.BackgroundTransparency = 0.6
-topGlowSoft.BorderSizePixel = 0
-topGlowSoft.ZIndex = 3
-topGlowSoft.Parent = frame
-Instance.new("UICorner", topGlowSoft).CornerRadius = UDim.new(0, 4)
-local softGrad = Instance.new("UIGradient")
-softGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.5, 0),
-    NumberSequenceKeypoint.new(1, 1),
-})
-softGrad.Parent = topGlowSoft
+for i = 1, TOP_DOTS do
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(1 / TOP_DOTS, -2, 0, 3)
+    dot.Position = UDim2.new((i - 1) / TOP_DOTS, 1, 0, 0)
+    dot.BackgroundColor3 = C.accent1
+    dot.BackgroundTransparency = 0.9
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 4
+    dot.Parent = topStrip
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    topDots[i] = dot
+end
 
--- Lớp 3: vệt scan chạy ngang
-local scanLine = Instance.new("Frame")
-scanLine.Size = UDim2.new(0, 70, 0, 3)
-scanLine.Position = UDim2.new(0, -70, 0, 0)
-scanLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-scanLine.BorderSizePixel = 0
-scanLine.ZIndex = 5
-scanLine.Parent = frame
-Instance.new("UICorner", scanLine).CornerRadius = UDim.new(1, 0)
-local scanGrad = Instance.new("UIGradient")
-scanGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.5, 0),
-    NumberSequenceKeypoint.new(1, 1),
-})
-scanGrad.Parent = scanLine
-
--- Animation: glow breathing
 task.spawn(function()
+    local wave = 0
     while gui.Parent do
-        TweenService:Create(topGlowSoft, TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-            BackgroundTransparency = 0.4,
-            BackgroundColor3 = C.accent2,
-        }):Play()
-        task.wait(2.2)
-        TweenService:Create(topGlowSoft, TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-            BackgroundTransparency = 0.7,
-            BackgroundColor3 = C.accent1,
-        }):Play()
-        task.wait(2.2)
+        wave = wave + 0.06
+        for i = 1, TOP_DOTS do
+            local phase = ((i - 1) / TOP_DOTS - wave) % 1
+            if phase < 0 then phase = phase + 1 end
+            local brightness = (math.sin(phase * math.pi * 2) + 1) / 2
+            local mixed = C.accent1:Lerp(C.accent2, brightness)
+            topDots[i].BackgroundColor3 = mixed
+            topDots[i].BackgroundTransparency = 1 - brightness * 0.85
+        end
+        task.wait(0.04)
     end
 end)
+-- ============ END TOP LED ============
 
--- Animation: scan line chạy ngang
-task.spawn(function()
-    while gui.Parent do
-        task.wait(2)
-        scanLine.Position = UDim2.new(0, -70, 0, 0)
-        scanLine.BackgroundTransparency = 0
-        TweenService:Create(scanLine, TweenInfo.new(1.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
-            Position = UDim2.new(1, 0, 0, 0),
-        }):Play()
-        task.wait(0.9)
-        TweenService:Create(scanLine, TweenInfo.new(0.4), {
-            BackgroundTransparency = 1,
-        }):Play()
-        task.wait(0.4)
-    end
-end)
--- ============ END TOP BAR ============
 
 local progBar = Instance.new("Frame")
 progBar.Size = UDim2.new(0, 0, 0, 2)
