@@ -1,4 +1,21 @@
+-- language: Lua, file: keyauth_client.lua
+-- target: Roblox executor (Delta mobile / Synapse / Wave / Solara)
+-- branding: Khang Lê DDS · tiktok @khangdayy215
+-- version: premium UI
+
+local API_URL   = "https://spring-poetry-2831.letrongkhang098.workers.dev"
+local TOKEN_FILE = "keyauth_token.json"
+local HEARTBEAT_INTERVAL = 60
+
+local BRAND_NAME = "Khang Lê DDS"
+local BRAND_SUB  = "@khangdayy215"
+
 -- ============================================================
+-- PAYLOAD — DÁN SCRIPT HUB VÀO ĐÂY
+-- Xóa dòng print bên dưới, dán toàn bộ script hub Khangle DDS v26 vào
+-- ============================================================
+local function PAYLOAD()
+    -- ============================================================
 -- KHANGLE DDS HUB v26 — OFFICE ONLY
 -- ============================================================
 local CoreGui = game:GetService("CoreGui")
@@ -1995,5 +2012,742 @@ task.spawn(function()
             end
         end)
         print("[Rejoin] farm toggled")
+    end
+end)
+end
+-- ============================================================
+
+local HttpService  = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local RunService   = game:GetService("RunService")
+
+local function http_post(path, body, headers)
+    headers = headers or {}
+    headers["Content-Type"] = "application/json"
+    local opts = {
+        Url = API_URL .. path, Method = "POST",
+        Headers = headers, Body = HttpService:JSONEncode(body),
+    }
+    local r
+    if type(request) == "function" then r = request(opts)
+    elseif syn and syn.request then r = syn.request(opts)
+    elseif http_request then r = http_request(opts)
+    elseif http and http.request then r = http.request(opts)
+    else return nil, { detail = "no http" } end
+    local ok, parsed = pcall(HttpService.JSONDecode, HttpService, r.Body)
+    return r.StatusCode, ok and parsed or r.Body
+end
+
+local function get_hwid()
+    if type(gethwid) == "function" then
+        local ok, v = pcall(gethwid)
+        if ok and v and #tostring(v) > 4 then return tostring(v) end
+    end
+    local ok, id = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    if ok and id then return id end
+    return tostring(game:GetService("Players").LocalPlayer.UserId)
+end
+
+local HWID = get_hwid()
+
+local function save_token(tok)
+    if writefile then pcall(writefile, TOKEN_FILE, HttpService:JSONEncode({ token = tok, hwid = HWID })) end
+end
+local function load_token()
+    if readfile and isfile and isfile(TOKEN_FILE) then
+        local ok, data = pcall(readfile, TOKEN_FILE)
+        if ok then
+            local ok2, j = pcall(HttpService.JSONDecode, HttpService, data)
+            if ok2 and j.hwid == HWID then return j.token end
+        end
+    end
+    return nil
+end
+
+local C = {
+    bg_top     = Color3.fromRGB(30, 22, 52),
+    bg_bot     = Color3.fromRGB(10, 8, 18),
+    card_edge  = Color3.fromRGB(90, 70, 150),
+    input_bg   = Color3.fromRGB(10, 8, 18),
+    input_edge = Color3.fromRGB(70, 58, 110),
+    input_focus= Color3.fromRGB(160, 110, 255),
+    accent1    = Color3.fromRGB(139, 92, 246),
+    accent2    = Color3.fromRGB(236, 72, 153),
+    accent3    = Color3.fromRGB(59, 130, 246),
+    ok         = Color3.fromRGB(74, 222, 128),
+    err        = Color3.fromRGB(248, 113, 113),
+    text       = Color3.fromRGB(244, 242, 255),
+    text_dim   = Color3.fromRGB(150, 145, 180),
+    text_faint = Color3.fromRGB(90, 85, 125),
+}
+
+local player = game:GetService("Players").LocalPlayer
+local pg = player:WaitForChild("PlayerGui")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "KeyAuth_" .. tostring(math.random(100000, 999999))
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 999
+gui.Parent = pg
+
+local overlay = Instance.new("Frame")
+overlay.Size = UDim2.new(1, 0, 1, 0)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 1
+overlay.BorderSizePixel = 0
+overlay.Parent = gui
+TweenService:Create(overlay, TweenInfo.new(0.4), { BackgroundTransparency = 0.55 }):Play()
+
+local function makeBlob(color, size, pos, zIdx)
+    local b = Instance.new("Frame")
+    b.Size = UDim2.new(0, size, 0, size)
+    b.Position = pos
+    b.BackgroundColor3 = color
+    b.BackgroundTransparency = 0.85
+    b.BorderSizePixel = 0
+    b.ZIndex = zIdx or 0
+    b.Parent = gui
+    local c = Instance.new("UICorner", b); c.CornerRadius = UDim.new(1, 0)
+    return b
+end
+
+
+
+
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 400, 0, 320)
+frame.Position = UDim2.new(0.5, -200, 0.5, -160)
+frame.BackgroundColor3 = Color3.fromRGB(22, 18, 34)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.ClipsDescendants = true
+frame.ZIndex = 2
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 22)
+
+local bgGrad = Instance.new("UIGradient")
+bgGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.bg_top),
+    ColorSequenceKeypoint.new(1, C.bg_bot),
+})
+bgGrad.Rotation = 135
+bgGrad.Parent = frame
+
+local gridHolder = Instance.new("Frame")
+gridHolder.Size = UDim2.new(1, 0, 1, 0)
+gridHolder.BackgroundTransparency = 1
+gridHolder.ClipsDescendants = true
+gridHolder.ZIndex = 3
+gridHolder.Parent = frame
+
+for row = 1, 10 do
+    for col = 1, 16 do
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.new(0, 2, 0, 2)
+        dot.Position = UDim2.new(0, col * 26 - 6, 0, row * 26 - 6)
+        dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dot.BackgroundTransparency = 0.94
+        dot.BorderSizePixel = 0
+        dot.ZIndex = 3
+        dot.Parent = gridHolder
+        local c = Instance.new("UICorner", dot); c.CornerRadius = UDim.new(1, 0)
+    end
+end
+
+
+
+local progBar = Instance.new("Frame")
+progBar.Size = UDim2.new(0, 0, 0, 2)
+progBar.Position = UDim2.new(0, 0, 0, 3)
+progBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+progBar.BorderSizePixel = 0
+progBar.ZIndex = 5
+progBar.Visible = false
+progBar.Parent = frame
+local progGrad = Instance.new("UIGradient")
+progGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.accent2),
+    ColorSequenceKeypoint.new(1, C.accent3),
+})
+progGrad.Parent = progBar
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = C.card_edge
+stroke.Thickness = 1.2
+stroke.Transparency = 0.5
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+task.spawn(function()
+    while gui.Parent do
+        TweenService:Create(stroke, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Transparency = 0.15, Color = C.accent1 }):Play()
+        task.wait(2.5)
+        TweenService:Create(stroke, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Transparency = 0.6, Color = C.card_edge }):Play()
+        task.wait(2.5)
+    end
+end)
+
+task.spawn(function()
+    TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 440, 0, 350),
+        Position = UDim2.new(0.5, -220, 0.5, -175),
+        BackgroundTransparency = 0,
+    }):Play()
+    
+    task.wait(0.5)
+    TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 440, 0, 340),
+        Position = UDim2.new(0.5, -220, 0.5, -170),
+    }):Play()
+    
+end)
+
+do
+    local drag, ds, sp
+    frame.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag, ds, sp = true, i.Position, frame.Posit    i.Changed:Connect(function()
+                if i.UserInputState == Enum.UserInputState.End then drag = false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(i)
+        if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - ds
+            frame.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+        end
+    end)
+end
+
+local badge = Instance.new("Frame")
+badge.Size = UDim2.new(0, 52, 0, 52)
+badge.Position = UDim2.new(0, 24, 0, 22)
+badge.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+badge.BorderSizePixel = 0
+badge.ClipsDescendants = true
+badge.ZIndex = 4
+badge.Parent = frame
+Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 14)
+local badgeGrad = Instance.new("UIGradient")
+badgeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.accent1),
+    ColorSequenceKeypoint.new(1, C.accent2),
+})
+badgeGrad.Rotation = 45
+badgeGrad.Parent = badge
+
+local badgeImage = Instance.new("ImageLabel")
+badgeImage.Size = UDim2.new(1, -6, 1, -6)
+badgeImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+badgeImage.AnchorPoint = Vector2.new(0.5, 0.5)
+badgeImage.BackgroundTransparency = 1
+badgeImage.ImageColor3 = Color3.fromRGB(255, 255, 255)
+badgeImage.ScaleType = Enum.ScaleType.Fit
+badgeImage.ZIndex = 5
+badgeImage.Parent = badge
+
+task.spawn(function()
+    local ok = pcall(function()
+        local logo = game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/main/logo.png")
+        writefile("khangle_logo.png", logo)
+        badgeImage.Image = getcustomasset("khangle_logo.png")
+    end)
+    if not ok then
+        local fallback = Instance.new("TextLabel")
+        fallback.Size = UDim2.new(1, 0, 1, 0)
+        fallback.BackgroundTransparency = 1
+        fallback.Text = "K"
+        fallback.Font = Enum.Font.GothamBlack
+        fallback.TextSize = 26
+        fallback.TextColor3 = Color3.fromRGB(255, 255, 255)
+        fallback.ZIndex = 5
+        fallback.Parent = badge
+    end
+end)
+
+local badgeShine = Instance.new("Frame")
+badgeShine.Size = UDim2.new(0, 30, 2, 0)
+badgeShine.Position = UDim2.new(0, -40, 0, -10)
+badgeShine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+badgeShine.BackgroundTransparency = 0.4
+badgeShine.BorderSizePixel = 0
+badgeShine.Rotation = 20
+badgeShine.ZIndex = 5
+badgeShine.Parent = badge
+
+task.spawn(function()
+    while gui.Parent do
+        badgeShine.Position = UDim2.new(0, -40, 0, -10)
+        badgeShine.BackgroundTransparency = 1
+        task.wait(2.5)
+        badgeShine.BackgroundTransparency = 0.4
+        TweenService:Create(badgeShine, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, 70, 0, -10),
+        }):Play()
+        task.wait(0.9)
+        badgeShine.BackgroundTransparency = 1
+        task.wait(0.1)
+    end
+end)
+
+local brand = Instance.new("TextLabel")
+brand.Size = UDim2.new(1, -180, 0, 26)
+brand.Position = UDim2.new(0, 88, 0, 26)
+brand.BackgroundTransparency = 1
+brand.Text = BRAND_NAME
+brand.Font = Enum.Font.GothamBold
+brand.TextSize = 18
+brand.TextColor3 = C.text
+brand.TextXAlignment = Enum.TextXAlignment.Left
+brand.ZIndex = 4
+brand.Parent = frame
+
+local subBrand = Instance.new("TextLabel")
+subBrand.Size = UDim2.new(1, -180, 0, 18)
+subBrand.Position = UDim2.new(0, 88, 0, 50)
+subBrand.BackgroundTransparency = 1
+subBrand.Text = "tiktok " .. BRAND_SUB
+subBrand.Font = Enum.Font.Gotham
+subBrand.TextSize = 12
+subBrand.TextColor3 = C.text_dim
+subBrand.TextXAlignment = Enum.TextXAlignment.Left
+subBrand.ZIndex = 4
+subBrand.Parent = frame
+
+task.spawn(function()
+    while gui.Parent do
+        TweenService:Create(subBrand, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { TextColor3 = C.accent2 }):Play()
+        task.wait(1.5)
+        TweenService:Create(subBrand, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { TextColor3 = C.text_dim }):Play()
+        task.wait(1.5)
+    end
+end)
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0, 32, 0, 32)
+close.Position = UDim2.new(1, -44, 0, 22)
+close.BackgroundColor3 = Color3.fromRGB(42, 36, 62)
+close.BorderSizePixel = 0
+close.Text = "X"
+close.Font = Enum.Font.GothamBold
+close.TextSize = 14
+close.TextColor3 = C.text_dim
+close.AutoButtonColor = false
+close.ZIndex = 4
+close.Parent = frame
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
+
+close.MouseEnter:Connect(function()
+    TweenService:Create(close, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(200, 60, 80), TextColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+end)
+close.MouseLeave:Connect(function()
+    TweenService:Create(close, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(42, 36, 62), TextColor3 = C.text_dim }):Play()
+end)
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -48, 0, 1)
+divider.Position = UDim2.new(0, 24, 0, 92)
+divider.BackgroundColor3 = C.card_edge
+divider.BackgroundTransparency = 0.7
+divider.BorderSizePixel = 0
+divider.ZIndex = 4
+divider.Parent = frame
+
+local divGrad = Instance.new("UIGradient")
+divGrad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(0.5, 0),
+    NumberSequenceKeypoint.new(1, 1),
+})
+divGrad.Parent = divider
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -48, 0, 18)
+label.Position = UDim2.new(0, 24, 0, 106)
+label.BackgroundTransparency = 1
+label.Text = "LICENSE KEY"
+label.Font = Enum.Font.GothamBold
+label.TextSize = 10
+label.TextColor3 = C.text_faint
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.ZIndex = 4
+label.Parent = frame
+
+local inputWrap = Instance.new("Frame")
+inputWrap.Size = UDim2.new(1, -48, 0, 52)
+inputWrap.Position = UDim2.new(0, 24, 0, 128)
+inputWrap.BackgroundColor3 = C.input_bg
+inputWrap.BorderSizePixel = 0
+inputWrap.ZIndex = 4
+inputWrap.Parent = frame
+Instance.new("UICorner", inputWrap).CornerRadius = UDim.new(0, 12)
+
+local inputStroke = Instance.new("UIStroke", inputWrap)
+inputStroke.Color = C.input_edge
+inputStroke.Thickness = 1.5
+
+local inputGlow = Instance.new("Frame")
+inputGlow.Size = UDim2.new(1, 0, 1, 0)
+inputGlow.BackgroundColor3 = C.input_focus
+inputGlow.BackgroundTransparency = 1
+inputGlow.BorderSizePixel = 0
+inputGlow.ZIndex = 4
+inputGlow.Parent = inputWrap
+Instance.new("UICorner", inputGlow).CornerRadius = UDim.new(0, 12)
+
+local lockIcon = Instance.new("TextLabel")
+lockIcon.Size = UDim2.new(0, 26, 1, 0)
+lockIcon.Position = UDim2.new(0, 14, 0, 0)
+lockIcon.BackgroundTransparency = 1
+lockIcon.Text = ">"
+lockIcon.Font = Enum.Font.GothamBold
+lockIcon.TextSize = 16
+lockIcon.TextColor3 = C.text_faint
+lockIcon.ZIndex = 5
+lockIcon.Parent = inputWrap
+
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1, -60, 1, 0)
+box.Position = UDim2.new(0, 46, 0, 0)
+box.BackgroundTransparency = 1
+box.Text = ""
+box.PlaceholderText = "KEY-XXXX-XXXX-XXXX-XXXX"
+box.Font = Enum.Font.Code
+box.TextSize = 15
+box.TextColor3 = C.text
+box.PlaceholderColor3 = C.text_faint
+box.ClearTextOnFocus = false
+box.TextXAlignment = Enum.TextXAlignment.Left
+box.ZIndex = 5
+box.Parent = inputWrap
+
+box.Focused:Connect(function()
+    TweenService:Create(inputStroke, TweenInfo.new(0.25), { Color = C.input_focus, Transparency = 0 }):Play()
+    TweenService:Create(inputGlow, TweenInfo.new(0.3), { BackgroundTransparency = 0.92 }):Play()
+    TweenService:Create(lockIcon, TweenInfo.new(0.2), { TextColor3 = C.input_focus }):Play()
+end)
+box.FocusLost:Connect(function()
+    TweenService:Create(inputStroke, TweenInfo.new(0.25), { Color = C.input_edge, Transparency = 0.2 }):Play()
+    TweenService:Create(inputGlow, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(lockIcon, TweenInfo.new(0.2), { TextColor3 = C.text_faint }):Play()
+end)
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -48, 0, 48)
+btn.Position = UDim2.new(0, 24, 0, 192)
+btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+btn.BorderSizePixel = 0
+btn.Text = "KÍCH HOẠT"
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 15
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.AutoButtonColor = false
+btn.ClipsDescendants = true
+btn.ZIndex = 5
+btn.Parent = frame
+btn.TextStrokeTransparency = 0
+btn.TextStrokeColor3 = Color3.fromRGB(15, 5, 45)
+btn.TextSize = 17
+btn.Font = Enum.Font.GothamBlack
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+
+local btnGrad = Instance.new("UIGradient")
+btnGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, C.accent1),
+    ColorSequenceKeypoint.new(1, C.accent3),
+})
+btnGrad.Parent = btn
+
+local btnStroke = Instance.new("UIStroke", btn)
+btnStroke.Color = Color3.fromRGB(180, 160, 255)
+btnStroke.Thickness = 1
+btnStroke.Transparency = 0.7
+
+local btnShine = Instance.new("Frame")
+btnShine.Size = UDim2.new(0, 50, 1, 0)
+btnShine.Position = UDim2.new(0, -80, 0, 0)
+btnShine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+btnShine.BackgroundTransparency = 0.75
+btnShine.BorderSizePixel = 0
+btnShine.Rotation = 15
+btnShine.ZIndex = 6
+btnShine.Parent = btn
+
+task.spawn(function()
+    while gui.Parent do
+        task.wait(3)
+        btnShine.Position = UDim2.new(0, -80, 0, 0)
+        TweenService:Create(btnShine, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1, 40, 0, 0),
+        }):Play()
+    end
+end)
+
+btn.MouseEnter:Connect(function()
+    TweenService:Create(btnStroke, TweenInfo.new(0.15), { Transparency = 0.2 }):Play()
+end)
+btn.MouseLeave:Connect(function()
+    TweenService:Create(btnStroke, TweenInfo.new(0.15), { Transparency = 0.7 }):Play()
+end)
+
+btn.MouseButton1Down:Connect(function()
+    local ripple = Instance.new("Frame")
+    ripple.Size = UDim2.new(0, 10, 0, 10)
+    ripple.Position = UDim2.new(0.5, -5, 0.5, -5)
+    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ripple.BackgroundTransparency = 0.5
+    ripple.BorderSizePixel = 0
+    ripple.ZIndex = 6
+    ripple.Parent = btn
+    local c = Instance.new("UICorner", ripple); c.CornerRadius = UDim.new(1, 0)
+    TweenService:Create(ripple, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 400, 0, 400),
+        Position = UDim2.new(0.5, -200, 0.5, -200),
+        BackgroundTransparency = 1,
+    }):Play()
+    task.delay(0.7, function() ripple:Destroy() end)
+end)
+
+local hwidBtn = Instance.new("TextButton")
+hwidBtn.Size = UDim2.new(1, -48, 0, 24)
+hwidBtn.Position = UDim2.new(0, 24, 0, 250)
+hwidBtn.BackgroundTransparency = 1
+hwidBtn.Text = ""
+hwidBtn.AutoButtonColor = false
+hwidBtn.ZIndex = 4
+hwidBtn.Parent = frame
+
+local hwidText = Instance.new("TextLabel")
+hwidText.Size = UDim2.new(1, -50, 1, 0)
+hwidText.BackgroundTransparency = 1
+local hwidShort = #HWID > 22 and (HWID:sub(1, 22) .. "...") or HWID
+hwidText.Text = "HWID · " .. hwidShort
+hwidText.Font = Enum.Font.Code
+hwidText.TextSize = 11
+hwidText.TextColor3 = C.text_faint
+hwidText.TextXAlignment = Enum.TextXAlignment.Left
+hwidText.ZIndex = 5
+hwidText.Parent = hwidBtn
+
+local copyIcon = Instance.new("TextLabel")
+copyIcon.Size = UDim2.new(0, 44, 1, 0)
+copyIcon.Position = UDim2.new(1, -44, 0, 0)
+copyIcon.BackgroundTransparency = 1
+copyIcon.Text = "copy"
+copyIcon.Font = Enum.Font.Gotham
+copyIcon.TextSize = 11
+copyIcon.TextColor3 = C.accent1
+copyIcon.TextXAlignment = Enum.TextXAlignment.Right
+copyIcon.ZIndex = 5
+copyIcon.Parent = hwidBtn
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -48, 0, 32)
+status.Position = UDim2.new(0, 24, 0, 282)
+status.BackgroundTransparency = 1
+status.Text = ""
+status.Font = Enum.Font.Gotham
+status.TextSize = 12
+status.TextColor3 = C.text_dim
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.TextYAlignment = Enum.TextYAlignment.Top
+status.TextWrapped = true
+status.ZIndex = 4
+status.Parent = frame
+
+local footer = Instance.new("TextLabel")
+footer.Size = UDim2.new(1, -48, 0, 14)
+footer.Position = UDim2.new(0, 24, 1, -20)
+footer.BackgroundTransparency = 1
+footer.Text = "powered by " .. BRAND_NAME .. " · " .. BRAND_SUB
+footer.Font = Enum.Font.Gotham
+footer.TextSize = 10
+footer.TextColor3 = C.text_faint
+footer.TextXAlignment = Enum.TextXAlignment.Left
+footer.ZIndex = 4
+footer.Parent = frame
+
+local function burst(centerX, centerY, color)
+    for i = 1, 14 do
+        local p = Instance.new("Frame")
+        p.Size = UDim2.new(0, 6, 0, 6)
+        p.Position = UDim2.new(0, centerX, 0, centerY)
+        p.BackgroundColor3 = color
+        p.BackgroundTransparency = 0
+        p.BorderSizePixel = 0
+        p.ZIndex = 7
+        p.Parent = frame
+        local c = Instance.new("UICorner", p); c.CornerRadius = UDim.new(1, 0)
+        local angle = (i / 14) * math.pi * 2
+        local dist = 80 + math.random(20, 60)
+        local dx = math.cos(angle) * dist
+        local dy = math.sin(angle) * dist
+        TweenService:Create(p, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, centerX + dx, 0, centerY + dy),
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, 2, 0, 2),
+        }):Play()
+        task.delay(0.8, function() p:Destroy() end)
+    end
+end
+
+hwidBtn.MouseButton1Click:Connect(function()
+    if setclipboard then pcall(setclipboard, HWID) end
+    copyIcon.Text = "copied"
+    TweenService:Create(copyIcon, TweenInfo.new(0.15), { TextColor3 = C.ok }):Play()
+    task.wait(1.2)
+    copyIcon.Text = "copy"
+    TweenService:Create(copyIcon, TweenInfo.new(0.15), { TextColor3 = C.accent1 }):Play()
+end)
+
+close.MouseButton1Click:Connect(function()
+    TweenService:Create(frame, TweenInfo.new(0.2), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
+    
+    TweenService:Create(overlay, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
+    task.wait(0.2)
+    gui:Destroy()
+end)
+
+local running = false
+local token = nil
+
+local function set_status(text, color)
+    status.Text = text
+    TweenService:Create(status, TweenInfo.new(0.15), { TextColor3 = color or C.text_dim }):Play()
+end
+
+local function set_btn(text, colorSeq)
+    btn.Text = text
+    if colorSeq then btnGrad.Color = colorSeq end
+end
+
+local function start_progress()
+    return nil
+end
+
+local function end_progress(success)
+    return nil
+end
+
+local function launch()
+    if running then return end
+    running = true
+    TweenService:Create(frame, TweenInfo.new(0.25), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
+    
+    TweenService:Create(overlay, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+    task.wait(0.25)
+    gui:Destroy()
+    task.spawn(function()
+        local ok, err = pcall(PAYLOAD)
+        if not ok then warn("[keyauth] payload error:", err) end
+    end)
+end
+
+local function start_heartbeat()
+    task.spawn(function()
+        while token and not running do
+            task.wait(HEARTBEAT_INTERVAL)
+            if not token or running then break end
+            local code = http_post("/heartbeat", {}, {
+                ["Authorization"] = "Bearer " .. token,
+                ["X-HWID"] = HWID,
+            })
+            if code ~= 200 then token = nil; break end
+        end
+    end)
+end
+
+local GRAD_OK   = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.ok), ColorSequenceKeypoint.new(1, Color3.fromRGB(34, 197, 94)) })
+local GRAD_LOAD = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 100, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 70, 180)) })
+local GRAD_IDLE = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.accent1), ColorSequenceKeypoint.new(1, C.accent3) })
+
+local function do_auth(key)
+    local code, body = http_post("/auth", { key = key, hwid = HWID })
+    if not code then
+        end_progress(false)
+        set_status("Khong ket noi duoc server", C.err)
+        set_btn("KÍCH HOẠT", GRAD_IDLE)
+        return
+    end
+    if code == 200 and type(body) == "table" and body.token then
+        token = body.token
+        save_token(token)
+        end_progress(true)
+        burst(220, 216, C.ok)
+        set_status("License hợp lệ", C.ok)
+        set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
+        start_heartbeat()
+        task.wait(0.9)
+        launch()
+    else
+        local msg = "Key không hợp lệ"
+        if type(body) == "table" and body.detail then
+            local d = body.detail
+            if d == "invalid key" then msg = "Key không tồn tại"
+            elseif d == "key expired" then msg = "Key đã hết hạn"
+            elseif d == "key revoked" then msg = "Key đã bị thu hồi"
+            elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
+            else msg = d end
+        end
+        end_progress(false)
+        set_status(msg, C.err)
+        set_btn("KÍCH HOẠT", GRAD_IDLE)
+        TweenService:Create(stroke, TweenInfo.new(0.1), { Color = C.err, Transparency = 0 }):Play()
+        task.wait(0.15)
+        TweenService:Create(stroke, TweenInfo.new(0.4), { Color = C.card_edge, Transparency = 0.5 }):Play()
+        local orig = frame.Position
+        for i = 1, 3 do
+            TweenService:Create(frame, TweenInfo.new(0.05), { Position = orig + UDim2.new(0, 10, 0, 0) }):Play()
+            task.wait(0.05)
+            TweenService:Create(frame, TweenInfo.new(0.05), { Position = orig - UDim2.new(0, 10, 0, 0) }):Play()
+            task.wait(0.05)
+        end
+        TweenService:Create(frame, TweenInfo.new(0.08), { Position = orig }):Play()
+    end
+end
+
+btn.MouseButton1Click:Connect(function()
+    if running then return end
+    local key = box.Text:gsub("%s+", ""):upper()
+    if #key < 10 then
+        set_status("Key quá ngắn", C.err)
+        return
+    end
+    set_btn("ĐANG KIỂM TRA...", GRAD_LOAD)
+    set_status("Đang xác thực...", C.text_dim)
+    start_progress()
+    task.spawn(do_auth, key)
+end)
+
+box.FocusLost:Connect(function(enter)
+    if enter then btn:Activate() end
+end)
+
+task.spawn(function()
+    local saved = load_token()
+    if not saved then return end
+    set_btn("DANG TỰ ĐỘNG ĐĂNG NHẬP...", GRAD_LOAD)
+    set_status("Dang kiem tra phien cu...", C.text_dim)
+    start_progress()
+    local code = http_post("/heartbeat", {}, {
+        ["Authorization"] = "Bearer " .. saved,
+        ["X-HWID"] = HWID,
+    })
+    if code == 200 then
+        token = saved
+        end_progress(true)
+        set_status("Auto-login thành công", C.ok)
+        set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
+        start_heartbeat()
+        task.wait(0.6)
+        launch()
+    else
+        end_progress(false)
+        set_btn("KÍCH HOẠT", GRAD_IDLE)
+        set_status("", C.text_dim)
     end
 end)
