@@ -2159,45 +2159,6 @@ for row = 1, 10 do
     end
 end
 
--- ============ TOP LED STRIP ============
-local TOP_DOTS = 20
-local topDots = {}
-local topStrip = Instance.new("Frame")
-topStrip.Size = UDim2.new(1, -40, 0, 3)
-topStrip.Position = UDim2.new(0, 20, 0, 0)
-topStrip.BackgroundTransparency = 1
-topStrip.ZIndex = 4
-topStrip.Parent = frame
-
-for i = 1, TOP_DOTS do
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(1 / TOP_DOTS, 0, 0, 3)
-dot.Position = UDim2.new((i - 1) / TOP_DOTS, 0, 0, 0)
-    dot.BackgroundColor3 = C.accent1
-    dot.BackgroundTransparency = 0.9
-    dot.BorderSizePixel = 0
-    dot.ZIndex = 4
-    dot.Parent = topStrip
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-    topDots[i] = dot
-end
-
-task.spawn(function()
-    local wave = 0
-    while gui.Parent do
-        wave = wave + 0.025
-        for i = 1, TOP_DOTS do
-            local phase = ((i - 1) / TOP_DOTS - wave) % 1
-            if phase < 0 then phase = phase + 1 end
-            local brightness = (math.sin(phase * math.pi * 2) + 1) / 2
-            local mixed = C.accent1:Lerp(C.accent2, brightness)
-            topDots[i].BackgroundColor3 = mixed
-            topDots[i].BackgroundTransparency = 1 - brightness * 0.85
-        end
-        task.wait(0.05)
-    end
-end)
--- ============ END TOP LED ============
 
 
 local progBar = Instance.new("Frame")
@@ -2736,13 +2697,13 @@ local function do_auth(key)
         task.wait(0.9)
         launch()
     else
-        local msg = "Key khong hop le"
+        local msg = "Key không hợp lệ"
         if type(body) == "table" and body.detail then
             local d = body.detail
-            if d == "invalid key" then msg = "Key khong ton tai"
-            elseif d == "key expired" then msg = "Key da het han"
-            elseif d == "key revoked" then msg = "Key da bi thu hoi"
-            elseif d == "hwid mismatch" then msg = "Key dung cho may khac"
+            if d == "invalid key" then msg = "Key không tồn tại"
+            elseif d == "key expired" then msg = "Key đã hết hạn"
+            elseif d == "key revoked" then msg = "Key đã bị thu hồi"
+            elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
             else msg = d end
         end
         end_progress(false)
