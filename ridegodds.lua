@@ -2626,24 +2626,11 @@ local function set_btn(text, colorSeq)
 end
 
 local function start_progress()
-    progBar.Visible = true
-    progBar.Size = UDim2.new(0, 0, 0, 2)
-    local tw = TweenService:Create(progBar, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0.85, 0, 0, 2),
-    })
-    tw:Play()
-    return tw
+    return nil
 end
 
 local function end_progress(success)
-    local target = success and 1 or 0
-    TweenService:Create(progBar, TweenInfo.new(0.3), {
-        Size = UDim2.new(target, 0, 0, 2),
-    }):Play()
-    task.delay(0.4, function()
-        progBar.Visible = false
-        progBar.Size = UDim2.new(0, 0, 0, 2)
-    end)
+    return nil
 end
 
 local function launch()
