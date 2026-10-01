@@ -2260,15 +2260,33 @@ badgeGrad.Color = ColorSequence.new({
 badgeGrad.Rotation = 45
 badgeGrad.Parent = badge
 
-local badgeLabel = Instance.new("TextLabel")
-badgeLabel.Size = UDim2.new(1, 0, 1, 0)
-badgeLabel.BackgroundTransparency = 1
-badgeLabel.Text = "K"
-badgeLabel.Font = Enum.Font.GothamBlack
-badgeLabel.TextSize = 26
-badgeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-badgeLabel.ZIndex = 5
-badgeLabel.Parent = badge
+local badgeImage = Instance.new("ImageLabel")
+badgeImage.Size = UDim2.new(1, -6, 1, -6)
+badgeImage.Position = UDim2.new(0, 3, 0, 3)
+badgeImage.BackgroundTransparency = 1
+badgeImage.ImageColor3 = Color3.fromRGB(255, 255, 255)
+badgeImage.ScaleType = Enum.ScaleType.Fit
+badgeImage.ZIndex = 5
+badgeImage.Parent = badge
+
+task.spawn(function()
+    local ok = pcall(function()
+        local logo = game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/main/logo.png")
+        writefile("khangle_logo.png", logo)
+        badgeImage.Image = getcustomasset("khangle_logo.png")
+    end)
+    if not ok then
+        local fallback = Instance.new("TextLabel")
+        fallback.Size = UDim2.new(1, 0, 1, 0)
+        fallback.BackgroundTransparency = 1
+        fallback.Text = "K"
+        fallback.Font = Enum.Font.GothamBlack
+        fallback.TextSize = 26
+        fallback.TextColor3 = Color3.fromRGB(255, 255, 255)
+        fallback.ZIndex = 5
+        fallback.Parent = badge
+    end
+end)
 
 local badgeShine = Instance.new("Frame")
 badgeShine.Size = UDim2.new(0, 30, 2, 0)
