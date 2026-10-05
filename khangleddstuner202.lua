@@ -1913,26 +1913,7 @@ do
         if h.Sit then pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end); task.wait(0.3) end
     end
     local OF_TELE_MIN = 60
-    local function of_walkTo(target, sd, timeout, allowSit)
-        sd = sd or 3; timeout = timeout or 20
-        local deadline = os.clock() + timeout; local reached = false
-        pcall(function()
-            while os.clock() < deadline and farmOffice do
-                local h = of_humanoid(); local hrp = of_root()
-                if not h or not hrp then break end
-                if h.Sit or h:GetState() == Enum.HumanoidStateType.Seated then
-                    if allowSit then reached = true; break else of_standUp() end
-                end
-                local delta = target - hrp.Position
-                local flat = Vector3.new(delta.X, 0, delta.Z)
-                if flat.Magnitude <= sd then reached = true; break end
-                h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z)); task.wait(0.15)
-            end
-        end)
-        local h = of_humanoid(); local hrp = of_root()
-        if h and hrp then h:MoveTo(hrp.Position) end
-        return reached
-    end
+    
     
     local function of_solve(q)
         if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then return nil end
@@ -2009,14 +1990,18 @@ do
     end
 local function of_teleNear(target, od)
     local hrp = of_root(); if not hrp then return false end
+    local h = of_humanoid()
     local dir = (target - hrp.Position); dir = Vector3.new(dir.X, 0, dir.Z)
     if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
     dir = dir.Unit
     local landPos = target - dir * (od or 6)
     landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
     setStatus("tele tới máy in")
+    if h then pcall(function() h:MoveTo(landPos) end) end
     hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, landPos.Z))
-    task.wait(0.3)
+    task.wait(0.1)
+    if h then pcall(function() h:MoveTo(hrp.Position) end) end
+    task.wait(0.2)
     return true
 end
 
