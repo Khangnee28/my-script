@@ -1373,7 +1373,7 @@ do
 
     -- ===== CỤM NÚT ĐIỀU KHIỂN =====
     local controlFrame = Instance.new("Frame", ScreenGui)
-    controlFrame.Size = UDim2.new(0, 245, 0, 160); controlFrame.Position = UDim2.new(0, 80, 1, -215)
+    controlFrame.Size = UDim2.new(0, 245, 0, 160); controlFrame.Position = UDim2.new(0, 80, 1, -270)
     controlFrame.BackgroundTransparency = 1; controlFrame.Visible = false; controlFrame.ZIndex = 1
     local controlButtons = {}
     local function mkPad(txt, size, pos)
@@ -1381,7 +1381,8 @@ do
         b.Size = size; b.Position = pos; b.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
         b.BackgroundTransparency = 0.35; b.Text = txt; b.TextColor3 = Color3.fromRGB(240, 240, 250)
         b.TextSize = 15; b.Font = Enum.Font.GothamBold; b.ZIndex = 2
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+        b.Active = false
+Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
         addStroke(b, Color3.fromRGB(70, 70, 95), 1)
         table.insert(controlButtons, b); return b
     end
@@ -1615,39 +1616,17 @@ end)
     end)
 -- ===== TOUCH =====
 local function isInside(pt, f)
-local function isInRobloxJoystick(pos)
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then return false end
-    local tg = pg:FindFirstChild("TouchGui")
-    if not tg then return false end
-    local tcf = tg:FindFirstChild("TouchControlFrame")
-    if not tcf then return false end
-    for _, child in ipairs(tcf:GetChildren()) do
-        local n = child.Name:lower()
-        if (n:find("thumbstick") or n:find("joystick")) and child:IsA("GuiObject") and child.Visible then
-            local ap, as = child.AbsolutePosition, child.AbsoluteSize
-            if pos.X >= ap.X and pos.X <= ap.X + as.X
-               and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
-                return true
-            end
-        end
-    end
-    return false
-end
+
 
         if not f.Visible then return false end
         local ap, as = f.AbsolutePosition, f.AbsoluteSize
         return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
     end
 
-    UserInputService.TouchStarted:Connect(function(touch)
-        if not freecamActive then return end
-        local pos = touch.Position
-        local inUI = isInside(pos, freecamMenuFrame)
-            or isInside(pos, FreecamFloatingBtn) or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
-            or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
-           if not inUI and isInRobloxJoystick(pos) then inUI = true end
-    if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
+    UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
+    if not freecamActive then return end
+    if gameProcessed then return end
+    if not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
 end)
     UserInputService.TouchMoved:Connect(function(touch)
     if freecamActive and touch == activeTouch and lastTouchPos then
