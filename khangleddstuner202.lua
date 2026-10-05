@@ -1373,7 +1373,7 @@ do
 
     -- ===== CỤM NÚT ĐIỀU KHIỂN =====
     local controlFrame = Instance.new("Frame", ScreenGui)
-    controlFrame.Size = UDim2.new(0, 205, 0, 300); controlFrame.Position = UDim2.new(0, 80, 1, -305)
+    controlFrame.Size = UDim2.new(0, 245, 0, 160); controlFrame.Position = UDim2.new(0, 80, 1, -165)
     controlFrame.BackgroundTransparency = 1; controlFrame.Visible = false; controlFrame.ZIndex = 1
     local controlButtons = {}
     local function mkPad(txt, size, pos)
@@ -1391,15 +1391,13 @@ do
     local btnS = mkPad("▼", UDim2.new(0, 44, 0, 44), UDim2.new(0, 48, 0, 96))
     local btnA = mkPad("◀", UDim2.new(0, 44, 0, 44), UDim2.new(0, 0, 0, 48))
     local btnD = mkPad("▶", UDim2.new(0, 44, 0, 44), UDim2.new(0, 96, 0, 48))
-
-    -- Cột phải: Up/Down → Zoom → Nghiêng, xếp dọc
-    local btnUp = mkPad("+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 0))
-    local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
-    local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 100))
-    local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 148))
-    local btnRollL = mkPad("Q", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 200))
-    local btnRollR = mkPad("E", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 248))
-
+-- Cột phải: 3 hàng, mỗi hàng 2 nút
+local btnUp = mkPad("+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 0))
+local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 0))
+local btnRollL = mkPad("Q", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
+local btnRollR = mkPad("E", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 48))
+local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 96))
+local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 96))
     -- ===== DRAG =====
     do
         local dg, ds, sp
@@ -1527,28 +1525,56 @@ do
 
     -- ===== CAMERA STATE =====
     local freecamActive = false
-    local followMode = false
-    local followOffset = Vector3.new(0, 0, 0)
-    local camPos = camera.CFrame.Position
-    local camAngles = Vector3.new(0, 0, 0)
-    local targetCamAngles = Vector3.new(0, 0, 0)
-    local currentFOV = camera.FieldOfView
-    local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
+local followMode = false
+local followOffset = Vector3.new(0, 0, 0)
+local camPos = camera.CFrame.Position
+local camAngles = Vector3.new(0, 0, 0)
+local targetCamAngles = Vector3.new(0, 0, 0)
+local currentFOV = camera.FieldOfView
+local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
+local activeTouch, lastTouchPos = nil, nil
+local buttonHeld = false
 
-    local function bindTouch(btn, key)
-        btn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = true end end)
-        btn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = false end end)
-    end
+local function bindTouch(btn, key)
+    btn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            moveStates[key] = true
+            buttonHeld = true
+            activeTouch = nil; lastTouchPos = nil
+        end
+    end)
+    btn.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            moveStates[key] = false
+            buttonHeld = false
+        end
+    end)
+end
     bindTouch(btnW, "W"); bindTouch(btnS, "S"); bindTouch(btnA, "A"); bindTouch(btnD, "D")
     bindTouch(btnUp, "Up"); bindTouch(btnDown, "Down")
     bindTouch(btnRollL, "RollL"); bindTouch(btnRollR, "RollR")
 
     local zIn, zOut = false, false
-    btnZoomIn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = true end end)
-    btnZoomIn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = false end end)
-    btnZoomOut.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zOut = true end end)
-    btnZoomOut.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zOut = false end end)
-
+    btnZoomIn.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        zIn = true; buttonHeld = true; activeTouch = nil; lastTouchPos = nil
+    end
+end)
+btnZoomIn.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        zIn = false; buttonHeld = false
+    end
+end)
+btnZoomOut.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        zOut = true; buttonHeld = true; activeTouch = nil; lastTouchPos = nil
+    end
+end)
+btnZoomOut.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+        zOut = false; buttonHeld = false
+    end
+end)
     local function getPlayerPos()
         local c = LocalPlayer.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
@@ -1587,10 +1613,8 @@ do
             followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
         end
     end)
-
-    -- ===== TOUCH =====
-    local activeTouch, lastTouchPos = nil, nil
-    local function isInside(pt, f)
+-- ===== TOUCH =====
+local function isInside(pt, f)
         if not f.Visible then return false end
         local ap, as = f.AbsolutePosition, f.AbsoluteSize
         return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
@@ -1610,7 +1634,8 @@ do
         if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
     end)
     UserInputService.TouchMoved:Connect(function(touch)
-        if freecamActive and touch == activeTouch and lastTouchPos then
+    if buttonHeld then return end
+    if freecamActive and touch == activeTouch and lastTouchPos then
             local d = touch.Position - lastTouchPos
             targetCamAngles = Vector3.new(
                 targetCamAngles.X - d.X * 0.004 * rotSens,
