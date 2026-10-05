@@ -20,7 +20,7 @@ local function PAYLOAD()
 -- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-locallocal function of_teleNear(target, od) RunService = game:GetService("RunService")
+local function of_teleNear(target, od) RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
