@@ -20,7 +20,7 @@ local function PAYLOAD()
 -- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
@@ -1773,9 +1773,7 @@ UserInputService.InputEnded:Connect(function(input)
         lastRotatePos = nil
     end
 end)
-    UserInputService.TouchEnded:Connect(function(touch)
-        if touch == activeTouch then activeTouch = nil; lastTouchPos = nil end
-    end)
+    
 
     -- ===== RENDER LOOP =====
     RunService.RenderStepped:Connect(function(dt)
