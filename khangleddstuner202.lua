@@ -1440,7 +1440,7 @@ do
         b.Size = size; b.Position = pos; b.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
         b.BackgroundTransparency = 0.35; b.Text = txt; b.TextColor3 = Color3.fromRGB(240, 240, 250)
         b.TextSize = 15; b.Font = Enum.Font.GothamBold; b.ZIndex = 2
-        b.Active = false
+        
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
         addStroke(b, Color3.fromRGB(70, 70, 95), 1)
         table.insert(controlButtons, b); return b
@@ -1667,7 +1667,7 @@ end
     local targetCamAngles = Vector3.new(0, 0, 0)
     local currentFOV = camera.FieldOfView
     local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
-    local activeTouch, lastTouchPos = nil, nil
+    
 
     local function bindTouch(btn, key)
         btn.InputBegan:Connect(function(i)
@@ -1735,52 +1735,61 @@ if followMode then
             followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
         end
     end)
+-- ===== TOUCH =====
+local function isInside(pt, f)
+    if not f.Visible then return false end
+    local ap, as = f.AbsolutePosition, f.AbsoluteSize
+    return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
+end
 
-    -- ===== TOUCH =====
-    local function isInside(pt, f)
-        if not f.Visible then return false end
-        local ap, as = f.AbsolutePosition, f.AbsoluteSize
-        return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
+local function isInAnyButton(pos)
+    for _, b in ipairs(controlButtons) do
+        if isInside(pos, b) then return true end
     end
+    return false
+end
 
-    local function isInAnyButton(pos)
-        for _, b in ipairs(controlButtons) do
-            if isInside(pos, b) then return true end
-        end
-        return false
-    end
+local activeTouchInput = nil
+local lastTouchPos = nil
 
-    UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
-        if not freecamActive then return end
-        local pos = touch.Position
-        -- Menu/UI elements chặn
-        if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
-           or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
-           or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
-           or (floatEye.Visible and isInside(pos, floatEye))
-           or isInside(pos, dragBar) then
-            return
-        end
-        -- Joystick Roblox: nửa dưới trái màn hình, nếu không phải nút freecam
-     if not isInAnyButton(pos) then
-    local vp = workspace.CurrentCamera.ViewportSize
-    if pos.X < vp.X * 0.55 and pos.Y > vp.Y * 0.45 then
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not freecamActive then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch then return end
+    local pos = Vector2.new(input.Position.X, input.Position.Y)
+    if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
+       or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
+       or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
+       or (floatEye.Visible and isInside(pos, floatEye))
+       or isInside(pos, dragBar) then
         return
     end
-end
-        if not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
-    end)
-    UserInputService.TouchMoved:Connect(function(touch)
-        if freecamActive and touch == activeTouch and lastTouchPos then
-            local d = touch.Position - lastTouchPos
-            targetCamAngles = Vector3.new(
-                targetCamAngles.X - d.X * 0.004 * rotSens,
-                targetCamAngles.Y - d.Y * 0.004 * rotSens,
-                targetCamAngles.Z
-            )
-            lastTouchPos = touch.Position
-        end
-    end)
+    if gameProcessed and not isInAnyButton(pos) then return end
+    if not activeTouchInput then
+        activeTouchInput = input
+        lastTouchPos = pos
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not freecamActive then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch then return end
+    if input ~= activeTouchInput or not lastTouchPos then return end
+    local pos = Vector2.new(input.Position.X, input.Position.Y)
+    local d = pos - lastTouchPos
+    targetCamAngles = Vector3.new(
+        targetCamAngles.X - d.X * 0.004 * rotSens,
+        targetCamAngles.Y - d.Y * 0.004 * rotSens,
+        targetCamAngles.Z
+    )
+    lastTouchPos = pos
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input == activeTouchInput then
+        activeTouchInput = nil
+        lastTouchPos = nil
+    end
+end)
     UserInputService.TouchEnded:Connect(function(touch)
         if touch == activeTouch then activeTouch = nil; lastTouchPos = nil end
     end)
