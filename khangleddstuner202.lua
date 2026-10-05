@@ -1640,21 +1640,7 @@ autoRepeat(rollDec, function()
 end)
 
     -- ===== CAMERA STATE =====
-   local nametagCache = {}
-local lastNametagScan = 0
-local function gatherNametags()
-    table.clear(nametagCache)
-    for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
-        local char = plr.Character
-        if char then
-            for _, d in ipairs(char:GetDescendants()) do
-                if d:IsA("BillboardGui") then
-                    table.insert(nametagCache, d)
-                end
-            end
-        end
-    end
-end
+   
 
  local freecamActive = false
     local followMode = false
@@ -1707,15 +1693,6 @@ end
     freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
 
 controlFrame.Visible = false
-for _, bg in ipairs(nametagCache) do
-    if bg and bg.Parent then
-        for _, child in ipairs(bg:GetChildren()) do
-            if child:IsA("GuiObject") and child.Rotation ~= 0 then
-                child.Rotation = 0
-            end
-        end
-    end
-end
 if followMode then
                 followMode = false
                 followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
@@ -1831,34 +1808,7 @@ end)
             camPos = camPos + (rotCF * mv) * speed * dt
         end
 
-                camera.CFrame = CFrame.new(camPos) * rotCF
-
-        local degZ = math.deg(camAngles.Z)
-        if math.abs(degZ) > 0.5 then
-            if os.clock() - lastNametagScan > 2 then
-                gatherNametags()
-                lastNametagScan = os.clock()
-            end
-            for _, bg in ipairs(nametagCache) do
-                if bg and bg.Parent then
-                    for _, child in ipairs(bg:GetChildren()) do
-                        if child:IsA("GuiObject") then
-                            child.Rotation = degZ
-                        end
-                    end
-                end
-            end
-        else
-            for _, bg in ipairs(nametagCache) do
-                if bg and bg.Parent then
-                    for _, child in ipairs(bg:GetChildren()) do
-                        if child:IsA("GuiObject") and child.Rotation ~= 0 then
-                            child.Rotation = 0
-                        end
-                    end
-                end
-            end
-        end
+                        camera.CFrame = CFrame.new(camPos) * rotCF
     end)
 end
    
