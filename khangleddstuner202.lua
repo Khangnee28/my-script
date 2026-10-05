@@ -17,7 +17,7 @@ local BRAND_SUB  = "@khangdayy215"
 local function PAYLOAD()
     -- ============================================================
 -- KHANGLE DDS HUB v26 — OFFICE ONLY
--- ============================================================
+-- ========================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -1303,9 +1303,9 @@ do
         return s
     end
 
-    -- ===== MENU GỌN =====
+    -- ===== MENU FREECAM =====
     freecamMenuFrame = Instance.new("Frame", ScreenGui)
-    freecamMenuFrame.Size = UDim2.new(0, 300, 0, 270); freecamMenuFrame.Position = UDim2.new(0.5, -150, 0.5, -135)
+    freecamMenuFrame.Size = UDim2.new(0, 300, 0, 230); freecamMenuFrame.Position = UDim2.new(0.5, -150, 0.5, -115)
     freecamMenuFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 21); freecamMenuFrame.BackgroundTransparency = 0.12
     freecamMenuFrame.Visible = false; freecamMenuFrame.ZIndex = 15
     Instance.new("UICorner", freecamMenuFrame).CornerRadius = UDim.new(0, 14)
@@ -1327,41 +1327,35 @@ do
     end
 
     local freecamToggleBtn = mkBtn(42, "Freecam: OFF", Color3.fromRGB(45, 45, 58))
-    local hideAllBtn = mkBtn(78, "Ẩn Giao Diện: OFF", Color3.fromRGB(50, 50, 68))
-    local followBtn = mkBtn(114, "Khóa Tầm: OFF", Color3.fromRGB(50, 50, 68))
+    local followBtn = mkBtn(78, "Khóa Tầm: OFF", Color3.fromRGB(50, 50, 68))
 
-    -- helper: 1 hàng gọn — label trái + [-] [+] phải
     local function makeCompactRow(y, labelText)
         local row = Instance.new("Frame", freecamMenuFrame)
         row.Size = UDim2.new(0.9, 0, 0, 30); row.Position = UDim2.new(0.05, 0, 0, y)
         row.BackgroundTransparency = 1; row.ZIndex = 16
-
         local lbl = Instance.new("TextLabel", row)
         lbl.Size = UDim2.new(1, -80, 1, 0); lbl.Position = UDim2.new(0, 4, 0, 0)
         lbl.BackgroundTransparency = 1; lbl.Text = labelText
         lbl.TextColor3 = Color3.fromRGB(180, 180, 200); lbl.TextSize = 11
         lbl.Font = Enum.Font.GothamBold; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.ZIndex = 17
-
         local dec = Instance.new("TextButton", row)
         dec.Size = UDim2.new(0, 34, 0, 26); dec.Position = UDim2.new(1, -76, 0, 2)
         dec.BackgroundColor3 = Color3.fromRGB(50, 50, 68); dec.Text = "−"
         dec.TextColor3 = Color3.fromRGB(235, 235, 245); dec.TextSize = 15; dec.Font = Enum.Font.GothamBold; dec.ZIndex = 17
         Instance.new("UICorner", dec).CornerRadius = UDim.new(0, 6)
-
         local inc = Instance.new("TextButton", row)
         inc.Size = UDim2.new(0, 34, 0, 26); inc.Position = UDim2.new(1, -38, 0, 2)
         inc.BackgroundColor3 = Color3.fromRGB(50, 50, 68); inc.Text = "+"
         inc.TextColor3 = Color3.fromRGB(235, 235, 245); inc.TextSize = 15; inc.Font = Enum.Font.GothamBold; inc.ZIndex = 17
         Instance.new("UICorner", inc).CornerRadius = UDim.new(0, 6)
-
         return lbl, dec, inc
     end
 
-    local spdLbl, spdDec, spdInc = makeCompactRow(152, "Tốc độ di chuyển: 25.0")
-    local rotLbl, rotDec, rotInc = makeCompactRow(186, "Tốc độ xoay: 1.00x")
-    local rollLbl, rollDec, rollInc = makeCompactRow(220, "Tốc độ nghiêng: 1.00x")
+    local spdLbl, spdDec, spdInc = makeCompactRow(116, "Tốc độ di chuyển: 25.0")
+    local rotLbl, rotDec, rotInc = makeCompactRow(150, "Tốc độ xoay: 1.00x")
+    local rollLbl, rollDec, rollInc = makeCompactRow(184, "Tốc độ nghiêng: 1.00x")
 
-    -- ===== hide float btn =====
+    -- ===== NÚT ẨN FLOAT =====
     hideFloatBtn = Instance.new("TextButton", ScreenGui)
     hideFloatBtn.Size = UDim2.new(0, 52, 0, 52); hideFloatBtn.Position = UDim2.new(0, 80, 0, 150)
     hideFloatBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28); hideFloatBtn.BackgroundTransparency = 0.2
@@ -1371,10 +1365,75 @@ do
     addStroke(hideFloatBtn, Color3.fromRGB(80, 80, 110), 2)
     hideFloatBtn.Visible = false
 
-    -- ===== CỤM NÚT ĐIỀU KHIỂN =====
+    -- ===== CỤM ĐIỀU KHIỂN =====
     local controlFrame = Instance.new("Frame", ScreenGui)
-    controlFrame.Size = UDim2.new(0, 245, 0, 160); controlFrame.Position = UDim2.new(0, 80, 1, -270)
+    controlFrame.Size = UDim2.new(0, 245, 0, 160)
+    controlFrame.Position = UDim2.new(0, 80, 1, -215)
     controlFrame.BackgroundTransparency = 1; controlFrame.Visible = false; controlFrame.ZIndex = 1
+    controlFrame.Active = false
+
+    -- Load vị trí đã lưu
+    if readfile and isfile and isfile("freecam_pos.txt") then
+        local ok, data = pcall(readfile, "freecam_pos.txt")
+        if ok then
+            local xs, xo, ys, yo = data:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+            if xs then
+                controlFrame.Position = UDim2.new(tonumber(xs), tonumber(xo), tonumber(ys), tonumber(yo))
+            end
+        end
+    end
+
+    -- Drag bar
+    local dragBar = Instance.new("Frame", controlFrame)
+    dragBar.Size = UDim2.new(1, 0, 0, 22); dragBar.Position = UDim2.new(0, 0, 0, -22)
+    dragBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40); dragBar.BackgroundTransparency = 0.3
+    dragBar.ZIndex = 2
+    Instance.new("UICorner", dragBar).CornerRadius = UDim.new(0, 6)
+    addStroke(dragBar, Color3.fromRGB(80, 80, 100), 1)
+    local dragLbl = Instance.new("TextLabel", dragBar)
+    dragLbl.Size = UDim2.new(1, -30, 1, 0); dragLbl.Position = UDim2.new(0, 6, 0, 0)
+    dragLbl.BackgroundTransparency = 1; dragLbl.Text = "≡ KÉO"
+    dragLbl.TextColor3 = Color3.fromRGB(150, 150, 170); dragLbl.TextSize = 10
+    dragLbl.Font = Enum.Font.GothamBold; dragLbl.TextXAlignment = Enum.TextXAlignment.Left; dragLbl.ZIndex = 3
+
+    -- Eye button trong drag bar
+    local eyeBtn = Instance.new("TextButton", dragBar)
+    eyeBtn.Size = UDim2.new(0, 20, 0, 20); eyeBtn.Position = UDim2.new(1, -22, 0.5, -10)
+    eyeBtn.BackgroundTransparency = 1; eyeBtn.Text = "👁"
+    eyeBtn.TextColor3 = Color3.fromRGB(200, 200, 220); eyeBtn.TextSize = 12
+    eyeBtn.Font = Enum.Font.GothamBold; eyeBtn.ZIndex = 3
+
+    -- Drag logic
+    local dragBarDragging = false
+    local dragStartPos, dragFrameStart
+    dragBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragBarDragging = true; dragStartPos = input.Position; dragFrameStart = controlFrame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragBarDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local d = input.Position - dragStartPos
+            controlFrame.Position = UDim2.new(
+                dragFrameStart.X.Scale, dragFrameStart.X.Offset + d.X,
+                dragFrameStart.Y.Scale, dragFrameStart.Y.Offset + d.Y
+            )
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if dragBarDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
+            dragBarDragging = false
+            if writefile then
+                pcall(writefile, "freecam_pos.txt",
+                    tostring(controlFrame.Position.X.Scale) .. "|" ..
+                    tostring(controlFrame.Position.X.Offset) .. "|" ..
+                    tostring(controlFrame.Position.Y.Scale) .. "|" ..
+                    tostring(controlFrame.Position.Y.Offset))
+            end
+        end
+    end)
+
+    -- Nút cụm
     local controlButtons = {}
     local function mkPad(txt, size, pos)
         local b = Instance.new("TextButton", controlFrame)
@@ -1382,39 +1441,129 @@ do
         b.BackgroundTransparency = 0.35; b.Text = txt; b.TextColor3 = Color3.fromRGB(240, 240, 250)
         b.TextSize = 15; b.Font = Enum.Font.GothamBold; b.ZIndex = 2
         b.Active = false
-Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
         addStroke(b, Color3.fromRGB(70, 70, 95), 1)
         table.insert(controlButtons, b); return b
     end
 
-    -- Cụm WASD trái
     local btnW = mkPad("▲", UDim2.new(0, 44, 0, 44), UDim2.new(0, 48, 0, 0))
     local btnS = mkPad("▼", UDim2.new(0, 44, 0, 44), UDim2.new(0, 48, 0, 96))
     local btnA = mkPad("◀", UDim2.new(0, 44, 0, 44), UDim2.new(0, 0, 0, 48))
     local btnD = mkPad("▶", UDim2.new(0, 44, 0, 44), UDim2.new(0, 96, 0, 48))
--- Cột phải: 3 hàng, mỗi hàng 2 nút
-local btnUp = mkPad("+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 0))
-local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 0))
-local btnRollL = mkPad("Q", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
-local btnRollR = mkPad("E", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 48))
-local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 96))
-local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 96))
-    -- ===== DRAG =====
+    local btnUp = mkPad("+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 0))
+    local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 0))
+    local btnRollL = mkPad("Q", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
+    local btnRollR = mkPad("E", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 48))
+    local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 96))
+    local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 96))
+
+    -- ===== NÚT MẮT NỔI =====
+    local floatEye = Instance.new("TextButton", ScreenGui)
+    floatEye.Size = UDim2.new(0, 44, 0, 44)
+    floatEye.Position = UDim2.new(0, 20, 0.5, -22)
+    floatEye.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    floatEye.BackgroundTransparency = 0.7
+    floatEye.Text = "👁"; floatEye.TextColor3 = Color3.fromRGB(255, 255, 255)
+    floatEye.TextSize = 20; floatEye.Font = Enum.Font.GothamBold
+    floatEye.Visible = false; floatEye.ZIndex = 20; floatEye.Active = false
+    Instance.new("UICorner", floatEye).CornerRadius = UDim.new(1, 0)
+
     do
         local dg, ds, sp
-        hideFloatBtn.InputBegan:Connect(function(i)
+        floatEye.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dg = true; ds = i.Position; sp = hideFloatBtn.Position end
+                dg = true; ds = i.Position; sp = floatEye.Position
+            end
         end)
         UserInputService.InputChanged:Connect(function(i)
             if dg and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
                 local d = i.Position - ds
-                hideFloatBtn.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y) end
+                floatEye.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X, sp.Y.Scale, sp.Y.Offset + d.Y)
+            end
         end)
         UserInputService.InputEnded:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dg = false end
         end)
     end
+
+    -- ===== ẨN/HIỆN =====
+    local hiddenMode = false
+    local function setRobloxTouchGuiTransparency(t)
+        local target = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if target then
+            local tg = target:FindFirstChild("TouchGui")
+            if tg then
+                for _, d in ipairs(tg:GetDescendants()) do
+                    if d:IsA("ImageLabel") or d:IsA("ImageButton") then d.ImageTransparency = t
+                    elseif d:IsA("TextLabel") or d:IsA("TextButton") then d.TextTransparency = t end
+                end
+            end
+        end
+        pcall(function()
+            local cg = game:GetService("CoreGui")
+            local tg = cg:FindFirstChild("TouchGui")
+            if tg then
+                for _, d in ipairs(tg:GetDescendants()) do
+                    if d:IsA("ImageLabel") or d:IsA("ImageButton") then d.ImageTransparency = t
+                    elseif d:IsA("TextLabel") or d:IsA("TextButton") then d.TextTransparency = t end
+                end
+            end
+        end)
+    end
+
+    local function toggleHidden()
+        hiddenMode = not hiddenMode
+        if hiddenMode then
+            for _, b in ipairs(controlButtons) do
+                b.BackgroundTransparency = 1; b.TextTransparency = 1
+                local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 1 end
+            end
+            dragBar.BackgroundTransparency = 1
+            dragLbl.TextTransparency = 1
+            eyeBtn.TextTransparency = 1
+            local s = dragBar:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 1 end
+            FreecamFloatingBtn.Visible = false
+            HubFrame.Visible = false
+            ToggleBtn.Visible = false
+            freecamMenuFrame.Visible = false
+            setRobloxTouchGuiTransparency(1)
+            floatEye.Visible = true
+        else
+            for _, b in ipairs(controlButtons) do
+                b.BackgroundTransparency = 0.35; b.TextTransparency = 0
+                local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
+            end
+            dragBar.BackgroundTransparency = 0.3
+            dragLbl.TextTransparency = 0
+            eyeBtn.TextTransparency = 0
+            local s = dragBar:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
+            FreecamFloatingBtn.Visible = true
+            ToggleBtn.Visible = true
+            setRobloxTouchGuiTransparency(0)
+            floatEye.Visible = false
+        end
+    end
+
+    eyeBtn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            toggleHidden()
+        end
+    end)
+
+    local floatEyeClickReady = false
+    floatEye.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            floatEyeClickReady = true
+        end
+    end)
+    floatEye.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            if floatEyeClickReady then toggleHidden() end
+            floatEyeClickReady = false
+        end
+    end)
+
+    -- ===== DRAG MENU FREECAM =====
     do
         local dg, ds, sp
         freecamMenuTitle.InputBegan:Connect(function(i)
@@ -1435,64 +1584,12 @@ local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 
         freecamMenuFrame.Visible = not freecamMenuFrame.Visible
     end)
 
-    local function setRobloxTouchGuiTransparency(t)
-        local tg = LocalPlayer.PlayerGui:FindFirstChild("TouchGui")
-        if tg then
-            for _, d in ipairs(tg:GetDescendants()) do
-                if d:IsA("ImageLabel") or d:IsA("ImageButton") then d.ImageTransparency = t
-                elseif d:IsA("TextLabel") or d:IsA("TextButton") then d.TextTransparency = t end
-            end
-        end
-    end
-
-    local hideModeActive, isUiHidden = false, false
-    hideAllBtn.MouseButton1Click:Connect(function()
-        hideModeActive = not hideModeActive
-        if hideModeActive then
-            hideAllBtn.Text = "Ẩn Giao Diện: ON"; hideAllBtn.BackgroundColor3 = Color3.fromRGB(150, 45, 45)
-            hideFloatBtn.Visible = true; hideFloatBtn.BackgroundTransparency = 0.2; hideFloatBtn.TextTransparency = 0
-            local s = hideFloatBtn:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
-            freecamMenuFrame.Visible = false
-        else
-            hideAllBtn.Text = "Ẩn Giao Diện: OFF"; hideAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
-            hideFloatBtn.Visible = false; isUiHidden = false; FreecamFloatingBtn.Visible = true
-            for _, b in ipairs(controlButtons) do
-                b.BackgroundTransparency = 0.35; b.TextTransparency = 0
-                local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
-            end
-            setRobloxTouchGuiTransparency(0)
-        end
-    end)
-    hideFloatBtn.MouseButton1Click:Connect(function()
-        isUiHidden = not isUiHidden
-        if isUiHidden then
-            FreecamFloatingBtn.Visible = false
-            for _, b in ipairs(controlButtons) do
-                b.BackgroundTransparency = 1; b.TextTransparency = 1
-                local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 1 end
-            end
-            hideFloatBtn.BackgroundTransparency = 1; hideFloatBtn.TextTransparency = 1
-            local s = hideFloatBtn:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 1 end
-            setRobloxTouchGuiTransparency(1)
-        else
-            FreecamFloatingBtn.Visible = true
-            for _, b in ipairs(controlButtons) do
-                b.BackgroundTransparency = 0.35; b.TextTransparency = 0
-                local s = b:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
-            end
-            hideFloatBtn.BackgroundTransparency = 0.2; hideFloatBtn.TextTransparency = 0
-            local s = hideFloatBtn:FindFirstChildOfClass("UIStroke"); if s then s.Transparency = 0 end
-            setRobloxTouchGuiTransparency(0)
-        end
-    end)
-
     -- ===== BIẾN =====
     local speed = 25.0
     local rotSens = 1.0
     local rollSens = 1.0
     local rollSpeed = 1.8
 
-    -- bind speed
     spdInc.MouseButton1Click:Connect(function()
         local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
         speed = math.clamp(speed + st, 0.3, 250)
@@ -1503,8 +1600,6 @@ local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 
         speed = math.clamp(speed - st, 0.3, 250)
         spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
     end)
-
-    -- bind rot
     rotInc.MouseButton1Click:Connect(function()
         rotSens = math.clamp(rotSens + 0.05, 0.1, 3.0)
         rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
@@ -1513,8 +1608,6 @@ local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 
         rotSens = math.clamp(rotSens - 0.05, 0.1, 3.0)
         rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
     end)
-
-    -- bind roll
     rollInc.MouseButton1Click:Connect(function()
         rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
         rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
@@ -1526,56 +1619,33 @@ local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 
 
     -- ===== CAMERA STATE =====
     local freecamActive = false
-local followMode = false
-local followOffset = Vector3.new(0, 0, 0)
-local camPos = camera.CFrame.Position
-local camAngles = Vector3.new(0, 0, 0)
-local targetCamAngles = Vector3.new(0, 0, 0)
-local currentFOV = camera.FieldOfView
-local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
-local activeTouch, lastTouchPos = nil, nil
-local buttonHeld = false
+    local followMode = false
+    local followOffset = Vector3.new(0, 0, 0)
+    local camPos = camera.CFrame.Position
+    local camAngles = Vector3.new(0, 0, 0)
+    local targetCamAngles = Vector3.new(0, 0, 0)
+    local currentFOV = camera.FieldOfView
+    local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
+    local activeTouch, lastTouchPos = nil, nil
 
-local function bindTouch(btn, key)
-    btn.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            moveStates[key] = true
-            buttonHeld = true
-            activeTouch = nil; lastTouchPos = nil
-        end
-    end)
-    btn.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            moveStates[key] = false
-            buttonHeld = false
-        end
-    end)
-end
+    local function bindTouch(btn, key)
+        btn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = true end
+        end)
+        btn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = false end
+        end)
+    end
     bindTouch(btnW, "W"); bindTouch(btnS, "S"); bindTouch(btnA, "A"); bindTouch(btnD, "D")
     bindTouch(btnUp, "Up"); bindTouch(btnDown, "Down")
     bindTouch(btnRollL, "RollL"); bindTouch(btnRollR, "RollR")
 
     local zIn, zOut = false, false
-    btnZoomIn.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-        zIn = true; buttonHeld = true; activeTouch = nil; lastTouchPos = nil
-    end
-end)
-btnZoomIn.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-        zIn = false; buttonHeld = false
-    end
-end)
-btnZoomOut.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-        zOut = true; buttonHeld = true; activeTouch = nil; lastTouchPos = nil
-    end
-end)
-btnZoomOut.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-        zOut = false; buttonHeld = false
-    end
-end)
+    btnZoomIn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = true end end)
+    btnZoomIn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = false end end)
+    btnZoomOut.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zOut = true end end)
+    btnZoomOut.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zOut = false end end)
+
     local function getPlayerPos()
         local c = LocalPlayer.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
@@ -1586,7 +1656,7 @@ end)
         freecamActive = not freecamActive
         if freecamActive then
             camPos = camera.CFrame.Position
-            local rx, ry, rz = camera.CFrame:ToOrientation()
+            local rx, ry = camera.CFrame:ToOrientation()
             camAngles = Vector3.new(ry, rx, 0); targetCamAngles = camAngles
             currentFOV = camera.FieldOfView; camera.CameraType = Enum.CameraType.Scriptable
             freecamToggleBtn.Text = "Freecam: ON"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
@@ -1614,22 +1684,43 @@ end)
             followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
         end
     end)
--- ===== TOUCH =====
-local function isInside(pt, f)
 
-
+    -- ===== TOUCH =====
+    local function isInside(pt, f)
         if not f.Visible then return false end
         local ap, as = f.AbsolutePosition, f.AbsoluteSize
         return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
     end
 
+    local function isInAnyButton(pos)
+        for _, b in ipairs(controlButtons) do
+            if isInside(pos, b) then return true end
+        end
+        return false
+    end
+
     UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
-    if not freecamActive then return end
-    if gameProcessed then return end
-    if not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
-end)
+        if not freecamActive then return end
+        local pos = touch.Position
+        -- Menu/UI elements chặn
+        if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
+           or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
+           or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
+           or (floatEye.Visible and isInside(pos, floatEye))
+           or isInside(pos, dragBar) then
+            return
+        end
+        -- Joystick Roblox: nửa dưới trái màn hình, nếu không phải nút freecam
+        if not isInAnyButton(pos) then
+            local vp = workspace.CurrentCamera.ViewportSize
+            if pos.X < vp.X * 0.4 and pos.Y > vp.Y * 0.55 then
+                return
+            end
+        end
+        if not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
+    end)
     UserInputService.TouchMoved:Connect(function(touch)
-    if freecamActive and touch == activeTouch and lastTouchPos then
+        if freecamActive and touch == activeTouch and lastTouchPos then
             local d = touch.Position - lastTouchPos
             targetCamAngles = Vector3.new(
                 targetCamAngles.X - d.X * 0.004 * rotSens,
@@ -1678,7 +1769,6 @@ end)
         camera.CFrame = CFrame.new(camPos) * rotCF
     end)
 end
-
 -- ============================================================
 -- KHOI 5: OFFICE FARM
 -- ============================================================
