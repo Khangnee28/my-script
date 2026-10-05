@@ -20,7 +20,7 @@ local function PAYLOAD()
 -- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+locallocal function of_teleNear(target, od) RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
@@ -1935,23 +1935,19 @@ do
         if h and hrp then h:MoveTo(hrp.Position) end
         return reached
     end
-    local function of_teleNear(target, od)
-        local hrp = of_root(); if not hrp then return false end
-        local dist = (target - hrp.Position).Magnitude
-        if dist < OF_TELE_MIN then
-            setStatus("đi bộ (" .. math.floor(dist) .. ")")
-            return of_walkTo(target, od or 4, 8, false)
-        end
-        local dir = (target - hrp.Position); dir = Vector3.new(dir.X, 0, dir.Z)
-        if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
-        dir = dir.Unit
-        local landPos = target - dir * (od or 4)
-        landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
-        setStatus("tele xa (" .. math.floor(dist) .. ")")
-        hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, target.Z))
-        task.wait(0.6)
-        return true
-    end
+    
+        local function of_teleNear(target, od)
+    local hrp = of_root(); if not hrp then return false end
+    local dir = (target - hrp.Position); dir = Vector3.new(dir.X, 0, dir.Z)
+    if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
+    dir = dir.Unit
+    local landPos = target - dir * (od or 6)
+    landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
+    setStatus("tele tới máy in")
+    hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, target.Z))
+    task.wait(0.3)
+    return true
+end
     local function of_solve(q)
         if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then return nil end
         local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
