@@ -13,7 +13,7 @@ local BRAND_SUB  = "@khangdayy215"
 -- ============================================================
 -- PAYLOAD — DÁN SCRIPT HUB VÀO ĐÂY
 -- Xóa dòng print bên dưới, dán toàn bộ script hub Khangle DDS v26 vào
--- ============================================================
+-- ====local function of_doPrint(name)========================================================
 local function PAYLOAD()
     -- ============================================================
 -- KHANGLE DDS HUB v26 — OFFICE ONLY
@@ -2021,36 +2021,59 @@ local function of_teleNear(target, od)
 end
 
     local function of_doPrint(name)
-        local Comp = workspace:FindFirstChild("Computers"); if not Comp then return end
-        local model = Comp:FindFirstChild(name); if not model then return end
-        local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-        if not part then return end
-        of_standUp(); setStatus("tới máy in"); of_teleNear(part.Position, 4)
-        setStatus("chuẩn bị in"); task.wait(0.5); setStatus("đang in")
-        local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
-        while of_printAssigned and farmOffice do
-            local attempt = 0
-            while of_printAssigned and farmOffice and attempt < 3 do
-                attempt = attempt + 1
-                if attempt == 1 then setStatus("đang in") else setStatus("thử in lại") end
-                if prompt then
-                    pcall(function() prompt:InputHoldBegin() end)
-                    local t1 = os.clock()
-                    while of_printAssigned and farmOffice and os.clock() - t1 < 3 do task.wait(0.2) end
-                    pcall(function() prompt:InputHoldEnd() end)
-                end
-                local t2 = os.clock()
-                while of_printAssigned and farmOffice and os.clock() - t2 < 3 do task.wait(0.2) end
-                if not of_printAssigned then break end
-            end
-            if not of_printAssigned then break end
+    local Comp = workspace:FindFirstChild("Computers"); if not Comp then return end
+    local model = Comp:FindFirstChild(name); if not model then return end
+    local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+    if not part then return end
+
+    of_standUp()
+    setStatus("tới máy in")
+    of_teleNear(part.Position, 4)
+    setStatus("chuẩn bị in")
+    task.wait(0.5)
+
+    local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+    local attempt = 0
+    local teleRetried = false
+
+    while of_printAssigned and farmOffice do
+        attempt = attempt + 1
+        if attempt == 1 then
+            setStatus("đang in")
+        else
+            setStatus("thử in lại (lần " .. attempt .. ")")
+        end
+
+        if prompt then
+            pcall(function() prompt:InputHoldBegin() end)
+            local t1 = os.clock()
+            while of_printAssigned and farmOffice and os.clock() - t1 < 3 do task.wait(0.2) end
+            pcall(function() prompt:InputHoldEnd() end)
+        end
+
+        local t2 = os.clock()
+        while of_printAssigned and farmOffice and os.clock() - t2 < 3 do task.wait(0.2) end
+
+        if not of_printAssigned then break end
+
+        -- Vẫn chưa in xong → fail
+        if attempt == 1 and not teleRetried then
+            teleRetried = true
+            setStatus("in fail — tele lại máy in")
+            of_teleNear(part.Position, 4)
+            task.wait(0.3)
+        else
             setStatus("chờ 5s thử lại")
             local t3 = os.clock()
             while of_printAssigned and farmOffice and os.clock() - t3 < 5 do task.wait(0.2) end
         end
-        if not farmOffice then return end
-        setStatus("đã in"); task.wait(2); of_sitAtChair()
     end
+
+    if not farmOffice then return end
+    setStatus("đã in")
+    task.wait(2)
+    of_sitAtChair()
+end
     local function of_runCycle()
         while farmOffice and os.clock() < of_resetUntil do setStatus("chờ reset nhân vật"); task.wait(0.2) end
         if not farmOffice then return end
