@@ -1617,26 +1617,21 @@ end)
 local function isInside(pt, f)
 local function isInRobloxJoystick(pos)
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        local tg = pg:FindFirstChild("TouchGui")
-        if tg then
-            local tcf = tg:FindFirstChild("TouchControlFrame")
-            if tcf then
-                for _, child in ipairs(tcf:GetChildren()) do
-                    if child:IsA("GuiObject") and child.Visible then
-                        local ap, as = child.AbsolutePosition, child.AbsoluteSize
-                        if pos.X >= ap.X and pos.X <= ap.X + as.X
-                           and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
-                            return true
-                        end
-                    end
-                end
+    if not pg then return false end
+    local tg = pg:FindFirstChild("TouchGui")
+    if not tg then return false end
+    local tcf = tg:FindFirstChild("TouchControlFrame")
+    if not tcf then return false end
+    for _, child in ipairs(tcf:GetChildren()) do
+        local n = child.Name:lower()
+        if (n:find("thumbstick") or n:find("joystick")) and child:IsA("GuiObject") and child.Visible then
+            local ap, as = child.AbsolutePosition, child.AbsoluteSize
+            if pos.X >= ap.X and pos.X <= ap.X + as.X
+               and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
+                return true
             end
         end
     end
-    -- Fallback: vùng góc dưới trái 200x200
-    local vp = workspace.CurrentCamera.ViewportSize
-    if pos.X < 200 and pos.Y > vp.Y - 200 then return true end
     return false
 end
 
@@ -1651,16 +1646,10 @@ end
         local inUI = isInside(pos, freecamMenuFrame)
             or isInside(pos, FreecamFloatingBtn) or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
             or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
-           if not inUI then
-        for _, b in ipairs(controlButtons) do
-            if isInside(pos, b) then inUI = true; break end
-        end
-    end
-    if not inUI and isInRobloxJoystick(pos) then inUI = true end
+           if not inUI and isInRobloxJoystick(pos) then inUI = true end
     if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
 end)
     UserInputService.TouchMoved:Connect(function(touch)
-    if buttonHeld then return end
     if freecamActive and touch == activeTouch and lastTouchPos then
             local d = touch.Position - lastTouchPos
             targetCamAngles = Vector3.new(
