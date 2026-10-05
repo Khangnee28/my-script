@@ -3046,4 +3046,4 @@ task.spawn(function()
         set_btn("KÍCH HOẠT", GRAD_IDLE)
         set_status("", C.text_dim)
     end
-end)fals
+end)
