@@ -1749,13 +1749,14 @@ local function isInAnyButton(pos)
     return false
 end
 
-local activeTouchInput = nil
-local lastTouchPos = nil
+local rotateTouch = nil
+local lastRotatePos = nil
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not freecamActive then return end
     if input.UserInputType ~= Enum.UserInputType.Touch then return end
     local pos = Vector2.new(input.Position.X, input.Position.Y)
+
     if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
        or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
        or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
@@ -1763,31 +1764,36 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
        or isInside(pos, dragBar) then
         return
     end
-    if gameProcessed and not isInAnyButton(pos) then return end
-    if not activeTouchInput then
-        activeTouchInput = input
-        lastTouchPos = pos
-    end
+
+    if isInAnyButton(pos) then return end
+    if gameProcessed then return end
+
+    local vp = workspace.CurrentCamera.ViewportSize
+    if pos.X < vp.X * 0.55 and pos.Y > vp.Y * 0.45 then return end
+
+    if rotateTouch then return end
+
+    rotateTouch = input
+    lastRotatePos = pos
 end)
 
 UserInputService.InputChanged:Connect(function(input)
     if not freecamActive then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch then return end
-    if input ~= activeTouchInput or not lastTouchPos then return end
+    if input ~= rotateTouch or not lastRotatePos then return end
     local pos = Vector2.new(input.Position.X, input.Position.Y)
-    local d = pos - lastTouchPos
+    local d = pos - lastRotatePos
     targetCamAngles = Vector3.new(
         targetCamAngles.X - d.X * 0.004 * rotSens,
         targetCamAngles.Y - d.Y * 0.004 * rotSens,
         targetCamAngles.Z
     )
-    lastTouchPos = pos
+    lastRotatePos = pos
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input == activeTouchInput then
-        activeTouchInput = nil
-        lastTouchPos = nil
+    if input == rotateTouch then
+        rotateTouch = nil
+        lastRotatePos = nil
     end
 end)
     UserInputService.TouchEnded:Connect(function(touch)
