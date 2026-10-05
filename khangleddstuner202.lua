@@ -1349,7 +1349,7 @@ do
     addStroke(hideFloatBtn, Color3.fromRGB(80, 80, 110), 2)
     hideFloatBtn.Visible = false
     local controlFrame = Instance.new("Frame", ScreenGui)
-    controlFrame.Size = UDim2.new(0, 205, 0, 195); controlFrame.Position = UDim2.new(0, 20, 1, -200)
+    controlFrame.Size = UDim2.new(0, 205, 0, 240); controlFrame.Position = UDim2.new(0, 80, 1, -245)
     controlFrame.BackgroundTransparency = 1; controlFrame.Visible = false; controlFrame.ZIndex = 1
     local controlButtons = {}
     local function mkPad(txt, size, pos)
@@ -1369,7 +1369,9 @@ do
     local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
     local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 100))
     local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 148))
-    do
+    local btnRollL = mkPad("⟲", UDim2.new(0, 60, 0, 38), UDim2.new(0, 20, 0, 196))
+local btnRollR = mkPad("⟳", UDim2.new(0, 60, 0, 38), UDim2.new(0, 90, 0, 196))
+do
         local dg, ds, sp
         hideFloatBtn.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -1473,17 +1475,19 @@ do
     end)
     local freecamActive = false
     local camPos = camera.CFrame.Position
-    local camAngles = Vector2.new(0, 0)
-    local targetCamAngles = Vector2.new(0, 0)
+    local camAngles = Vector3.new(0, 0, 0)
+local targetCamAngles = Vector3.new(0, 0, 0)
+local rollSpeed = 1.8
     local currentFOV = camera.FieldOfView
-    local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false}
+    local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
     local function bindTouch(btn, key)
         btn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = true end end)
         btn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then moveStates[key] = false end end)
     end
     bindTouch(btnW, "W"); bindTouch(btnS, "S"); bindTouch(btnA, "A"); bindTouch(btnD, "D")
     bindTouch(btnUp, "Up"); bindTouch(btnDown, "Down")
-    local zIn, zOut = false, false
+    bindTouch(btnRollL, "RollL"); bindTouch(btnRollR, "RollR")
+local zIn, zOut = false, false
     btnZoomIn.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = true end end)
     btnZoomIn.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zIn = false end end)
     btnZoomOut.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then zOut = true end end)
@@ -1493,7 +1497,7 @@ do
         if freecamActive then
             camPos = camera.CFrame.Position
             local rx, ry, rz = camera.CFrame:ToOrientation()
-            camAngles = Vector2.new(ry, rx); targetCamAngles = camAngles
+            camAngles = Vector3.new(ry, rx, 0); targetCamAngles = camAngles
             currentFOV = camera.FieldOfView; camera.CameraType = Enum.CameraType.Scriptable
             freecamToggleBtn.Text = "Freecam: ON"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
             controlFrame.Visible = true; freecamMenuFrame.Visible = false
@@ -1542,9 +1546,11 @@ do
         if moveStates.D then mv = mv + Vector3.new(1, 0, 0) end
         if moveStates.Up then mv = mv + Vector3.new(0, 1, 0) end
         if moveStates.Down then mv = mv + Vector3.new(0, -1, 0) end
-        local rotCF = CFrame.Angles(0, camAngles.X, 0) * CFrame.Angles(camAngles.Y, 0, 0)
-        camPos = camPos + (rotCF * mv) * speed * dt
-        camera.CFrame = CFrame.new(camPos) * rotCF
+     if moveStates.RollL then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z + rollSpeed * dt) end
+if moveStates.RollR then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z - rollSpeed * dt) end
+local rotCF = CFrame.Angles(0, camAngles.X, 0) * CFrame.Angles(camAngles.Y, 0, 0) * CFrame.Angles(0, 0, camAngles.Z)
+camPos = camPos + (rotCF * mv) * speed * dt
+camera.CFrame = CFrame.new(camPos) * rotCF
     end)
 end
 
