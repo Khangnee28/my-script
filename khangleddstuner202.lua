@@ -17,7 +17,7 @@ local BRAND_SUB  = "@khangdayy215"
 local function PAYLOAD()
     -- ============================================================
 -- KHANGLE DDS HUB v26 — OFFICE ONLY
--- ========================================================================================================================
+-- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -1385,7 +1385,7 @@ do
 
     -- Drag bar
     local dragBar = Instance.new("Frame", controlFrame)
-    dragBar.Size = UDim2.new(1, 0, 0, 22); dragBar.Position = UDim2.new(0, 0, 0, -22)
+    dragBar.Size = UDim2.new(1, 0, 0, 22); dragBar.Position = UDim2.new(0, 0, 0, -26)
     dragBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40); dragBar.BackgroundTransparency = 0.3
     dragBar.ZIndex = 2
     Instance.new("UICorner", dragBar).CornerRadius = UDim.new(0, 6)
@@ -1590,36 +1590,74 @@ do
     local rollSens = 1.0
     local rollSpeed = 1.8
 
-    spdInc.MouseButton1Click:Connect(function()
-        local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
-        speed = math.clamp(speed + st, 0.3, 250)
-        spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
+    local function autoRepeat(btn, step)
+    local holding = false
+    btn.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            holding = true
+            step()
+            task.spawn(function()
+                task.wait(0.45)
+                while holding do
+                    step()
+                    task.wait(0.07)
+                end
+            end)
+        end
     end)
-    spdDec.MouseButton1Click:Connect(function()
-        local st = speed <= 2 and 0.1 or (speed <= 10 and 1 or 5)
-        speed = math.clamp(speed - st, 0.3, 250)
-        spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
+    btn.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+            holding = false
+        end
     end)
-    rotInc.MouseButton1Click:Connect(function()
-        rotSens = math.clamp(rotSens + 0.05, 0.1, 3.0)
-        rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
-    end)
-    rotDec.MouseButton1Click:Connect(function()
-        rotSens = math.clamp(rotSens - 0.05, 0.1, 3.0)
-        rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
-    end)
-    rollInc.MouseButton1Click:Connect(function()
-        rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
-        rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
-    end)
-    rollDec.MouseButton1Click:Connect(function()
-        rollSens = math.clamp(rollSens - 0.05, 0.1, 5.0)
-        rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
-    end)
+end
+
+autoRepeat(spdInc, function()
+    local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
+    speed = math.clamp(speed + st, 0.3, 250)
+    spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
+end)
+autoRepeat(spdDec, function()
+    local st = speed <= 2 and 0.1 or (speed <= 10 and 1 or 5)
+    speed = math.clamp(speed - st, 0.3, 250)
+    spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
+end)
+autoRepeat(rotInc, function()
+    rotSens = math.clamp(rotSens + 0.05, 0.1, 3.0)
+    rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
+end)
+autoRepeat(rotDec, function()
+    rotSens = math.clamp(rotSens - 0.05, 0.1, 3.0)
+    rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
+end)
+autoRepeat(rollInc, function()
+    rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
+    rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+end)
+autoRepeat(rollDec, function()
+    rollSens = math.clamp(rollSens - 0.05, 0.1, 5.0)
+    rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+end)
 
     -- ===== CAMERA STATE =====
     local freecamActive = false
     local followMode = false
+local nametagCache = {}
+local lastNametagScan = 0
+local function gatherNametags()
+    table.clear(nametagCache)
+    for _, plr in ipairs(game:GetService("Players"):GetPlayers()) do
+        local char = plr.Character
+        if char then
+            for _, d in ipairs(char:GetDescendants()) do
+                if d:IsA("BillboardGui") then
+                    table.insert(nametagCache, d)
+                end
+            end
+        end
+    end
+end
+
     local followOffset = Vector3.new(0, 0, 0)
     local camPos = camera.CFrame.Position
     local camAngles = Vector3.new(0, 0, 0)
@@ -1661,11 +1699,21 @@ do
             currentFOV = camera.FieldOfView; camera.CameraType = Enum.CameraType.Scriptable
             freecamToggleBtn.Text = "Freecam: ON"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
             controlFrame.Visible = true; freecamMenuFrame.Visible = false
-        else
-            camera.CameraType = Enum.CameraType.Custom; camera.FieldOfView = 70
-            freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
-            controlFrame.Visible = false
-            if followMode then
+      else
+    camera.CameraType = Enum.CameraType.Custom; camera.FieldOfView = 70
+    freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+
+controlFrame.Visible = false
+for _, bg in ipairs(nametagCache) do
+    if bg and bg.Parent then
+        for _, child in ipairs(bg:GetChildren()) do
+            if child:IsA("GuiObject") and child.Rotation ~= 0 then
+                child.Rotation = 0
+            end
+        end
+    end
+end
+if followMode then
                 followMode = false
                 followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
             end
@@ -1711,12 +1759,12 @@ do
             return
         end
         -- Joystick Roblox: nửa dưới trái màn hình, nếu không phải nút freecam
-        if not isInAnyButton(pos) then
-            local vp = workspace.CurrentCamera.ViewportSize
-            if pos.X < vp.X * 0.4 and pos.Y > vp.Y * 0.55 then
-                return
-            end
-        end
+     if not isInAnyButton(pos) then
+    local vp = workspace.CurrentCamera.ViewportSize
+    if pos.X < vp.X * 0.55 and pos.Y > vp.Y * 0.45 then
+        return
+    end
+end
         if not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
     end)
     UserInputService.TouchMoved:Connect(function(touch)
@@ -1767,7 +1815,33 @@ do
         end
 
         camera.CFrame = CFrame.new(camPos) * rotCF
-    end)
+
+        -- Counter-rotate nametag để đứng thẳng khi nghiêng
+local degZ = math.deg(camAngles.Z)
+if math.abs(degZ) > 0.5 then
+    if os.clock() - lastNametagScan > 2 then
+        gatherNametags()
+        lastNametagScan = os.clock()
+    end
+    for _, bg in ipairs(nametagCache) do
+        if bg and bg.Parent then
+            for _, child in ipairs(bg:GetChildren()) do
+                if child:IsA("GuiObject") then
+                    child.Rotation = degZ
+                end
+            end
+        end
+    end
+else
+    for _, bg in ipairs(nametagCache) do
+        if bg and bg.Parent then
+            for _, child in ipairs(bg:GetChildren()) do
+                if child:IsA("GuiObject") and child.Rotation ~= 0 then
+                    child.Rotation = 0
+                end
+            end
+        end
+    end
 end
 -- ============================================================
 -- KHOI 5: OFFICE FARM
