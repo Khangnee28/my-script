@@ -1640,9 +1640,7 @@ autoRepeat(rollDec, function()
 end)
 
     -- ===== CAMERA STATE =====
-    local freecamActive = false
-    local followMode = false
-local nametagCache = {}
+   local nametagCache = {}
 local lastNametagScan = 0
 local function gatherNametags()
     table.clear(nametagCache)
@@ -1657,6 +1655,11 @@ local function gatherNametags()
         end
     end
 end
+
+ local freecamActive = false
+    local followMode = false
+
+
 
     local followOffset = Vector3.new(0, 0, 0)
     local camPos = camera.CFrame.Position
@@ -1803,7 +1806,6 @@ end
         if moveStates.Down then mv = mv + Vector3.new(0, -1, 0) end
 
         local rotCF = CFrame.Angles(0, camAngles.X, 0) * CFrame.Angles(camAngles.Y, 0, 0) * CFrame.Angles(0, 0, camAngles.Z)
-
         if followMode then
             local pp = getPlayerPos()
             if pp then
@@ -1814,35 +1816,39 @@ end
             camPos = camPos + (rotCF * mv) * speed * dt
         end
 
-        camera.CFrame = CFrame.new(camPos) * rotCF
+                camera.CFrame = CFrame.new(camPos) * rotCF
 
-        -- Counter-rotate nametag để đứng thẳng khi nghiêng
-local degZ = math.deg(camAngles.Z)
-if math.abs(degZ) > 0.5 then
-    if os.clock() - lastNametagScan > 2 then
-        gatherNametags()
-        lastNametagScan = os.clock()
-    end
-    for _, bg in ipairs(nametagCache) do
-        if bg and bg.Parent then
-            for _, child in ipairs(bg:GetChildren()) do
-                if child:IsA("GuiObject") then
-                    child.Rotation = degZ
+        local degZ = math.deg(camAngles.Z)
+        if math.abs(degZ) > 0.5 then
+            if os.clock() - lastNametagScan > 2 then
+                gatherNametags()
+                lastNametagScan = os.clock()
+            end
+            for _, bg in ipairs(nametagCache) do
+                if bg and bg.Parent then
+                    for _, child in ipairs(bg:GetChildren()) do
+                        if child:IsA("GuiObject") then
+                            child.Rotation = degZ
+                        end
+                    end
+                end
+            end
+        else
+            for _, bg in ipairs(nametagCache) do
+                if bg and bg.Parent then
+                    for _, child in ipairs(bg:GetChildren()) do
+                        if child:IsA("GuiObject") and child.Rotation ~= 0 then
+                            child.Rotation = 0
+                        end
+                    end
                 end
             end
         end
-    end
-else
-    for _, bg in ipairs(nametagCache) do
-        if bg and bg.Parent then
-            for _, child in ipairs(bg:GetChildren()) do
-                if child:IsA("GuiObject") and child.Rotation ~= 0 then
-                    child.Rotation = 0
-                end
-            end
-        end
-    end
+    end)
 end
+   
+        
+        
 -- ============================================================
 -- KHOI 5: OFFICE FARM
 -- ============================================================
