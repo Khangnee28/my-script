@@ -1465,12 +1465,12 @@ do
     local speed = 25.0
     speedIncBtn.MouseButton1Click:Connect(function()
         local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
-        speed = math.clamp(speed + st, 0.3, 150)
+        speed = math.clamp(speed + st, 0.3, 250)
         speedLabel.Text = string.format("Tốc độ di chuyển: %.1f", speed)
     end)
     speedDecBtn.MouseButton1Click:Connect(function()
         local st = speed <= 2 and 0.1 or (speed <= 10 and 1 or 5)
-        speed = math.clamp(speed - st, 0.3, 150)
+        speed = math.clamp(speed - st, 0.3, 250)
         speedLabel.Text = string.format("Tốc độ di chuyển: %.1f", speed)
     end)
     local rotSens = 1.0
@@ -1483,11 +1483,11 @@ do
         rotLabel.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
     end)
 rollIncBtn.MouseButton1Click:Connect(function()
-    rollSens = math.clamp(rollSens + 0.1, 0.05, 5.0)
+    rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
     rollLabel.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
 end)
 rollDecBtn.MouseButton1Click:Connect(function()
-    rollSens = math.clamp(rollSens - 0.1, 0.05, 5.0)
+    rollSens = math.clamp(rollSens - 0.05, 0.1, 5.0)
     rollLabel.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
 end)
     local freecamActive = false
@@ -1545,13 +1545,17 @@ local zIn, zOut = false, false
     end
     if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
 end)
-    UserInputService.TouchMoved:Connect(function(touch)
-        if freecamActive and touch == activeTouch and lastTouchPos then
-            local d = touch.Position - lastTouchPos
-            targetCamAngles = targetCamAngles - Vector2.new(d.X * 0.004 * rotSens, d.Y * 0.004 * rotSens)
-            lastTouchPos = touch.Position
-        end
-    end)
+UserInputService.TouchMoved:Connect(function(touch)
+    if freecamActive and touch == activeTouch and lastTouchPos then
+        local d = touch.Position - lastTouchPos
+        targetCamAngles = Vector3.new(
+            targetCamAngles.X - d.X * 0.004 * rotSens,
+            targetCamAngles.Y - d.Y * 0.004 * rotSens,
+            targetCamAngles.Z
+        )
+        lastTouchPos = touch.Position
+    end
+end)
     UserInputService.TouchEnded:Connect(function(touch)
         if touch == activeTouch then activeTouch = nil; lastTouchPos = nil end
     end)
