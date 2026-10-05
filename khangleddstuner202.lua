@@ -1304,7 +1304,7 @@ do
         return s
     end
     freecamMenuFrame = Instance.new("Frame", ScreenGui)
-    freecamMenuFrame.Size = UDim2.new(0, 280, 0, 310); freecamMenuFrame.Position = UDim2.new(0.5, -140, 0.5, -155)
+    freecamMenuFrame.Size = UDim2.new(0, 280, 0, 380); freecamMenuFrame.Position = UDim2.new(0.5, -140, 0.5, -190)
     freecamMenuFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 21); freecamMenuFrame.BackgroundTransparency = 0.12
     freecamMenuFrame.Visible = false; freecamMenuFrame.ZIndex = 15
     Instance.new("UICorner", freecamMenuFrame).CornerRadius = UDim.new(0, 14)
@@ -1340,7 +1340,16 @@ do
     rotIncBtn.Size = UDim2.new(0.42, 0, 0, 32); rotIncBtn.Position = UDim2.new(0.06, 0, 0, 225)
     local rotDecBtn = mkBtn(225, "Xoay Chậm (-)", Color3.fromRGB(50, 50, 68))
     rotDecBtn.Size = UDim2.new(0.42, 0, 0, 32); rotDecBtn.Position = UDim2.new(0.52, 0, 0, 225)
-    hideFloatBtn = Instance.new("TextButton", ScreenGui)
+    local rollLabel = Instance.new("TextLabel", freecamMenuFrame)
+rollLabel.Size = UDim2.new(0.88, 0, 0, 22); rollLabel.Position = UDim2.new(0.06, 0, 0, 265)
+rollLabel.BackgroundTransparency = 1; rollLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+rollLabel.TextSize = 12; rollLabel.Font = Enum.Font.GothamBold; rollLabel.Text = "Tốc độ nghiêng: 1.00x"; rollLabel.ZIndex = 16
+
+local rollIncBtn = mkBtn(290, "Nghiêng Nhanh (+)", Color3.fromRGB(50, 50, 68))
+rollIncBtn.Size = UDim2.new(0.42, 0, 0, 32); rollIncBtn.Position = UDim2.new(0.06, 0, 0, 290)
+local rollDecBtn = mkBtn(290, "Nghiêng Chậm (-)", Color3.fromRGB(50, 50, 68))
+rollDecBtn.Size = UDim2.new(0.42, 0, 0, 32); rollDecBtn.Position = UDim2.new(0.52, 0, 0, 290)
+hideFloatBtn = Instance.new("TextButton", ScreenGui)
     hideFloatBtn.Size = UDim2.new(0, 52, 0, 52); hideFloatBtn.Position = UDim2.new(0, 80, 0, 150)
     hideFloatBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28); hideFloatBtn.BackgroundTransparency = 0.2
     hideFloatBtn.Text = "👁️"; hideFloatBtn.TextColor3 = Color3.fromRGB(255, 255, 255); hideFloatBtn.TextSize = 22
@@ -1369,8 +1378,8 @@ do
     local btnDown = mkPad("-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 48))
     local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 100))
     local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 148))
-    local btnRollL = mkPad("⟲", UDim2.new(0, 60, 0, 38), UDim2.new(0, 20, 0, 196))
-local btnRollR = mkPad("⟳", UDim2.new(0, 60, 0, 38), UDim2.new(0, 90, 0, 196))
+    local btnRollL = mkPad("Q", UDim2.new(0, 60, 0, 38), UDim2.new(0, 20, 0, 196))
+local btnRollR = mkPad("E", UDim2.new(0, 60, 0, 38), UDim2.new(0, 90, 0, 196))
 do
         local dg, ds, sp
         hideFloatBtn.InputBegan:Connect(function(i)
@@ -1473,11 +1482,20 @@ do
         rotSens = math.clamp(rotSens - 0.1, 0.05, 3.0)
         rotLabel.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
     end)
+rollIncBtn.MouseButton1Click:Connect(function()
+    rollSens = math.clamp(rollSens + 0.1, 0.05, 5.0)
+    rollLabel.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+end)
+rollDecBtn.MouseButton1Click:Connect(function()
+    rollSens = math.clamp(rollSens - 0.1, 0.05, 5.0)
+    rollLabel.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+end)
     local freecamActive = false
     local camPos = camera.CFrame.Position
     local camAngles = Vector3.new(0, 0, 0)
 local targetCamAngles = Vector3.new(0, 0, 0)
 local rollSpeed = 1.8
+local rollSens = 1.0
     local currentFOV = camera.FieldOfView
     local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
     local function bindTouch(btn, key)
@@ -1515,13 +1533,18 @@ local zIn, zOut = false, false
         return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
     end
     UserInputService.TouchStarted:Connect(function(touch)
-        if not freecamActive then return end
-        local pos = touch.Position
-        local inUI = isInside(pos, controlFrame) or isInside(pos, freecamMenuFrame)
-            or isInside(pos, FreecamFloatingBtn) or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
-            or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
-        if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
-    end)
+    if not freecamActive then return end
+    local pos = touch.Position
+    local inUI = isInside(pos, freecamMenuFrame)
+        or isInside(pos, FreecamFloatingBtn) or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
+        or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
+    if not inUI then
+        for _, b in ipairs(controlButtons) do
+            if isInside(pos, b) then inUI = true; break end
+        end
+    end
+    if not inUI and not activeTouch then activeTouch = touch; lastTouchPos = touch.Position end
+end)
     UserInputService.TouchMoved:Connect(function(touch)
         if freecamActive and touch == activeTouch and lastTouchPos then
             local d = touch.Position - lastTouchPos
@@ -1546,8 +1569,8 @@ local zIn, zOut = false, false
         if moveStates.D then mv = mv + Vector3.new(1, 0, 0) end
         if moveStates.Up then mv = mv + Vector3.new(0, 1, 0) end
         if moveStates.Down then mv = mv + Vector3.new(0, -1, 0) end
-     if moveStates.RollL then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z + rollSpeed * dt) end
-if moveStates.RollR then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z - rollSpeed * dt) end
+     if moveStates.RollL then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z + rollSpeed * rollSens * dt) end
+if moveStates.RollR then targetCamAngles = Vector3.new(targetCamAngles.X, targetCamAngles.Y, targetCamAngles.Z - rollSpeed * rollSens * dt) end
 local rotCF = CFrame.Angles(0, camAngles.X, 0) * CFrame.Angles(camAngles.Y, 0, 0) * CFrame.Angles(0, 0, camAngles.Z)
 camPos = camPos + (rotCF * mv) * speed * dt
 camera.CFrame = CFrame.new(camPos) * rotCF
