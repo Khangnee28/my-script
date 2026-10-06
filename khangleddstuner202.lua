@@ -222,17 +222,9 @@ local rpPopupActive = nil
 local function spawnRPPopup(delta)
     if not statPanel or not statPanel.Parent then return end
 
-    -- Còn popup cũ → cộng dồn, không tạo mới
-    if rpPopupActive and rpPopupActive.Parent then
-        rpPopupActive._total = (rpPopupActive._total or 0) + delta
-        rpPopupActive.Text = "+" .. fmtRP(rpPopupActive._total)
-        rpPopupActive._time = os.clock()
-        return
-    end
-
     local popup = Instance.new("TextLabel", statPanel)
     popup.Size = UDim2.new(0, 130, 0, 18)
-    popup.Position = UDim2.new(1, -140, 0, 130)
+    popup.Position = UDim2.new(1, -20, 0, 108)
     popup.BackgroundTransparency = 1
     popup.Text = "+" .. fmtRP(delta)
     popup.TextColor3 = Color3.fromRGB(0, 255, 120)
@@ -242,27 +234,23 @@ local function spawnRPPopup(delta)
     popup.TextStrokeTransparency = 0
     popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
     popup.ZIndex = 20
-    popup._total = delta
-    popup._time = os.clock()
-    rpPopupActive = popup
 
     task.spawn(function()
-        while popup.Parent do
-            task.wait(0.05)
-            local elapsed = os.clock() - popup._time
-            if elapsed > 0.8 then
-                local t = math.min((elapsed - 0.8) / 0.6, 1)
-                popup.Position = UDim2.new(1, -140, 0, 130 - 40 * t)
-                popup.TextTransparency = t
-                popup.TextStrokeTransparency = t
-                if t >= 1 then break end
-            end
+        local dur = 0.55
+        local t0 = os.clock()
+        while popup and popup.Parent do
+            local elapsed = os.clock() - t0
+            local t = math.min(elapsed / dur, 1)
+            popup.Position = UDim2.new(1, -20 - 170 * t, 0, 108)
+            local fade = math.min(t * 1.3, 1)
+            popup.TextTransparency = fade
+            popup.TextStrokeTransparency = fade
+            if t >= 1 then break end
+            task.wait(0.03)
         end
         if popup then popup:Destroy() end
-        if rpPopupActive == popup then rpPopupActive = nil end
     end)
 end
-
 task.spawn(function()
     while true do
         task.wait(0.5)
