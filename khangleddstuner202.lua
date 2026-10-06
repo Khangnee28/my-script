@@ -98,7 +98,14 @@ local HubFrame, hubClose, hubHeader, hubStroke, statPanel
 local farmSwitch, farmNote
 local bodyOpenBtn, fcOpenBtn
 local ToggleFloatMenuBtn
-local lblStat1, lblStat2, lblTime, lblWork
+local lblStat1, lblStat2, lblTime, lblWork, lblRPNow, lblRPEarned
+local farmRPStart = 0
+local lastRPValue = 0
+local afkActive = false
+local afkStartTime = 0
+local afkRPStart = 0
+local afkOverlay, afkTimeLbl, afkRPNowLbl, afkRPEarnedLbl
+local AFK_FPS = 15
 local showAutoTFloat = false
 local farmOffice = false
 local ofAnswers, ofPrints = 0, 0
@@ -142,7 +149,7 @@ end)
 
 do
     statPanel = Instance.new("Frame")
-    statPanel.Size = UDim2.new(0, 250, 0, 148)
+    statPanel.Size = UDim2.new(0, 250, 0, 165)
     statPanel.Position = UDim2.new(0, 76, 0.5, 20)
     statPanel.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
     statPanel.BackgroundTransparency = 0.15
@@ -175,7 +182,11 @@ do
         return l
     end
     lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68); lblWork = sl(92)
-    lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
+lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
+lblRPNow = sl(114)
+lblRPNow.TextColor3 = Color3.fromRGB(120, 220, 255)
+lblRPEarned = sl(132)
+lblRPEarned.TextColor3 = Color3.fromRGB(0, 255, 120)
 end
 
 local function setStatus(t) if lblWork then lblWork.Text = "📍 " .. t end end
@@ -191,10 +202,56 @@ local function refreshStatPanel()
         lblStat2.Text = "🖨️ Lượt in: " .. ofPrints
     end
 end
+local function getRP()
+    local pd = game.Players.LocalPlayer:FindFirstChild("PlayerData")
+    local rp = pd and pd:FindFirstChild("RPValue")
+    return rp and rp.Value or nil
+end
+
+local function fmtRP(n)
+    if not n then return "--" end
+    if n >= 1e9 then return string.format("%.2fB", n / 1e9)
+    elseif n >= 1e6 then return string.format("%.2fM", n / 1e6)
+    elseif n >= 1e3 then return string.format("%.1fK", n / 1e3)
+    else return tostring(math.floor(n)) end
+end
+
+local function spawnRPPopup(delta)
+    if not statPanel or not statPanel.Parent then return end
+    local popup = Instance.new("TextLabel", statPanel)
+    popup.Size = UDim2.new(0, 130, 0, 18)
+    popup.Position = UDim2.new(1, -140, 0, 130)
+    popup.BackgroundTransparency = 1
+    popup.Text = "+" .. fmtRP(delta)
+    popup.TextColor3 = Color3.fromRGB(0, 255, 120)
+    popup.TextSize = 12
+    popup.Font = Enum.Font.GothamBold
+    popup.TextXAlignment = Enum.TextXAlignment.Right
+    popup.TextStrokeTransparency = 0
+    popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
+    popup.ZIndex = 20
+    TweenService:Create(popup, TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -140, 0, 100),
+        TextTransparency = 1,
+        TextStrokeTransparency = 1,
+    }):Play()
+    task.delay(1.7, function() if popup then popup:Destroy() end end)
+end
+
 task.spawn(function()
-    while true do task.wait(1)
+    while true do task.wait(0.5)
         if activeMode == "office" and farmStart > 0 then
             lblTime.Text = "⏱ Thời gian: " .. fmtTime(os.clock() - farmStart)
+            local rp = getRP()
+            if rp then
+                lblRPNow.Text = "💰 Hiện tại: " .. fmtRP(rp)
+                local earned = rp - farmRPStart
+                lblRPEarned.Text = "📈 Farm được: +" .. fmtRP(earned)
+                if lastRPValue > 0 and rp > lastRPValue then
+                    spawnRPPopup(rp - lastRPValue)
+                end
+                lastRPValue = rp
+            end
         end
     end
 end)
@@ -220,6 +277,112 @@ local function getPing()
 end
 local fpsFrames = 0
 RunService.RenderStepped:Connect(function() fpsFrames = fpsFrames + 1 end)
+-- ============================================================
+-- AFK MODE (TREO MÁY)
+-- ============================================================
+do
+    afkOverlay = Instance.new("Frame", ScreenGui)
+    afkOverlay.Size = UDim2.new(1, 0, 1, 0)
+    afkOverlay.Position = UDim2.new(0, 0, 0, 0)
+    afkOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    afkOverlay.BorderSizePixel = 0
+    afkOverlay.ZIndex = 9999
+    afkOverlay.Visible = false
+
+    local t1 = Instance.new("TextLabel", afkOverlay)
+    t1.Size = UDim2.new(1, 0, 0, 36)
+    t1.Position = UDim2.new(0, 0, 0, 60)
+    t1.BackgroundTransparency = 1
+    t1.Text = "🌙 CHẾ ĐỘ TREO MÁY"
+    t1.TextColor3 = Color3.fromRGB(120, 220, 255)
+    t1.TextSize = 22
+    t1.Font = Enum.Font.GothamBold
+    t1.ZIndex = 10000
+
+    afkTimeLbl = Instance.new("TextLabel", afkOverlay)
+    afkTimeLbl.Size = UDim2.new(1, 0, 0, 30)
+    afkTimeLbl.Position = UDim2.new(0, 0, 0, 120)
+    afkTimeLbl.BackgroundTransparency = 1
+    afkTimeLbl.Text = "⏱ 00:00"
+    afkTimeLbl.TextColor3 = Color3.fromRGB(200, 200, 220)
+    afkTimeLbl.TextSize = 18
+    afkTimeLbl.Font = Enum.Font.GothamBold
+    afkTimeLbl.ZIndex = 10000
+
+    afkRPNowLbl = Instance.new("TextLabel", afkOverlay)
+    afkRPNowLbl.Size = UDim2.new(1, 0, 0, 30)
+    afkRPNowLbl.Position = UDim2.new(0, 0, 0, 160)
+    afkRPNowLbl.BackgroundTransparency = 1
+    afkRPNowLbl.Text = "💰 Hiện tại: --"
+    afkRPNowLbl.TextColor3 = Color3.fromRGB(120, 220, 255)
+    afkRPNowLbl.TextSize = 16
+    afkRPNowLbl.Font = Enum.Font.GothamBold
+    afkRPNowLbl.ZIndex = 10000
+
+    afkRPEarnedLbl = Instance.new("TextLabel", afkOverlay)
+    afkRPEarnedLbl.Size = UDim2.new(1, 0, 0, 30)
+    afkRPEarnedLbl.Position = UDim2.new(0, 0, 0, 192)
+    afkRPEarnedLbl.BackgroundTransparency = 1
+    afkRPEarnedLbl.Text = "📈 Kiếm: +0"
+    afkRPEarnedLbl.TextColor3 = Color3.fromRGB(0, 255, 120)
+    afkRPEarnedLbl.TextSize = 16
+    afkRPEarnedLbl.Font = Enum.Font.GothamBold
+    afkRPEarnedLbl.ZIndex = 10000
+
+    local stopBtn = Instance.new("TextButton", afkOverlay)
+    stopBtn.Size = UDim2.new(0, 180, 0, 44)
+    stopBtn.Position = UDim2.new(0.5, -90, 0, 260)
+    stopBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 60)
+    stopBtn.Text = "TẮT TREO MÁY"
+    stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stopBtn.TextSize = 14
+    stopBtn.Font = Enum.Font.GothamBold
+    stopBtn.ZIndex = 10000
+    Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0, 10)
+
+    local hint = Instance.new("TextLabel", afkOverlay)
+    hint.Size = UDim2.new(1, 0, 0, 20)
+    hint.Position = UDim2.new(0, 0, 1, -40)
+    hint.BackgroundTransparency = 1
+    hint.Text = "Game vẫn chạy • Tắt để trở lại bình thường"
+    hint.TextColor3 = Color3.fromRGB(80, 80, 100)
+    hint.TextSize = 12
+    hint.Font = Enum.Font.Gotham
+    hint.ZIndex = 10000
+
+    stopBtn.MouseButton1Click:Connect(function()
+        afkActive = false
+        afkOverlay.Visible = false
+        if writefile then pcall(writefile, "afkMode.txt", "0") end
+    end)
+end
+
+function _G.startAFK()
+    afkActive = true
+    afkStartTime = os.clock()
+    afkRPStart = getRP() or 0
+    if afkOverlay then afkOverlay.Visible = true end
+    if writefile then pcall(writefile, "afkMode.txt", "1") end
+end
+
+function _G.stopAFK()
+    afkActive = false
+    if afkOverlay then afkOverlay.Visible = false end
+    if writefile then pcall(writefile, "afkMode.txt", "0") end
+end
+
+task.spawn(function()
+    while true do task.wait(0.5)
+        if afkActive and afkTimeLbl then
+            afkTimeLbl.Text = "⏱ " .. fmtTime(os.clock() - afkStartTime)
+            local rp = getRP()
+            if rp then
+                afkRPNowLbl.Text = "💰 Hiện tại: " .. fmtRP(rp)
+                afkRPEarnedLbl.Text = "📈 Kiếm: +" .. fmtRP(rp - afkRPStart)
+            end
+        end
+    end
+end)
 task.spawn(function()
     while true do task.wait(1)
         local fps = fpsFrames; fpsFrames = 0
@@ -900,7 +1063,10 @@ end)
     makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT",
         Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
         function(v) perfOn = v; perfFrame.Visible = v end)
-    makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT",
+    makeToggle(perfSection, 5, false, "🌙 TREO MÁY: BẬT", "🌙 TREO MÁY: TẮT",
+    Color3.fromRGB(60, 60, 140), Color3.fromRGB(60, 60, 70),
+    function(v) if v then _G.startAFK() else _G.stopAFK() end end)
+makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT",
         Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70),
         function(v) perfLocked = v; perfFrame.Draggable = not v end)
 
@@ -2122,6 +2288,7 @@ end
         of_lastKnownQuestion = nil; of_questionArrivedAt = 0; of_nextDelay = 2.4; of_refired = false
         of_lastFireAt = 0; of_phasing = false; ofAnswers = 0; OF_SKIPPED_SEATS = {}; ofPrints = 0
         refreshStatPanel(); farmOffice = true; activeMode = "office"; farmStart = os.clock()
+local rp0 = getRP(); farmRPStart = rp0 or 0; lastRPValue = rp0 or 0
         TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
         of_resetUntil = os.clock() + 5
         if writefile then pcall(writefile, "farmState.txt", "1") end
@@ -2324,6 +2491,18 @@ task.spawn(function()
             end
         end)
         print("[Rejoin] farm toggled")
+    end
+
+    -- Auto restore AFK mode
+    local afkFlag = false
+    if readfile and isfile and isfile("afkMode.txt") then
+        local ok, v = pcall(readfile, "afkMode.txt")
+        if ok and v == "1" then afkFlag = true end
+    end
+    if afkFlag and _G.startAFK then
+        task.wait(2)
+        _G.startAFK()
+        print("[Rejoin] AFK restored")
     end
 end)
 end
