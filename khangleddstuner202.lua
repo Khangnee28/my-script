@@ -219,12 +219,12 @@ end
 
 local rpPopupActive = nil
 
+
 local _popupTS = nil
 local function spawnRPPopup(delta)
     if not statPanel or not statPanel.Parent or not lblRPEarned then return end
     if not _popupTS then _popupTS = game:GetService("TextService") end
 
-    -- Đo chiều rộng text farm hiện tại để đặt popup ngay cạnh
     local textW = 200
     pcall(function()
         local sz = _popupTS:GetTextSize(
@@ -244,21 +244,22 @@ local function spawnRPPopup(delta)
     popup.BackgroundTransparency = 1
     popup.Text = "+" .. fmtRP(delta)
     popup.TextColor3 = Color3.fromRGB(0, 255, 120)
-    popup.TextSize = 13
-    popup.Font = Enum.Font.GothamBold
+    popup.TextSize = lblRPEarned.TextSize - 1
+    popup.Font = lblRPEarned.Font
     popup.TextXAlignment = Enum.TextXAlignment.Left
-    popup.TextStrokeTransparency = 0
+    popup.TextStrokeTransparency = 0.4
     popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
     popup.ZIndex = 20
 
     task.spawn(function()
-        local dur = 0.7
+        local dur = 1.2
         local t0 = os.clock()
         while popup and popup.Parent do
             local t = math.min((os.clock() - t0) / dur, 1)
-            popup.Position = UDim2.new(0, startX, 0, 108 - 10 * t)
-            popup.TextTransparency = t
-            popup.TextStrokeTransparency = t
+            local ease = t * t
+            popup.Position = UDim2.new(0, startX, 0, 108 - 14 * ease)
+            popup.TextTransparency = ease
+            popup.TextStrokeTransparency = 0.4 + 0.6 * ease
             if t >= 1 then break end
             task.wait(0.03)
         end
