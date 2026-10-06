@@ -181,12 +181,13 @@ do
         l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 10
         return l
     end
-    lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68); lblWork = sl(92)
-lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
-lblRPNow = sl(114)
+    lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68)
+lblRPNow = sl(90)
 lblRPNow.TextColor3 = Color3.fromRGB(120, 220, 255)
-lblRPEarned = sl(132)
+lblRPEarned = sl(108)
 lblRPEarned.TextColor3 = Color3.fromRGB(0, 255, 120)
+lblWork = sl(130)
+lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
 end
 
 local function setStatus(t) if lblWork then lblWork.Text = "📍 " .. t end end
@@ -239,20 +240,24 @@ local function spawnRPPopup(delta)
 end
 
 task.spawn(function()
-    while true do task.wait(0.5)
-        if activeMode == "office" and farmStart > 0 then
-            lblTime.Text = "⏱ Thời gian: " .. fmtTime(os.clock() - farmStart)
-            local rp = getRP()
-            if rp then
-                lblRPNow.Text = "💰 Hiện tại: " .. fmtRP(rp)
-                local earned = rp - farmRPStart
-                lblRPEarned.Text = "📈 Farm được: +" .. fmtRP(earned)
-                if lastRPValue > 0 and rp > lastRPValue then
-                    spawnRPPopup(rp - lastRPValue)
+    while true do
+        task.wait(0.5)
+        local ok, err = pcall(function()
+            if activeMode == "office" and farmStart > 0 then
+                if lblTime then lblTime.Text = "⏱ Thời gian: " .. fmtTime(os.clock() - farmStart) end
+                local rp = getRP()
+                if rp then
+                    if lblRPNow then lblRPNow.Text = "💰 Hiện tại: " .. fmtRP(rp) end
+                    local earned = rp - farmRPStart
+                    if lblRPEarned then lblRPEarned.Text = "📈 Farm được: +" .. fmtRP(earned) end
+                    if lastRPValue > 0 and rp > lastRPValue then
+                        pcall(spawnRPPopup, rp - lastRPValue)
+                    end
+                    lastRPValue = rp
                 end
-                lastRPValue = rp
             end
-        end
+        end)
+        if not ok then warn("[RP Loop] " .. tostring(err)) end
     end
 end)
 
@@ -351,10 +356,11 @@ do
     hint.ZIndex = 10000
 
     stopBtn.MouseButton1Click:Connect(function()
-        afkActive = false
-        afkOverlay.Visible = false
-        if writefile then pcall(writefile, "afkMode.txt", "0") end
-    end)
+    afkActive = false
+    afkOverlay.Visible = false
+    if writefile then pcall(writefile, "afkMode.txt", "0") end
+    if _G._setAFKToggle then _G._setAFKToggle(false) end
+end)
 end
 
 function _G.startAFK()
@@ -362,6 +368,8 @@ function _G.startAFK()
     afkStartTime = os.clock()
     afkRPStart = getRP() or 0
     if afkOverlay then afkOverlay.Visible = true end
+    if HubFrame then HubFrame.Visible = false end
+    if freecamMenuFrame then freecamMenuFrame.Visible = false end
     if writefile then pcall(writefile, "afkMode.txt", "1") end
 end
 
@@ -1063,9 +1071,38 @@ end)
     makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT",
         Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
         function(v) perfOn = v; perfFrame.Visible = v end)
-    makeToggle(perfSection, 5, false, "🌙 TREO MÁY: BẬT", "🌙 TREO MÁY: TẮT",
-    Color3.fromRGB(60, 60, 140), Color3.fromRGB(60, 60, 70),
-    function(v) if v then _G.startAFK() else _G.stopAFK() end end)
+    do
+    local afkOn = false
+    local afkBtn = Instance.new("TextButton", perfSection)
+    afkBtn.Size = UDim2.new(1, 0, 0, 28)
+    afkBtn.LayoutOrder = 5
+    afkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    afkBtn.TextSize = 10
+    afkBtn.Font = Enum.Font.GothamBold
+    afkBtn.ZIndex = 14
+    Instance.new("UICorner", afkBtn).CornerRadius = UDim.new(0, 7)
+
+    local function paintAFK()
+        afkBtn.Text = afkOn and "🌙 TREO MÁY: BẬT" or "🌙 TREO MÁY: TẮT"
+        afkBtn.BackgroundColor3 = afkOn and Color3.fromRGB(60, 60, 140) or Color3.fromRGB(60, 60, 70)
+    end
+    paintAFK()
+
+    _G._setAFKToggle = function(on)
+        afkOn = on
+        paintAFK()
+    end
+
+    afkBtn.MouseButton1Click:Connect(function()
+        afkOn = not afkOn
+        paintAFK()
+        if afkOn then
+            if _G.startAFK then _G.startAFK() end
+        else
+            if _G.stopAFK then _G.stopAFK() end
+        end
+    end)
+end
 makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT",
         Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70),
         function(v) perfLocked = v; perfFrame.Draggable = not v end)
