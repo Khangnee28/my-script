@@ -654,67 +654,76 @@ do
         local GEAR_TBL = { gearratios=true, gears=true }
         local DRAG_KEYS = { drag=true, dragcoefficient=true, airresistance=true }
         local seen = {}
--- Tune chỉ 2 nguồn thật: model xe + ReplicatedStorage modules
--- getgc đã bỏ vì obfuscated tables làm lag không thể tránh
+local tuneStartTime = os.clock()
+local tuneTimeout = 8  -- dừng hẳn sau 8 giây
+local tuneVisited = 0
+local lastYieldTime = os.clock()
 
-local function tuneTable(t, depth, visited)
-    if depth > 5 or visited[t] then return end
+local function tuneTable(t, depth)
+    if os.clock() - tuneStartTime > tuneTimeout then return end
+    if depth > 6 or seen[t] then return end
     if type(t) ~= "table" then return end
     if isCharOwned(t) then return end
-    visited[t] = true
 
+    tuneVisited = tuneVisited + 1
+    if tuneVisited > 500000 then return end
+
+    -- Yield mỗi 4ms
+    if os.clock() - lastYieldTime > 0.004 then
+        task.wait()
+        lastYieldTime = os.clock()
+    end
+
+    seen[t] = true
     pcall(setreadonly, t, false)
+
     for k, v in pairs(t) do
-        local vt = type(v)
-        if vt == "number" and type(k) == "string" then
+        if type(k) == "string" then
             local lk = k:lower()
-            if SPEED_KEYS[lk] and v > 0 then
-                if pcall(function() t[k] = v * 1.6 end) then count = count + 1 end
-            elseif POWER_KEYS[lk] then
-                if pcall(function() t[k] = v * hpMult end) then count = count + 1 end
-            elseif RPM_KEYS[lk] and v >= 1000 then
-                if pcall(function() t[k] = v + rpmAdd end) then count = count + 1 end
-            elseif GEAR_KEYS[lk] and v > 0 then
-                if pcall(function() t[k] = v * gearMult end) then count = count + 1 end
-            elseif DRAG_KEYS[lk] and v > 0 then
-                if pcall(function() t[k] = v * 0.7 end) then count = count + 1 end
-            end
-        elseif vt == "table" and type(k) == "string" then
-            local lk = k:lower()
-            if GEAR_TBL[lk] then
-                pcall(setreadonly, v, false)
-                for i, g in pairs(v) do
-                    if type(g) == "number" then
-                        if pcall(function() v[i] = g * gearMult end) then count = count + 1 end
-                    end
+            local vt = type(v)
+            if vt == "number" then
+                local newVal
+                if SPEED_KEYS[lk] and v > 0 then newVal = v * 1.6
+                elseif POWER_KEYS[lk] then newVal = v * hpMult
+                elseif RPM_KEYS[lk] and v >= 1000 then newVal = v + rpmAdd
+                elseif GEAR_KEYS[lk] and v > 0 then newVal = v * gearMult
+                elseif DRAG_KEYS[lk] and v > 0 then newVal = v * 0.7
                 end
-            elseif depth < 4 then
-                tuneTable(v, depth + 1, visited)
+                if newVal then
+                    if pcall(rawset, t, k, newVal) then count = count + 1 end
+                end
+            elseif vt == "table" then
+                if GEAR_TBL[lk] then
+                    pcall(setreadonly, v, false)
+                    for i, g in pairs(v) do
+                        if type(g) == "number" then
+                            if pcall(rawset, v, i, g * gearMult) then count = count + 1 end
+                        end
+                    end
+                else
+                    tuneTable(v, depth + 1)
+                end
             end
+        elseif type(v) == "table" then
+            tuneTable(v, depth + 1)
         end
     end
 end
 
--- Nguồn 1: model xe (đã có sẵn phần scan attribute + NumberValue bên dưới)
--- Nguồn 2: ReplicatedStorage modules — chỗ chứa hidden config
-task.spawn(function()
-    local visited = {}
-    local rs = game:GetService("ReplicatedStorage")
-    for _, obj in ipairs(rs:GetDescendants()) do
-        if obj:IsA("ModuleScript") and not visited[obj] then
-            pcall(function()
-                local mod = require(obj)
-                if type(mod) == "table" then
-                    tuneTable(mod, 1, visited)
-                    if mod.Config then pcall(tuneTable, mod.Config, 2, visited) end
-                    if mod.Settings then pcall(tuneTable, mod.Settings, 2, visited) end
-                    if mod.Vehicle then pcall(tuneTable, mod.Vehicle, 2, visited) end
-                    if mod.Stats then pcall(tuneTable, mod.Stats, 2, visited) end
-                end
-            end)
+if typeof(getgc) == "function" then
+    task.spawn(function()
+        tuneStartTime = os.clock()
+        tuneVisited = 0
+        lastYieldTime = os.clock()
+        local gcList = getgc(true)
+        for _, obj in pairs(gcList) do
+            if os.clock() - tuneStartTime > tuneTimeout then break end
+            if typeof(obj) == "table" then
+                pcall(tuneTable, obj, 1)
+            end
         end
-    end
-end)
+    end)
+end
         if vehicleModel then
             for _, obj in pairs(vehicleModel:GetDescendants()) do
                 pcall(function()
