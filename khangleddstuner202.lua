@@ -219,32 +219,46 @@ end
 
 local rpPopupActive = nil
 
+local _popupTS = nil
 local function spawnRPPopup(delta)
-    if not statPanel or not statPanel.Parent then return end
+    if not statPanel or not statPanel.Parent or not lblRPEarned then return end
+    if not _popupTS then _popupTS = game:GetService("TextService") end
+
+    -- Đo chiều rộng text farm hiện tại để đặt popup ngay cạnh
+    local textW = 200
+    pcall(function()
+        local sz = _popupTS:GetTextSize(
+            lblRPEarned.Text,
+            lblRPEarned.TextSize,
+            lblRPEarned.Font,
+            Vector2.new(1000, 20)
+        )
+        textW = sz.X
+    end)
+
+    local startX = 10 + textW + 6
 
     local popup = Instance.new("TextLabel", statPanel)
-    popup.Size = UDim2.new(0, 130, 0, 18)
-    popup.Position = UDim2.new(1, -20, 0, 108)
+    popup.Size = UDim2.new(0, 120, 0, 18)
+    popup.Position = UDim2.new(0, startX, 0, 108)
     popup.BackgroundTransparency = 1
     popup.Text = "+" .. fmtRP(delta)
     popup.TextColor3 = Color3.fromRGB(0, 255, 120)
     popup.TextSize = 13
     popup.Font = Enum.Font.GothamBold
-    popup.TextXAlignment = Enum.TextXAlignment.Right
+    popup.TextXAlignment = Enum.TextXAlignment.Left
     popup.TextStrokeTransparency = 0
     popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
     popup.ZIndex = 20
 
     task.spawn(function()
-        local dur = 0.55
+        local dur = 0.7
         local t0 = os.clock()
         while popup and popup.Parent do
-            local elapsed = os.clock() - t0
-            local t = math.min(elapsed / dur, 1)
-            popup.Position = UDim2.new(1, -20 - 170 * t, 0, 108)
-            local fade = math.min(t * 1.3, 1)
-            popup.TextTransparency = fade
-            popup.TextStrokeTransparency = fade
+            local t = math.min((os.clock() - t0) / dur, 1)
+            popup.Position = UDim2.new(0, startX, 0, 108 - 10 * t)
+            popup.TextTransparency = t
+            popup.TextStrokeTransparency = t
             if t >= 1 then break end
             task.wait(0.03)
         end
