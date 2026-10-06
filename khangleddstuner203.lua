@@ -657,65 +657,50 @@ do
 local tuneVisited = 0
 local tuneLimitReached = false
 
--- Lookup table: 1 phép tra thay vì 6 if-elseif
-local TUNE_MAP = {}
-for k in pairs(SPEED_KEYS) do TUNE_MAP[k] = 1 end
-for k in pairs(POWER_KEYS) do TUNE_MAP[k] = 2 end
-for k in pairs(RPM_KEYS) do TUNE_MAP[k] = 3 end
-for k in pairs(GEAR_KEYS) do TUNE_MAP[k] = 4 end
-for k in pairs(GEAR_TBL) do TUNE_MAP[k] = 5 end
-for k in pairs(DRAG_KEYS) do TUNE_MAP[k] = 6 end
+-- Helper cố định, tránh tạo closure mới mỗi vòng lặp (nhanh gấp 3-5x)
+local function rawset_(tb, key, val) tb[key] = val end
 
 local function tuneTable(t, depth)
-    if tuneLimitReached or depth > 6 or seen[t] then return end
-    if type(t) ~= "table" or isCharOwned(t) then return end
+    if tuneLimitReached then return end
+    if depth > 6 or seen[t] then return end
+    if type(t) ~= "table" then return end
+    if isCharOwned(t) then return end
 
     tuneVisited = tuneVisited + 1
-    if tuneVisited > 200000 then
+    if tuneVisited > 500000 then
         tuneLimitReached = true
         return
     end
 
     seen[t] = true
-    pcall(setreadonly, t, false)
+    unfreeze(t)
 
     for k, v in pairs(t) do
-        local tv = type(v)
-        if tv == "number" then
-            if type(k) == "string" then
-                local mk = TUNE_MAP[k:lower()]
-                if mk == 1 then
-                    if v > 0 then
-                        if pcall(function() t[k] = v * 1.6 end) then count = count + 1 end
-                    end
-                elseif mk == 2 then
-                    if pcall(function() t[k] = v * hpMult end) then count = count + 1 end
-                elseif mk == 3 then
-                    if v >= 1000 then
-                        if pcall(function() t[k] = v + rpmAdd end) then count = count + 1 end
-                    end
-                elseif mk == 4 then
-                    if v > 0 then
-                        if pcall(function() t[k] = v * gearMult end) then count = count + 1 end
-                    end
-                elseif mk == 6 then
-                    if v > 0 then
-                        if pcall(function() t[k] = v * 0.7 end) then count = count + 1 end
-                    end
-                end
-            end
-        elseif tv == "table" then
-            local mk = type(k) == "string" and TUNE_MAP[k:lower()] or nil
-            if mk == 5 then
-                pcall(setreadonly, v, false)
+        if type(k) == "string" then
+            local lk = k:lower()
+            local vt = type(v)
+            if SPEED_KEYS[lk] and vt == "number" and v > 0 then
+                if pcall(rawset_, t, k, v * 1.6) then count = count + 1 end
+            elseif POWER_KEYS[lk] and vt == "number" then
+                if pcall(rawset_, t, k, v * hpMult) then count = count + 1 end
+            elseif RPM_KEYS[lk] and vt == "number" and v >= 1000 then
+                if pcall(rawset_, t, k, v + rpmAdd) then count = count + 1 end
+            elseif GEAR_KEYS[lk] and vt == "number" and v > 0 then
+                if pcall(rawset_, t, k, v * gearMult) then count = count + 1 end
+            elseif GEAR_TBL[lk] and vt == "table" then
+                unfreeze(v)
                 for i, g in pairs(v) do
                     if type(g) == "number" then
-                        if pcall(function() v[i] = g * gearMult end) then count = count + 1 end
+                        if pcall(rawset_, v, i, g * gearMult) then count = count + 1 end
                     end
                 end
-            else
+            elseif DRAG_KEYS[lk] and vt == "number" and v > 0 then
+                if pcall(rawset_, t, k, v * 0.7) then count = count + 1 end
+            elseif vt == "table" then
                 tuneTable(v, depth + 1)
             end
+        elseif type(v) == "table" then
+            tuneTable(v, depth + 1)
         end
     end
 end
@@ -731,8 +716,8 @@ if typeof(getgc) == "function" then
             if typeof(obj) == "table" then
                 pcall(tuneTable, obj, 1)
             end
-            -- Yield mỗi 6ms → game luôn có frame để render
-            if os.clock() - lastYield > 0.006 then
+            -- Yield mỗi 5ms → game luôn có frame để render
+            if os.clock() - lastYield > 0.005 then
                 task.wait()
                 lastYield = os.clock()
             end
