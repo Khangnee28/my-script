@@ -217,26 +217,50 @@ local function fmtRP(n)
     else return tostring(math.floor(n)) end
 end
 
+local rpPopupActive = nil
+
 local function spawnRPPopup(delta)
     if not statPanel or not statPanel.Parent then return end
+
+    -- Còn popup cũ → cộng dồn, không tạo mới
+    if rpPopupActive and rpPopupActive.Parent then
+        rpPopupActive._total = (rpPopupActive._total or 0) + delta
+        rpPopupActive.Text = "+" .. fmtRP(rpPopupActive._total)
+        rpPopupActive._time = os.clock()
+        return
+    end
+
     local popup = Instance.new("TextLabel", statPanel)
     popup.Size = UDim2.new(0, 130, 0, 18)
     popup.Position = UDim2.new(1, -140, 0, 130)
     popup.BackgroundTransparency = 1
     popup.Text = "+" .. fmtRP(delta)
     popup.TextColor3 = Color3.fromRGB(0, 255, 120)
-    popup.TextSize = 12
+    popup.TextSize = 13
     popup.Font = Enum.Font.GothamBold
     popup.TextXAlignment = Enum.TextXAlignment.Right
     popup.TextStrokeTransparency = 0
     popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
     popup.ZIndex = 20
-    TweenService:Create(popup, TweenInfo.new(1.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -140, 0, 100),
-        TextTransparency = 1,
-        TextStrokeTransparency = 1,
-    }):Play()
-    task.delay(1.7, function() if popup then popup:Destroy() end end)
+    popup._total = delta
+    popup._time = os.clock()
+    rpPopupActive = popup
+
+    task.spawn(function()
+        while popup.Parent do
+            task.wait(0.05)
+            local elapsed = os.clock() - popup._time
+            if elapsed > 0.8 then
+                local t = math.min((elapsed - 0.8) / 0.6, 1)
+                popup.Position = UDim2.new(1, -140, 0, 130 - 40 * t)
+                popup.TextTransparency = t
+                popup.TextStrokeTransparency = t
+                if t >= 1 then break end
+            end
+        end
+        if popup then popup:Destroy() end
+        if rpPopupActive == popup then rpPopupActive = nil end
+    end)
 end
 
 task.spawn(function()
