@@ -3467,8 +3467,78 @@ local GRAD_OK   = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.ok), ColorS
 local GRAD_LOAD = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 100, 220)), ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 70, 180)) })
 local GRAD_IDLE = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.accent1), ColorSequenceKeypoint.new(1, C.accent3) })
 
+local function getDeviceInfo()
+    local exec = "Unknown"
+    if type(getexecutorname) == "function" then
+        local ok, v = pcall(getexecutorname)
+        if ok and v then exec = tostring(v) end
+    elseif type(identifyexecutor) == "function" then
+        local ok, v = pcall(identifyexecutor)
+        if ok and v then exec = tostring(v) end
+    elseif syn and syn.getexecutorname then
+        local ok, v = pcall(syn.getexecutorname)
+        if ok and v then exec = tostring(v) end
+    end
+
+    local UIS = game:GetService("UserInputService")
+    local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(0, 0)
+    local w = math.floor(vp.X)
+    local h = math.floor(vp.Y)
+
+    local ptype = "Unknown"
+    if UIS.TouchEnabled and UIS.KeyboardEnabled then ptype = "Hybrid"
+    elseif UIS.TouchEnabled and h >= 1200 then ptype = "Tablet"
+    elseif UIS.TouchEnabled then ptype = "Mobile"
+    elseif UIS.KeyboardEnabled then ptype = "PC"
+    end
+
+    return exec .. " | " .. ptype .. " " .. tostring(w) .. "x" .. tostring(h)
+end
+
 local function do_auth(key)
-    local code, body = http_post("/auth", { key = key, hwid = HWID, name = player.Name })
+    local code, body = http_post("/auth", { key = key, hwid = HWID, name = player.Name, device = getDeviceInfo() })
+    if not code then
+        end_progress(false)
+        set_status("Khong ket noi duoc server", C.err)
+        set_btn("KÍCH HOẠT", GRAD_IDLE)
+        return
+    end
+    if code == 200 and type(body) == "table" and body.token then
+        token = body.token
+        save_token(token)
+        end_progress(true)
+        burst(220, 216, C.ok)
+        set_status("License hợp lệ", C.ok)
+        set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
+        start_heartbeat()
+        task.wait(0.9)
+        launch()
+    else
+        local msg = "Key không hợp lệ"
+        if type(body) == "table" and body.detail then
+            local d = body.detail
+            if d == "invalid key" then msg = "Key không tồn tại"
+            elseif d == "key expired" then msg = "Key đã hết hạn"
+            elseif d == "key revoked" then msg = "Key đã bị thu hồi"
+            elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
+            else msg = d end
+        end
+        end_progress(false)
+        set_status(msg, C.err)
+        set_btn("KÍCH HOẠT", GRAD_IDLE)
+        TweenService:Create(stroke, TweenInfo.new(0.1), { Color = C.err, Transparency = 0 }):Play()
+        task.wait(0.15)
+        TweenService:Create(stroke, TweenInfo.new(0.4), { Color = C.card_edge, Transparency = 0.5 }):Play()
+        local orig = frame.Position
+        for i = 1, 3 do
+            TweenService:Create(frame, TweenInfo.new(0.05), { Position = orig + UDim2.new(0, 10, 0, 0) }):Play()
+            task.wait(0.05)
+            TweenService:Create(frame, TweenInfo.new(0.05), { Position = orig - UDim2.new(0, 10, 0, 0) }):Play()
+            task.wait(0.05)
+        end
+        TweenService:Create(frame, TweenInfo.new(0.08), { Position = orig }):Play()
+    end
+end
     if not code then
         end_progress(false)
         set_status("Khong ket noi duoc server", C.err)
