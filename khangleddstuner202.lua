@@ -2406,24 +2406,24 @@ end
         tried[seat] = true
         setStatus("đi bộ tới ghế")
 
-        of_walkTo(seat.Position, 4, 12)
-task.wait(1)  -- chờ game settle, đủ để auto-sit kích hoạt
+        of_walkTo(seat.Position, 3, 12)
+task.wait(1)
 
 h = of_humanoid()
 if h and h.Sit then return true end
 if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
 
--- Chỉ đẩy CFrame nếu THỰC SỰ còn cách xa ghế (> 3 stud)
+-- Chưa ngồi sau 1s → CFrame đẩy vào ghế (logic cũ)
 hrp = of_root()
-if hrp and h then
+if hrp then
     local dir = seat.Position - hrp.Position
     dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude > 3 then
+    if dir.Magnitude > 0.1 then
         dir = dir.Unit
         pcall(function()
-            hrp.CFrame = CFrame.new(seat.Position - dir * 1.5)
+            hrp.CFrame = CFrame.new(seat.Position - dir * 1.2)
         end)
-        task.wait(0.8)
+        task.wait(0.6)
     end
 end
 
