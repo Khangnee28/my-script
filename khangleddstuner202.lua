@@ -2491,29 +2491,59 @@ end
         if not farmOffice then return end
         if not of_sitAtChair() then if farmOffice then task.wait(3) end return end
         setStatus("ngồi ghế, chờ câu hỏi")
-        local idleStart = os.clock(); local noQuestionStart = os.clock()
-        while farmOffice do
-            if of_printAssigned then break end
-            if of_pendingQuestion then noQuestionStart = os.clock() end
-            if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
-                local q = of_pendingQuestion; of_pendingQuestion = nil
-                of_fireAnswer(q); setStatus("đã giải"); of_nextDelay = math.random(20, 28) / 10
-                idleStart = os.clock()
-            end
-            if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
-                of_refired = true
-                if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); setStatus("đã giải") end
-                idleStart = os.clock()
-            end
-            if os.clock() - noQuestionStart > 5 and not of_pendingQuestion and not of_awaitingAck then
-                setStatus("5s không câu hỏi — đổi ghế")
-                local hh = of_humanoid()
-                if hh and hh.Sit then OF_SKIPPED_SEATS[hh.SeatPart] = true; pcall(function() hh.Sit = false end); task.wait(0.5) end
-                break
-            end
-            if os.clock() - idleStart > 60 then break end
-            task.wait(0.2)
+        local idleStart = os.clock()
+local noQuestionStart = os.clock()
+local gotAnyQuestion = false
+
+while farmOffice do
+    if of_printAssigned then break end
+
+    if of_pendingQuestion then
+        noQuestionStart = os.clock()
+        gotAnyQuestion = true
+    end
+
+    if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
+        local q = of_pendingQuestion; of_pendingQuestion = nil
+        of_fireAnswer(q); setStatus("đã giải"); of_nextDelay = math.random(20, 28) / 10
+        idleStart = os.clock()
+    end
+
+    if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
+        of_refired = true
+        if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); setStatus("đã giải") end
+        idleStart = os.clock()
+    end
+
+    -- Đổi ghế chỉ khi:
+    -- 1. Đã từng nhận được ít nhất 1 câu hỏi (không đổi ngay lần đầu)
+    -- 2. Đã chờ 15s mà không có câu hỏi mới
+    if gotAnyQuestion and os.clock() - noQuestionStart > 15 and not of_pendingQuestion and not of_awaitingAck then
+        setStatus("15s không câu hỏi — đổi ghế")
+        local hh = of_humanoid()
+        if hh and hh.Sit then
+            OF_SKIPPED_SEATS[hh.SeatPart] = true
+            pcall(function() hh.Sit = false end)
+            task.wait(0.5)
         end
+        break
+    end
+
+    -- Lần đầu vào office chưa có câu hỏi: chờ tối đa 30s
+    if not gotAnyQuestion and os.clock() - noQuestionStart > 30 then
+        setStatus("30s chưa có câu hỏi — đổi ghế")
+        local hh = of_humanoid()
+        if hh and hh.Sit then
+            OF_SKIPPED_SEATS[hh.SeatPart] = true
+            pcall(function() hh.Sit = false end)
+            task.wait(0.5)
+        end
+        break
+    end
+
+    if os.clock() - idleStart > 60 then break end
+    task.wait(0.2)
+end
         if farmOffice and of_printAssigned then
             if not Computers then return end
             of_doPrint(of_printAssigned)
