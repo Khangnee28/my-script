@@ -3451,12 +3451,22 @@ end
 
 local function start_heartbeat()
     task.spawn(function()
+        -- Gửi info ngay lập tức lần đầu
+        local firstSend = true
         while token and not running do
-            task.wait(HEARTBEAT_INTERVAL)
+            if not firstSend then task.wait(HEARTBEAT_INTERVAL) end
+            firstSend = false
             if not token or running then break end
+
+            local devInfo = "Unknown"
+            local okDev, devVal = pcall(getDeviceInfo)
+            if okDev and devVal then devInfo = devVal end
+
             local code = http_post("/heartbeat", {}, {
                 ["Authorization"] = "Bearer " .. token,
                 ["X-HWID"] = HWID,
+                ["X-Player-Name"] = player.Name,
+                ["X-Device"] = devInfo,
             })
             if code ~= 200 then token = nil; break end
         end
