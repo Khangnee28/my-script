@@ -2509,8 +2509,30 @@ end
         while farmOffice and os.clock() < of_resetUntil do setStatus("chờ reset nhân vật"); task.wait(0.2) end
         if not farmOffice then return end
         if not of_sitAtChair() then if farmOffice then task.wait(3) end return end
-        setStatus("ngồi ghế, chờ câu hỏi")
-        local idleStart = os.clock()
+setStatus("ngồi ghế, chờ câu hỏi")
+
+-- QUICK CHECK: 3s không có câu hỏi → nhảy ra tìm ghế khác
+local quickStart = os.clock()
+local gotQuick = of_pendingQuestion ~= nil
+while not gotQuick and os.clock() - quickStart < 3 and farmOffice do
+    task.wait(0.2)
+    if of_pendingQuestion then gotQuick = true end
+end
+
+if not gotQuick then
+    setStatus("3s không câu hỏi — đổi ghế")
+    local hh = of_humanoid()
+    if hh and hh.Sit then
+        OF_SKIPPED_SEATS[hh.SeatPart] = true
+        pcall(function() hh.Jump = true end)
+        task.wait(0.3)
+        pcall(function() hh.Sit = false end)
+        task.wait(0.5)
+    end
+    return
+end
+
+local idleStart = os.clock()
 local noQuestionStart = os.clock()
 local gotAnyQuestion = false
 
