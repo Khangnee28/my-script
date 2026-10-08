@@ -2179,10 +2179,10 @@ local function doJumpBoost()
     jumpBoostActive = true
     pcall(function()
         h.UseJumpPower = true
-        h.JumpPower = (origJumpPower or 50) + 10
-        h.Jump = true
+        h.JumpPower = (origJumpPower or 50) + 25
+        -- ChangeState bắt buộc nhảy — Jump = true không hoạt động khi đứng yên
+        h:ChangeState(Enum.HumanoidStateType.Jumping)
     end)
-    -- Sau 1 giây trả jump về bình thường
     task.delay(1, function()
         local h2 = getHumanoidSafe()
         if h2 and origJumpPower then
@@ -2481,16 +2481,20 @@ local function of_doPrint(name)
 
         if not of_printAssigned then break end
 
-        if attempt == 1 and not retried then
-            retried = true
-            setStatus("in fail — đi lại tới máy in")
-            of_walkTo(part.Position, 5, 10)
-            task.wait(0.3)
-        else
-            setStatus("chờ 5s thử lại")
-            local t3 = os.clock()
-            while of_printAssigned and farmOffice and os.clock() - t3 < 5 do task.wait(0.2) end
-        end
+        setStatus("thử lại — đi bộ lại tới máy in")
+of_walkTo(part.Position, 5, 10)
+task.wait(0.3)
+-- Nếu lỡ ngồi ghế giữa đường → jump ra
+local hh = of_humanoid()
+if hh and hh.Sit then
+    pcall(function() hh.Jump = true end)
+    task.wait(0.5)
+    if hh.Sit then
+        pcall(function() hh.Sit = false end)
+        task.wait(0.3)
+    end
+    of_walkTo(part.Position, 5, 8)
+end
     end
 
     if not farmOffice then return end
