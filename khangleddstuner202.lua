@@ -16,7 +16,7 @@ local BRAND_SUB  = "@khangdayy215"
 -- ====local function of_doPrint(name)========================================================
 local function PAYLOAD()
     -- ============================================================
--- KHlocal function of_sitAtChair()ANGLE DDS HUB v26 — OFFICE ONLY
+-- KHANGLE DDS HUB v26 — OFFICE ONLY
 -- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
@@ -2363,7 +2363,7 @@ local function of_sitAtChair()
     local h = of_humanoid()
     if h and h.Sit then return true end
     local hrp = of_root(); if not hrp then return false end
-if not of_initialTeleDone then
+   if not of_initialTeleDone then
     local dist = (hrp.Position - CHAIR_POS).Magnitude
     if dist > 500 then
         setStatus("tele lần đầu tới office")
@@ -2372,36 +2372,20 @@ if not of_initialTeleDone then
     end
     of_initialTeleDone = true
 
-    -- Ngồi ghế ngay tại chỗ tele — không tìm kiếm
-    local hrp2 = of_root()
-    if hrp2 then
-        local ok, parts = pcall(function()
-            return workspace:GetPartBoundsInRadius(hrp2.Position, 30)
-        end)
-        if ok and parts then
-            for _, p in ipairs(parts) do
-                if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
-                    setStatus("ngồi ghế tại chỗ")
-                    local h2 = of_humanoid()
-                    if h2 then
-                        pcall(function()
-                            hrp2.CFrame = CFrame.new(p.Position + Vector3.new(0, 2, 0))
-                        end)
-                        task.wait(0.8)
-                        h2 = of_humanoid()
-                        if h2 and h2.Sit then
-                            return true
-                        end
-                    end
-                    break
-                end
-            end
+    -- Đứng im 10s chờ game tự đẩy vào ghế
+    setStatus("chờ 10s — game tự ngồi")
+    local waitStart = os.clock()
+    while os.clock() - waitStart < 10 and farmOffice do
+        task.wait(0.3)
+        local h2 = of_humanoid()
+        if h2 and h2.Sit then
+            setStatus("đã ngồi ghế")
+            return true
         end
     end
-    -- Không có ghế tại chỗ → rơi xuống flow bình thường
-    setStatus("không có ghế tại chỗ — tìm ghế")
+    -- Hết 10s chưa ngồi → flow bình thường
+    setStatus("chưa ngồi — tìm ghế khác")
 end
-
     h = of_humanoid(); if h and h.Sit then return true end
 
     local tried = {}
