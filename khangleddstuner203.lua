@@ -2145,7 +2145,129 @@ do
         return nil
     end
     local function of_root() local c = player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
-    local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
+-- Anti-stuck: đứng im 5s → jump boost nhẹ, tối đa 3 lần liên tiếp
+local stuckAnchor = nil
+local stuckSince = 0
+local stuckJumpCount = 0
+local origJumpPower = nil
+local origUseJumpPower = nil
+local jumpBoostActive = false
+
+local function getHumanoidSafe()
+    local c = player.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function restoreJumpPower()
+    local h = getHumanoidSafe()
+    if h and origJumpPower then
+        pcall(function()
+            if origUseJumpPower ~= nil then h.UseJumpPower = origUseJumpPower end
+            h.JumpPower = origJumpPower
+        end)
+    end
+    jumpBoostActive = false
+end
+
+local function doJumpBoost()
+    local h = getHumanoidSafe()
+    if not h then return end
+    if not origJumpPower then
+        origJumpPower = h.JumpPower or 50
+        origUseJumpPower = h.UseJumpPower
+    end
+    jumpBoostActive = true
+    pcall(function()
+        h.UseJumpPower = true
+        h.JumpPower = (origJumpPower or 50) + 12
+        -- ChangeState bắt buộc nhảy — Jump = true không hoạt động khi đứng yên
+        h:ChangeState(Enum.HumanoidStateType.Jumping)
+    end)
+    task.delay(1, function()
+        local h2 = getHumanoidSafe()
+        if h2 and origJumpPower then
+            pcall(function() h2.JumpPower = origJumpPower end)
+        end
+    end)
+end
+
+RunService.Heartbeat:Connect(function()
+    if not farmOffice then
+        stuckAnchor = nil
+        stuckSince = 0
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
+        return
+    end
+
+    -- BỎ QUA nếu đang ngồi ghế (giải toán, chờ câu hỏi)
+    local c = player.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h and h.Sit then
+        stuckAnchor = nil
+        stuckSince = 0
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
+        return
+    end
+
+    -- BỎ QUA nếu đang in (chờ prompt, không di chuyển là bình thường)
+    if lblWork then
+        local s = lblWork.Text or ""
+        if s:find("đang in") or s:find("thử in") or s:find("chờ 5s") or s:find("chuẩn bị in") then
+            stuckAnchor = nil
+            stuckSince = 0
+            stuckJumpCount = 0
+            return
+        end
+    end
+
+    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local now = os.clock()
+    if not stuckAnchor then
+        stuckAnchor = hrp.Position
+        stuckSince = now
+        stuckJumpCount = 0
+        return
+    end
+
+    local moved = (hrp.Position - stuckAnchor).Magnitude
+    if moved > 3 then
+        stuckAnchor = hrp.Position
+        stuckSince = now
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
+        return
+    end
+
+    if now - stuckSince >= 5 then
+        if stuckJumpCount < 3 then
+            stuckJumpCount = stuckJumpCount + 1
+            setStatus("kẹt — nhảy lần " .. stuckJumpCount)
+            doJumpBoost()
+            stuckSince = now
+        else
+            restoreJumpPower()
+            setStatus("kẹt 3 lần — tự reset farm")
+            stuckAnchor = hrp.Position
+            stuckSince = now
+            stuckJumpCount = 0
+
+            task.spawn(function()
+                if _G._officeStop then
+                    pcall(function() _G._officeStop() end)
+                end
+                task.wait(2)
+                if farmSwitch and farmSwitch.track then
+                    pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
+                end
+            end)
+        end
+    end
+end)
+local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
     local function of_standUp()
         local h = of_humanoid(); if not h then return end
         if not h.Sit and h:GetState() ~= Enum.HumanoidStateType.Seated then return end
@@ -2204,63 +2326,143 @@ do
         end
         return best
     end
-    local function of_sitAtChair()
-        local h = of_humanoid()
-        if h and h.Sit then return true end
-        local hrp = of_root(); if not hrp then return false end
-        if not of_initialTeleDone then
-            local dist = (hrp.Position - CHAIR_POS).Magnitude
-            if dist > 500 then setStatus("tele lần đầu"); hrp.CFrame = CFrame.new(CHAIR_POS); task.wait(1.0) end
-            of_initialTeleDone = true
-        end
-        h = of_humanoid(); if h and h.Sit then return true end
-        local tried = {}
-        while farmOffice do
-            hrp = of_root(); if not hrp then return false end
-            local seat = of_findNearestUntriedSeat(hrp.Position, 350, tried)
-            if not seat then
-                setStatus("hết ghế — reset"); tried = {}; task.wait(2)
-                seat = of_findNearestUntriedSeat(hrp.Position, 350, tried)
-                if not seat then setStatus("không có ghế trống"); task.wait(3); return false end
+    
+        local function of_walkTo(target, stopDist, timeout)
+    stopDist = stopDist or 4
+    timeout = timeout or 20
+    local deadline = os.clock() + timeout
+    local reached = false
+    pcall(function()
+        while os.clock() < deadline and farmOffice do
+            local h = of_humanoid()
+            local hrp = of_root()
+            if not h or not hrp then break end
+            if h.Sit then
+                pcall(function() h.Sit = false end)
+                task.wait(0.4)
             end
-            tried[seat] = true; setStatus("tìm ghế — tele")
-            hrp.CFrame = CFrame.new(seat.Position + Vector3.new(0, 2, 0)); task.wait(1.5)
-            h = of_humanoid(); if h and h.Sit then return true end
+            local delta = target - hrp.Position
+            local flat = Vector3.new(delta.X, 0, delta.Z)
+            if flat.Magnitude <= stopDist then
+                reached = true
+                break
+            end
+            h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
+            task.wait(0.15)
         end
-        return false
-    end
-local function of_teleNear(target, od)
-    local hrp = of_root(); if not hrp then return false end
+    end)
     local h = of_humanoid()
-    local dir = (target - hrp.Position); dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude < 0.1 then dir = Vector3.new(1, 0, 0) end
-    dir = dir.Unit
-    local landPos = target - dir * (od or 6)
-    landPos = Vector3.new(landPos.X, hrp.Position.Y, landPos.Z)
-    setStatus("tele tới máy in")
-    if h then pcall(function() h:MoveTo(landPos) end) end
-    hrp.CFrame = CFrame.new(landPos, Vector3.new(target.X, landPos.Y, landPos.Z))
-    task.wait(0.1)
-    if h then pcall(function() h:MoveTo(hrp.Position) end) end
-    task.wait(0.2)
-    return true
+    local hrp = of_root()
+    if h and hrp and not h.Sit then
+        pcall(function() h:MoveTo(hrp.Position) end)
+    end
+    return reached
 end
 
-    local function of_doPrint(name)
+local function of_sitAtChair()
+    local h = of_humanoid()
+    if h and h.Sit then return true end
+    local hrp = of_root(); if not hrp then return false end
+   if not of_initialTeleDone then
+    local dist = (hrp.Position - CHAIR_POS).Magnitude
+    if dist > 500 then
+        setStatus("tele lần đầu tới office")
+        hrp.CFrame = CFrame.new(CHAIR_POS)
+        task.wait(1.5)
+    end
+    of_initialTeleDone = true
+
+    -- Đứng im 10s chờ game tự đẩy vào ghế
+    setStatus("chờ 10s — game tự ngồi")
+    local waitStart = os.clock()
+    while os.clock() - waitStart < 10 and farmOffice do
+        task.wait(0.3)
+        local h2 = of_humanoid()
+        if h2 and h2.Sit then
+            setStatus("đã ngồi ghế")
+            return true
+        end
+    end
+    -- Hết 10s chưa ngồi → flow bình thường
+    setStatus("chưa ngồi — tìm ghế khác")
+end
+    h = of_humanoid(); if h and h.Sit then return true end
+
+    local tried = {}
+    while farmOffice do
+        hrp = of_root(); if not hrp then return false end
+        local seat = of_findNearestUntriedSeat(hrp.Position, 500, tried)
+        if not seat then
+            setStatus("hết ghế — quét lại")
+            tried = {}
+            task.wait(2)
+            seat = of_findNearestUntriedSeat(hrp.Position, 500, tried)
+            if not seat then
+                setStatus("không có ghế trống")
+                task.wait(3)
+                return false
+            end
+        end
+        tried[seat] = true
+        setStatus("đi bộ tới ghế")
+
+        of_walkTo(seat.Position, 3, 12)
+task.wait(1)
+
+h = of_humanoid()
+if h and h.Sit then return true end
+if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
+
+-- Chưa ngồi sau 1s → CFrame đẩy vào ghế (logic cũ)
+hrp = of_root()
+if hrp then
+    local dir = seat.Position - hrp.Position
+    dir = Vector3.new(dir.X, 0, dir.Z)
+    if dir.Magnitude > 0.1 then
+        dir = dir.Unit
+        pcall(function()
+            hrp.CFrame = CFrame.new(seat.Position - dir * 1.2)
+        end)
+        task.wait(0.6)
+    end
+end
+
+h = of_humanoid()
+if h and h.Sit then return true end
+if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
+    end
+    return false
+end
+
+local function of_doPrint(name)
     local Comp = workspace:FindFirstChild("Computers"); if not Comp then return end
     local model = Comp:FindFirstChild(name); if not model then return end
     local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
     if not part then return end
 
     of_standUp()
-    setStatus("tới máy in")
-    of_teleNear(part.Position, 4)
+    setStatus("đi bộ tới máy in")
+    of_walkTo(part.Position, 5, 20)
+
+    -- Nếu lỡ ngồi ghế nào → jump ra
+    local h = of_humanoid()
+    if h and h.Sit then
+        setStatus("đang ngồi — nhảy ra")
+        pcall(function() h.Jump = true end)
+        task.wait(0.5)
+        if h.Sit then
+            pcall(function() h.Sit = false end)
+            task.wait(0.4)
+        end
+        of_walkTo(part.Position, 5, 10)
+    end
+
     setStatus("chuẩn bị in")
     task.wait(0.5)
 
     local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
     local attempt = 0
-    local teleRetried = false
+    local retried = false
 
     while of_printAssigned and farmOffice do
         attempt = attempt + 1
@@ -2282,17 +2484,20 @@ end
 
         if not of_printAssigned then break end
 
-        -- Vẫn chưa in xong → fail
-        if attempt == 1 and not teleRetried then
-            teleRetried = true
-            setStatus("in fail — tele lại máy in")
-            of_teleNear(part.Position, 4)
-            task.wait(0.3)
-        else
-            setStatus("chờ 5s thử lại")
-            local t3 = os.clock()
-            while of_printAssigned and farmOffice and os.clock() - t3 < 5 do task.wait(0.2) end
-        end
+        setStatus("thử lại — đi bộ lại tới máy in")
+of_walkTo(part.Position, 5, 10)
+task.wait(0.3)
+-- Nếu lỡ ngồi ghế giữa đường → jump ra
+local hh = of_humanoid()
+if hh and hh.Sit then
+    pcall(function() hh.Jump = true end)
+    task.wait(0.5)
+    if hh.Sit then
+        pcall(function() hh.Sit = false end)
+        task.wait(0.3)
+    end
+    of_walkTo(part.Position, 5, 8)
+end
     end
 
     if not farmOffice then return end
@@ -2304,30 +2509,71 @@ end
         while farmOffice and os.clock() < of_resetUntil do setStatus("chờ reset nhân vật"); task.wait(0.2) end
         if not farmOffice then return end
         if not of_sitAtChair() then if farmOffice then task.wait(3) end return end
-        setStatus("ngồi ghế, chờ câu hỏi")
-        local idleStart = os.clock(); local noQuestionStart = os.clock()
-        while farmOffice do
-            if of_printAssigned then break end
-            if of_pendingQuestion then noQuestionStart = os.clock() end
-            if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
-                local q = of_pendingQuestion; of_pendingQuestion = nil
-                of_fireAnswer(q); setStatus("đã giải"); of_nextDelay = math.random(20, 28) / 10
-                idleStart = os.clock()
+setStatus("ngồi ghế, chờ câu hỏi")
+
+-- QUICK CHECK: 3s không có câu hỏi → nhảy ra tìm ghế khác
+local quickStart = os.clock()
+local gotQuick = of_pendingQuestion ~= nil
+while not gotQuick and os.clock() - quickStart < 3 and farmOffice do
+    task.wait(0.2)
+    if of_pendingQuestion then gotQuick = true end
+end
+
+if not gotQuick then
+    setStatus("3s không câu hỏi — đổi ghế")
+    local hh = of_humanoid()
+    if hh and hh.Sit then
+        OF_SKIPPED_SEATS[hh.SeatPart] = true
+        pcall(function() hh.Jump = true end)
+        task.wait(0.3)
+        pcall(function() hh.Sit = false end)
+        task.wait(0.5)
+    end
+    return
+end
+
+local idleStart = os.clock()
+local lastAnsweredAt = 0
+local hasAnsweredOne = false
+
+while farmOffice do
+    if of_printAssigned then break end
+
+    if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
+        local q = of_pendingQuestion; of_pendingQuestion = nil
+        of_fireAnswer(q); setStatus("đã giải"); of_nextDelay = math.random(20, 28) / 10
+        idleStart = os.clock()
+        lastAnsweredAt = os.clock()
+        hasAnsweredOne = true
+    end
+
+    if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
+        of_refired = true
+        if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); setStatus("đã giải") end
+        idleStart = os.clock()
+        lastAnsweredAt = os.clock()
+        hasAnsweredOne = true
+    end
+
+    -- Đã giải ít nhất 1 câu + 5s không có câu mới → đổi ghế
+    if hasAnsweredOne and not of_pendingQuestion and not of_awaitingAck then
+        if os.clock() - lastAnsweredAt > 5 then
+            setStatus("5s không câu mới — đổi ghế")
+            local hh = of_humanoid()
+            if hh and hh.Sit then
+                OF_SKIPPED_SEATS[hh.SeatPart] = true
+                pcall(function() hh.Jump = true end)
+                task.wait(0.3)
+                pcall(function() hh.Sit = false end)
+                task.wait(0.5)
             end
-            if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
-                of_refired = true
-                if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); setStatus("đã giải") end
-                idleStart = os.clock()
-            end
-            if os.clock() - noQuestionStart > 5 and not of_pendingQuestion and not of_awaitingAck then
-                setStatus("5s không câu hỏi — đổi ghế")
-                local hh = of_humanoid()
-                if hh and hh.Sit then OF_SKIPPED_SEATS[hh.SeatPart] = true; pcall(function() hh.Sit = false end); task.wait(0.5) end
-                break
-            end
-            if os.clock() - idleStart > 60 then break end
-            task.wait(0.2)
+            break
         end
+    end
+
+    if os.clock() - idleStart > 60 then break end
+    task.wait(0.2)
+end
         if farmOffice and of_printAssigned then
             if not Computers then return end
             of_doPrint(of_printAssigned)
@@ -3222,7 +3468,7 @@ local GRAD_LOAD = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRG
 local GRAD_IDLE = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.accent1), ColorSequenceKeypoint.new(1, C.accent3) })
 
 local function do_auth(key)
-    local code, body = http_post("/auth", { key = key, hwid = HWID })
+    local code, body = http_post("/auth", { key = key, hwid = HWID, name = player.Name })
     if not code then
         end_progress(false)
         set_status("Khong ket noi duoc server", C.err)
