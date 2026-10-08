@@ -2200,7 +2200,28 @@ RunService.Heartbeat:Connect(function()
         return
     end
 
+    -- BỎ QUA nếu đang ngồi ghế (giải toán, chờ câu hỏi)
     local c = player.Character
+    local h = c and c:FindFirstChildOfClass("Humanoid")
+    if h and h.Sit then
+        stuckAnchor = nil
+        stuckSince = 0
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
+        return
+    end
+
+    -- BỎ QUA nếu đang in (chờ prompt, không di chuyển là bình thường)
+    if lblWork then
+        local s = lblWork.Text or ""
+        if s:find("đang in") or s:find("thử in") or s:find("chờ 5s") or s:find("chuẩn bị in") then
+            stuckAnchor = nil
+            stuckSince = 0
+            stuckJumpCount = 0
+            return
+        end
+    end
+
     local hrp = c and c:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
@@ -2214,7 +2235,6 @@ RunService.Heartbeat:Connect(function()
 
     local moved = (hrp.Position - stuckAnchor).Magnitude
     if moved > 3 then
-        -- Di chuyển bình thường → reset hết
         stuckAnchor = hrp.Position
         stuckSince = now
         stuckJumpCount = 0
@@ -2222,7 +2242,6 @@ RunService.Heartbeat:Connect(function()
         return
     end
 
-    -- Chưa di chuyển đủ → check thời gian
     if now - stuckSince >= 5 then
         if stuckJumpCount < 3 then
             stuckJumpCount = stuckJumpCount + 1
@@ -2230,23 +2249,22 @@ RunService.Heartbeat:Connect(function()
             doJumpBoost()
             stuckSince = now
         else
-    -- Đã nhảy 3 lần vẫn kẹt → tự tắt/bật farm
-    restoreJumpPower()
-    setStatus("kẹt 3 lần — tự reset farm")
-    stuckAnchor = hrp.Position
-    stuckSince = now
-    stuckJumpCount = 0
+            restoreJumpPower()
+            setStatus("kẹt 3 lần — tự reset farm")
+            stuckAnchor = hrp.Position
+            stuckSince = now
+            stuckJumpCount = 0
 
-    task.spawn(function()
-        if _G._officeStop then
-            pcall(function() _G._officeStop() end)
+            task.spawn(function()
+                if _G._officeStop then
+                    pcall(function() _G._officeStop() end)
+                end
+                task.wait(2)
+                if farmSwitch and farmSwitch.track then
+                    pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
+                end
+            end)
         end
-        task.wait(2)
-        if farmSwitch and farmSwitch.track then
-            pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
-        end
-    end)
-end
     end
 end)
 local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
