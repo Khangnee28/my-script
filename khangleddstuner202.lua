@@ -2363,16 +2363,44 @@ local function of_sitAtChair()
     local h = of_humanoid()
     if h and h.Sit then return true end
     local hrp = of_root(); if not hrp then return false end
-
-    if not of_initialTeleDone then
-        local dist = (hrp.Position - CHAIR_POS).Magnitude
-        if dist > 500 then
-            setStatus("tele lần đầu tới office")
-            hrp.CFrame = CFrame.new(CHAIR_POS)
-            task.wait(1.5)
-        end
-        of_initialTeleDone = true
+if not of_initialTeleDone then
+    local dist = (hrp.Position - CHAIR_POS).Magnitude
+    if dist > 500 then
+        setStatus("tele lần đầu tới office")
+        hrp.CFrame = CFrame.new(CHAIR_POS)
+        task.wait(1.5)
     end
+    of_initialTeleDone = true
+
+    -- Ngồi ghế ngay tại chỗ tele — không tìm kiếm
+    local hrp2 = of_root()
+    if hrp2 then
+        local ok, parts = pcall(function()
+            return workspace:GetPartBoundsInRadius(hrp2.Position, 30)
+        end)
+        if ok and parts then
+            for _, p in ipairs(parts) do
+                if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil then
+                    setStatus("ngồi ghế tại chỗ")
+                    local h2 = of_humanoid()
+                    if h2 then
+                        pcall(function()
+                            hrp2.CFrame = CFrame.new(p.Position + Vector3.new(0, 2, 0))
+                        end)
+                        task.wait(0.8)
+                        h2 = of_humanoid()
+                        if h2 and h2.Sit then
+                            return true
+                        end
+                    end
+                    break
+                end
+            end
+        end
+    end
+    -- Không có ghế tại chỗ → rơi xuống flow bình thường
+    setStatus("không có ghế tại chỗ — tìm ghế")
+end
 
     h = of_humanoid(); if h and h.Sit then return true end
 
