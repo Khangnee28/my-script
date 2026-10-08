@@ -2145,51 +2145,110 @@ do
         return nil
     end
     local function of_root() local c = player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
--- Anti-stuck: kẹt 3s → boost nhảy cao
-local antiStuckAnchor = nil
-local antiStuckLastCheck = 0
-local antiStuckOrigJump = nil
+-- Anti-stuck: đứng im 5s → jump boost nhẹ, tối đa 3 lần liên tiếp
+local stuckAnchor = nil
+local stuckSince = 0
+local stuckJumpCount = 0
+local origJumpPower = nil
+local origUseJumpPower = nil
+local jumpBoostActive = false
+
+local function getHumanoidSafe()
+    local c = player.Character
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function restoreJumpPower()
+    local h = getHumanoidSafe()
+    if h and origJumpPower then
+        pcall(function()
+            if origUseJumpPower ~= nil then h.UseJumpPower = origUseJumpPower end
+            h.JumpPower = origJumpPower
+        end)
+    end
+    jumpBoostActive = false
+end
+
+local function doJumpBoost()
+    local h = getHumanoidSafe()
+    if not h then return end
+    if not origJumpPower then
+        origJumpPower = h.JumpPower or 50
+        origUseJumpPower = h.UseJumpPower
+    end
+    jumpBoostActive = true
+    pcall(function()
+        h.UseJumpPower = true
+        h.JumpPower = (origJumpPower or 50) + 10
+        h.Jump = true
+    end)
+    -- Sau 1 giây trả jump về bình thường
+    task.delay(1, function()
+        local h2 = getHumanoidSafe()
+        if h2 and origJumpPower then
+            pcall(function() h2.JumpPower = origJumpPower end)
+        end
+    end)
+end
+
 RunService.Heartbeat:Connect(function()
     if not farmOffice then
-        antiStuckAnchor = nil
-        antiStuckLastCheck = 0
+        stuckAnchor = nil
+        stuckSince = 0
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
         return
     end
+
     local c = player.Character
     local hrp = c and c:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
     local now = os.clock()
-    if antiStuckLastCheck == 0 then
-        antiStuckAnchor = hrp.Position
-        antiStuckLastCheck = now
+    if not stuckAnchor then
+        stuckAnchor = hrp.Position
+        stuckSince = now
+        stuckJumpCount = 0
         return
     end
 
-    if now - antiStuckLastCheck > 3 then
-        local moved = (hrp.Position - antiStuckAnchor).Magnitude
-        if moved < 3 then
-            local h = c:FindFirstChildOfClass("Humanoid")
-            if h then
-                if not antiStuckOrigJump then
-                    antiStuckOrigJump = h.JumpPower or 50
-                end
-                pcall(function()
-                    h.UseJumpPower = true
-                    h.JumpPower = 150
-                    h.Jump = true
-                end)
-                task.delay(2, function()
-                    if h and h.Parent and antiStuckOrigJump then
-                        pcall(function() h.JumpPower = antiStuckOrigJump end)
-                    end
-                end)
-            end
-        end
-        antiStuckAnchor = hrp.Position
-        antiStuckLastCheck = now
+    local moved = (hrp.Position - stuckAnchor).Magnitude
+    if moved > 3 then
+        -- Di chuyển bình thường → reset hết
+        stuckAnchor = hrp.Position
+        stuckSince = now
+        stuckJumpCount = 0
+        if jumpBoostActive then restoreJumpPower() end
+        return
     end
-end)    
+
+    -- Chưa di chuyển đủ → check thời gian
+    if now - stuckSince >= 5 then
+        if stuckJumpCount < 3 then
+            stuckJumpCount = stuckJumpCount + 1
+            setStatus("kẹt — nhảy lần " .. stuckJumpCount)
+            doJumpBoost()
+            stuckSince = now
+        else
+    -- Đã nhảy 3 lần vẫn kẹt → tự tắt/bật farm
+    restoreJumpPower()
+    setStatus("kẹt 3 lần — tự reset farm")
+    stuckAnchor = hrp.Position
+    stuckSince = now
+    stuckJumpCount = 0
+
+    task.spawn(function()
+        if _G._officeStop then
+            pcall(function() _G._officeStop() end)
+        end
+        task.wait(2)
+        if farmSwitch and farmSwitch.track then
+            pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
+        end
+    end)
+end
+    end
+end)
 local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
     local function of_standUp()
         local h = of_humanoid(); if not h then return end
