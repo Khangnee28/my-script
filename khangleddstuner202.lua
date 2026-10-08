@@ -2179,7 +2179,7 @@ local function doJumpBoost()
     jumpBoostActive = true
     pcall(function()
         h.UseJumpPower = true
-        h.JumpPower = (origJumpPower or 50) + 25
+        h.JumpPower = (origJumpPower or 50) + 12
         -- ChangeState bắt buộc nhảy — Jump = true không hoạt động khi đứng yên
         h:ChangeState(Enum.HumanoidStateType.Jumping)
     end)
@@ -2353,7 +2353,7 @@ local function of_humanoid() local c = player.Character; return c and c:FindFirs
     end)
     local h = of_humanoid()
     local hrp = of_root()
-    if h and hrp then
+    if h and hrp and not h.Sit then
         pcall(function() h:MoveTo(hrp.Position) end)
     end
     return reached
@@ -2406,27 +2406,30 @@ end
         tried[seat] = true
         setStatus("đi bộ tới ghế")
 
-        of_walkTo(seat.Position, 3, 12)
-        task.wait(0.3)
+        of_walkTo(seat.Position, 4, 12)
+task.wait(1)  -- chờ game settle, đủ để auto-sit kích hoạt
 
-        h = of_humanoid()
-        if h and h.Sit then return true end
+h = of_humanoid()
+if h and h.Sit then return true end
+if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
 
-        hrp = of_root()
-        if hrp and h then
-            local dir = seat.Position - hrp.Position
-            dir = Vector3.new(dir.X, 0, dir.Z)
-            if dir.Magnitude > 0.1 then
-                dir = dir.Unit
-                pcall(function()
-                    hrp.CFrame = CFrame.new(seat.Position - dir * 1.2)
-                end)
-                task.wait(0.6)
-            end
-        end
+-- Chỉ đẩy CFrame nếu THỰC SỰ còn cách xa ghế (> 3 stud)
+hrp = of_root()
+if hrp and h then
+    local dir = seat.Position - hrp.Position
+    dir = Vector3.new(dir.X, 0, dir.Z)
+    if dir.Magnitude > 3 then
+        dir = dir.Unit
+        pcall(function()
+            hrp.CFrame = CFrame.new(seat.Position - dir * 1.5)
+        end)
+        task.wait(0.8)
+    end
+end
 
-        h = of_humanoid()
-        if h and h.Sit then return true end
+h = of_humanoid()
+if h and h.Sit then return true end
+if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
     end
     return false
 end
