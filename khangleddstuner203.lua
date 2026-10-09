@@ -116,38 +116,28 @@ do
     local vu = game:GetService("VirtualUser")
     local lp = game:GetService("Players").LocalPlayer
 
-    -- Cách 1: bắt Idled → claim controller + click giả
+    -- Lớp chính: bắt sự kiện Idled — Roblox fire khi sắp kick
+    -- ClickButton2 = chuột phải ảo, KHÔNG gây nhảy, KHÔNG ảnh hưởng nhân vật
     lp.Idled:Connect(function()
         if not antiAfk then return end
         pcall(function()
             vu:CaptureController()
             vu:ClickButton2(Vector2.new(0, 0))
+            task.wait(0.5)
+            vu:ReleaseController()
         end)
     end)
 
-    -- Cách 2: gửi key event mỗi 4 phút (dự phòng)
+    -- Dự phòng: xoay camera cực nhẹ mỗi 4 phút — không nhìn thấy, không gây nhảy
     task.spawn(function()
         while true do
             task.wait(240)
             if antiAfk then
                 pcall(function()
-                    local vim = game:GetService("VirtualInputManager")
-                    vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                    task.wait(0.1)
-                    vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                end)
-            end
-        end
-    end)
-
-    -- Cách 3: reset camera CFrame mỗi 3 phút (dự phòng 2)
-    task.spawn(function()
-        while true do
-            task.wait(180)
-            if antiAfk then
-                pcall(function()
                     local cam = workspace.CurrentCamera
-                    if cam then cam.CFrame = cam.CFrame end
+                    if cam then
+                        cam.CFrame = cam.CFrame * CFrame.Angles(0, 0.0001, 0)
+                    end
                 end)
             end
         end
