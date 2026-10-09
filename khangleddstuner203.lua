@@ -117,17 +117,20 @@ local antiAfk, optFPS = true, false
 do
     local vu = game:GetService("VirtualUser")
     local lp = game:GetService("Players").LocalPlayer
-    local cam = workspace.CurrentCamera
+    
 
     -- Cách 1: bắt sự kiện Idled — Roblox gọi khi sắp kick
     lp.Idled:Connect(function()
-        if not antiAfk then return end
-        pcall(function()
+    if not antiAfk then return end
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
             vu:Button2Down(Vector2.new(0, 0), cam.CFrame)
             task.wait(1)
             vu:Button2Up(Vector2.new(0, 0), cam.CFrame)
-        end)
+        end
     end)
+end)
 
     -- Cách 2: gửi key event mỗi 5 phút (chủ động hơn)
     task.spawn(function()
