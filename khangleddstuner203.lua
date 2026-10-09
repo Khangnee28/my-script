@@ -113,6 +113,37 @@ local ofAnswers, ofPrints = 0, 0
 local activeMode, farmStart = nil, 0
 local antiAfk, optFPS = true, false
 
+-- ANTI-AFK THỰC SỰ
+do
+    local vu = game:GetService("VirtualUser")
+    local lp = game:GetService("Players").LocalPlayer
+    local cam = workspace.CurrentCamera
+
+    -- Cách 1: bắt sự kiện Idled — Roblox gọi khi sắp kick
+    lp.Idled:Connect(function()
+        if not antiAfk then return end
+        pcall(function()
+            vu:Button2Down(Vector2.new(0, 0), cam.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0, 0), cam.CFrame)
+        end)
+    end)
+
+    -- Cách 2: gửi key event mỗi 5 phút (chủ động hơn)
+    task.spawn(function()
+        while true do
+            task.wait(300)
+            if antiAfk then
+                pcall(function()
+                    local vim = game:GetService("VirtualInputManager")
+                    vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                    task.wait(0.1)
+                    vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+                end)
+            end
+        end
+    end)
+end
 _G._officeStop = nil
 
 local function makeFloatBtn(icon, color, yPos)
@@ -2793,28 +2824,51 @@ task.spawn(function()
 
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
     print("[Rejoin] Computers:", workspace:FindFirstChild("Computers") ~= nil)
+-- Bat farm neu co flag + verify 2 phút
+local officeFlag = false
+if readfile and isfile and isfile("farmState.txt") then
+    local ok, v = pcall(readfile, "farmState.txt")
+    if ok and v == "1" then officeFlag = true end
+end
 
-    -- Bat farm neu co flag
-    local officeFlag = false
-    if readfile and isfile and isfile("farmState.txt") then
-        local ok, v = pcall(readfile, "farmState.txt")
-        if ok and v == "1" then officeFlag = true end
+if officeFlag then
+    for _ = 1, 60 do
+        if workspace:FindFirstChild("Computers") then break end
+        task.wait(1)
     end
+    task.wait(3)
 
-    if officeFlag then
-        for _ = 1, 60 do
-            if workspace:FindFirstChild("Computers") then break end
-            task.wait(1)
-        end
-        task.wait(3)
+    -- Thử bật farm 3 lần
+    for attempt = 1, 3 do
         pcall(function()
             if farmSwitch and farmSwitch.track and not farmOffice then
                 firesignal(farmSwitch.track.MouseButton1Click)
             end
         end)
-        print("[Rejoin] farm toggled")
+        task.wait(3)
+        if farmOffice then break end
     end
 
+    -- Chờ tối đa 2 phút xác nhận farm chạy
+    local deadline = os.clock() + 120
+    while os.clock() < deadline do
+        task.wait(3)
+        if farmOffice then break end
+    end
+
+    if farmOffice then
+        print("[Rejoin] farm OK")
+    else
+        warn("[Rejoin] farm không chạy sau 2 phút — force rejoin")
+        if writefile then pcall(writefile, "lastRejoin.txt", tostring(os.time())) end
+        if queue_on_teleport then
+            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+        end
+        task.wait(2)
+        pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
+        return
+    end
+end
     -- Auto restore AFK mode
     local afkFlag = false
     if readfile and isfile and isfile("afkMode.txt") then
