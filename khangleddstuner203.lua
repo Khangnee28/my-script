@@ -9,6 +9,7 @@ local HEARTBEAT_INTERVAL = 60
 
 local BRAND_NAME = "Khang Lê DDS"
 local BRAND_SUB  = "@khangdayy215"
+local LOCAL_PACKAGE = "full"
 
 -- ============================================================
 -- PAYLOAD — DÁN SCRIPT HUB VÀO ĐÂY
@@ -3518,6 +3519,7 @@ local function do_auth(key)
         hwid = HWID,
         name = player.Name,
         device = devInfo,
+        package = LOCAL_PACKAGE,
     })
     if not code then
         end_progress(false)
@@ -3544,6 +3546,7 @@ local function do_auth(key)
             elseif d == "key revoked" then msg = "Key đã bị thu hồi"
             elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
             else msg = d end
+            elseif d:find("key chỉ dùng cho") then msg = d
         end
         end_progress(false)
         set_status(msg, C.err)
