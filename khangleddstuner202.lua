@@ -91,6 +91,40 @@ local bodyOpenBtn, fcOpenBtn
 local perfOn, perfLocked = false, false
 local antiAfk = true
 local optFPS = false
+-- ANTI-AFK THỰC SỰ
+do
+    local vu = game:GetService("VirtualUser")
+    local lp = game:GetService("Players").LocalPlayer
+    
+
+    -- Cách 1: bắt sự kiện Idled — Roblox gọi khi sắp kick
+    lp.Idled:Connect(function()
+    if not antiAfk then return end
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
+            vu:Button2Down(Vector2.new(0, 0), cam.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0, 0), cam.CFrame)
+        end
+    end)
+end)
+
+    -- Cách 2: gửi key event mỗi 5 phút (chủ động hơn)
+    task.spawn(function()
+        while true do
+            task.wait(300)
+            if antiAfk then
+                pcall(function()
+                    local vim = game:GetService("VirtualInputManager")
+                    vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                    task.wait(0.1)
+                    vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+                end)
+            end
+        end
+    end)
+end
 
 local function makeFloatBtn(icon, color, yPos)
     local b = Instance.new("TextButton")
