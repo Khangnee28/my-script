@@ -9,6 +9,7 @@ local HEARTBEAT_INTERVAL = 60
 
 local BRAND_NAME = "Khang Lê DDS"
 local BRAND_SUB  = "@khangdayy215"
+local LOCAL_PACKAGE = "freecam"
 
 -- ============================================================
 -- PAYLOAD
@@ -2152,10 +2153,11 @@ local GRAD_IDLE = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.accent1), C
 
 local function do_auth(key)
     local code, body = http_post("/auth", {
-        key = key,
-        hwid = HWID,
-        name = player.Name,
-    })
+    key = key,
+    hwid = HWID,
+    name = player.Name,
+    package = LOCAL_PACKAGE,
+})
     if not code then
         set_status("Khong ket noi duoc server", C.err)
         set_btn("KÍCH HOẠT", GRAD_IDLE)
@@ -2179,6 +2181,7 @@ local function do_auth(key)
             elseif d == "key revoked" then msg = "Key đã bị thu hồi"
             elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
             else msg = d end
+elseif d:find("key chỉ dùng cho") then msg = d
         end
         set_status(msg, C.err)
         set_btn("KÍCH HOẠT", GRAD_IDLE)
