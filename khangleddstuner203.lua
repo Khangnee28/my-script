@@ -112,36 +112,42 @@ local farmOffice = false
 local ofAnswers, ofPrints = 0, 0
 local activeMode, farmStart = nil, 0
 local antiAfk, optFPS = true, false
-
--- ANTI-AFK THỰC SỰ
 do
     local vu = game:GetService("VirtualUser")
     local lp = game:GetService("Players").LocalPlayer
-    
 
-    -- Cách 1: bắt sự kiện Idled — Roblox gọi khi sắp kick
+    -- Cách 1: bắt Idled → claim controller + click giả
     lp.Idled:Connect(function()
-    if not antiAfk then return end
-    pcall(function()
-        local cam = workspace.CurrentCamera
-        if cam then
-            vu:Button2Down(Vector2.new(0, 0), cam.CFrame)
-            task.wait(1)
-            vu:Button2Up(Vector2.new(0, 0), cam.CFrame)
-        end
+        if not antiAfk then return end
+        pcall(function()
+            vu:CaptureController()
+            vu:ClickButton2(Vector2.new(0, 0))
+        end)
     end)
-end)
 
-    -- Cách 2: gửi key event mỗi 5 phút (chủ động hơn)
+    -- Cách 2: gửi key event mỗi 4 phút (dự phòng)
     task.spawn(function()
         while true do
-            task.wait(300)
+            task.wait(240)
             if antiAfk then
                 pcall(function()
                     local vim = game:GetService("VirtualInputManager")
                     vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
                     task.wait(0.1)
                     vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+                end)
+            end
+        end
+    end)
+
+    -- Cách 3: reset camera CFrame mỗi 3 phút (dự phòng 2)
+    task.spawn(function()
+        while true do
+            task.wait(180)
+            if antiAfk then
+                pcall(function()
+                    local cam = workspace.CurrentCamera
+                    if cam then cam.CFrame = cam.CFrame end
                 end)
             end
         end
@@ -2827,7 +2833,7 @@ task.spawn(function()
 
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
     print("[Rejoin] Computers:", workspace:FindFirstChild("Computers") ~= nil)
--- Bat farm neu co flag + verify 2 phút
+-- Bat farm neu co flag
 local officeFlag = false
 if readfile and isfile and isfile("farmState.txt") then
     local ok, v = pcall(readfile, "farmState.txt")
@@ -2835,25 +2841,23 @@ if readfile and isfile and isfile("farmState.txt") then
 end
 
 if officeFlag then
-    for _ = 1, 60 do
+    -- Đợi game vào hẳn (Computers xuất hiện)
+    for _ = 1, 90 do
         if workspace:FindFirstChild("Computers") then break end
         task.wait(1)
     end
     task.wait(3)
 
-    -- Thử bật farm 3 lần
-    for attempt = 1, 3 do
-        pcall(function()
-            if farmSwitch and farmSwitch.track and not farmOffice then
-                firesignal(farmSwitch.track.MouseButton1Click)
-            end
-        end)
-        task.wait(3)
-        if farmOffice then break end
-    end
+    -- Bấm farm 1 LẦN duy nhất
+    pcall(function()
+        if farmSwitch and farmSwitch.track and not farmOffice then
+            firesignal(farmSwitch.track.MouseButton1Click)
+        end
+    end)
+    print("[Rejoin] farm bấm 1 lần")
 
-    -- Chờ tối đa 2 phút xác nhận farm chạy
-    local deadline = os.clock() + 120
+    -- Chờ tối đa 3 phút xác nhận farm chạy
+    local deadline = os.clock() + 180
     while os.clock() < deadline do
         task.wait(3)
         if farmOffice then break end
@@ -2862,7 +2866,7 @@ if officeFlag then
     if farmOffice then
         print("[Rejoin] farm OK")
     else
-        warn("[Rejoin] farm không chạy sau 2 phút — force rejoin")
+        warn("[Rejoin] farm không chạy sau 3 phút — rejoin lại")
         if writefile then pcall(writefile, "lastRejoin.txt", tostring(os.time())) end
         if queue_on_teleport then
             pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
