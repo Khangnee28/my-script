@@ -1,7 +1,7 @@
--- language: Lua, file: keyauth_client.lua
+-- language: Lua, file: khangfreecam.lua
 -- target: Roblox executor (Delta mobile / Synapse / Wave / Solara)
 -- branding: Khang Lê DDS · tiktok @khangdayy215
--- version: premium UI
+-- package: FREECAM (chỉ freecam + tháo dàn áo)
 
 local API_URL   = "https://spring-poetry-2831.letrongkhang098.workers.dev"
 local TOKEN_FILE = "keyauth_token.json"
@@ -11,28 +11,19 @@ local BRAND_NAME = "Khang Lê DDS"
 local BRAND_SUB  = "@khangdayy215"
 
 -- ============================================================
--- PAYLOAD — DÁN SCRIPT HUB VÀO ĐÂY
--- Xóa dòng print bên dưới, dán toàn bộ script hub Khangle DDS v26 vào
--- ====local function of_doPrint(name)========================================================
+-- PAYLOAD
+-- ============================================================
 local function PAYLOAD()
-    -- ============================================================
--- KHANGLE DDS HUB v26 — OFFICE ONLY
--- ===controlFrame.Visible = false=====================================================================================================================
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StatsService = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local player = LocalPlayer
 local camera = workspace.CurrentCamera
-
-local function checkFarmOK() return workspace:FindFirstChild("Computers") ~= nil end
-
-
 
 local parent = nil
 pcall(function() parent = gethui and gethui() or CoreGui end)
@@ -94,25 +85,11 @@ local function addRGBStroke(btn)
 end
 
 local ControlPanel, freecamMenuFrame, hideFloatBtn
-local HubFrame, hubClose, hubHeader, hubStroke, statPanel
-local farmSwitch, farmNote
+local HubFrame, hubClose, hubHeader, hubStroke
 local bodyOpenBtn, fcOpenBtn
-local ToggleFloatMenuBtn
-local lblStat1, lblStat2, lblTime, lblWork, lblRPNow, lblRPEarned
-local farmRPStart = 0
-local lastRPValue = 0
-local afkActive = false
-local afkStartTime = 0
-local afkRPStart = 0
-local afkOverlay, afkTimeLbl, afkRPNowLbl, afkRPEarnedLbl
-local AFK_FPS = 15
-local showAutoTFloat = false
-local farmOffice = false
-local ofAnswers, ofPrints = 0, 0
-local activeMode, farmStart = nil, 0
-local antiAfk, optFPS = true, false
-
-_G._officeStop = nil
+local perfOn, perfLocked = false, false
+local antiAfk = true
+local optFPS = false
 
 local function makeFloatBtn(icon, color, yPos)
     local b = Instance.new("TextButton")
@@ -125,9 +102,8 @@ local function makeFloatBtn(icon, color, yPos)
 end
 
 local ToggleBtn = makeFloatBtn("👑", themeColor, 0.4)
-local AutoTFloatingBtn = makeFloatBtn("🕹️", Color3.fromRGB(255, 100, 0), 0.53); AutoTFloatingBtn.Visible = false
-local BodyManagerFloatingBtn = makeFloatBtn("🚗", Color3.fromRGB(0, 230, 180), 0.66); BodyManagerFloatingBtn.Visible = false
-local FreecamFloatingBtn = makeFloatBtn("📷", Color3.fromRGB(255, 255, 255), 0.79); FreecamFloatingBtn.Visible = false
+local BodyManagerFloatingBtn = makeFloatBtn("🚗", Color3.fromRGB(0, 230, 180), 0.53); BodyManagerFloatingBtn.Visible = false
+local FreecamFloatingBtn = makeFloatBtn("📷", Color3.fromRGB(255, 255, 255), 0.66); FreecamFloatingBtn.Visible = false
 
 task.spawn(function()
     local t = 0
@@ -147,148 +123,6 @@ task.spawn(function()
     end
 end)
 
-do
-    statPanel = Instance.new("Frame")
-    statPanel.Size = UDim2.new(0, 250, 0, 165)
-    statPanel.Position = UDim2.new(0, 76, 0.5, 20)
-    statPanel.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-    statPanel.BackgroundTransparency = 0.15
-    statPanel.BorderSizePixel = 0
-    statPanel.Active = true; statPanel.Draggable = true
-    statPanel.Visible = false; statPanel.ZIndex = 9
-    statPanel.Parent = ScreenGui
-    Instance.new("UICorner", statPanel).CornerRadius = UDim.new(0, 10)
-    local so = Instance.new("UIStroke", statPanel)
-    so.Name = "RainbowBorder"; so.Thickness = 2
-    so.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; so.Color = rainbowAt(0)
-    task.spawn(function()
-        local t = 0
-        while true do task.wait(0.03); t = t + 0.15
-            if so and so.Parent then so.Color = rainbowAt(t) end
-        end
-    end)
-    local t1 = Instance.new("TextLabel", statPanel)
-    t1.Size = UDim2.new(1, -20, 0, 24); t1.Position = UDim2.new(0, 10, 0, 4)
-    t1.BackgroundTransparency = 1; t1.Text = "🌾 Office Status"
-    t1.TextColor3 = Color3.fromRGB(255, 140, 40); t1.TextSize = 13
-    t1.Font = Enum.Font.GothamBold; t1.TextXAlignment = Enum.TextXAlignment.Left; t1.ZIndex = 10
-    local function sl(y)
-        local l = Instance.new("TextLabel", statPanel)
-        l.Size = UDim2.new(1, -20, 0, 18); l.Position = UDim2.new(0, 10, 0, y)
-        l.BackgroundTransparency = 1; l.Text = ""
-        l.TextColor3 = Color3.fromRGB(200, 220, 240); l.TextSize = 11
-        l.Font = Enum.Font.GothamMedium; l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextTruncate = Enum.TextTruncate.AtEnd; l.ZIndex = 10
-        return l
-    end
-    lblStat1 = sl(32); lblStat2 = sl(50); lblTime = sl(68)
-lblRPNow = sl(90)
-lblRPNow.TextColor3 = Color3.fromRGB(120, 220, 255)
-lblRPEarned = sl(108)
-lblRPEarned.TextColor3 = Color3.fromRGB(0, 255, 120)
-lblWork = sl(130)
-lblWork.TextColor3 = Color3.fromRGB(255, 200, 80)
-end
-
-local function setStatus(t) if lblWork then lblWork.Text = "📍 " .. t end end
-local function fmtTime(s)
-    s = math.floor(s)
-    local h = math.floor(s / 3600); local m = math.floor((s % 3600) / 60); local sec = s % 60
-    if h > 0 then return string.format("%d:%02d:%02d", h, m, sec) end
-    return string.format("%02d:%02d", m, sec)
-end
-local function refreshStatPanel()
-    if activeMode == "office" then
-        lblStat1.Text = "🧮 Lượt giải: " .. ofAnswers
-        lblStat2.Text = "🖨️ Lượt in: " .. ofPrints
-    end
-end
-local function getRP()
-    local pd = game.Players.LocalPlayer:FindFirstChild("PlayerData")
-    local rp = pd and pd:FindFirstChild("RPValue")
-    return rp and rp.Value or nil
-end
-
-local function fmtRP(n)
-    if not n then return "--" end
-    if n >= 1e9 then return string.format("%.2fB", n / 1e9)
-    elseif n >= 1e6 then return string.format("%.2fM", n / 1e6)
-    elseif n >= 1e3 then return string.format("%.1fK", n / 1e3)
-    else return tostring(math.floor(n)) end
-end
-
-local rpPopupActive = nil
-
-
-local _popupTS = nil
-local function spawnRPPopup(delta)
-    if not statPanel or not statPanel.Parent or not lblRPEarned then return end
-    if not _popupTS then _popupTS = game:GetService("TextService") end
-
-    local textW = 200
-    pcall(function()
-        local sz = _popupTS:GetTextSize(
-            lblRPEarned.Text,
-            lblRPEarned.TextSize,
-            lblRPEarned.Font,
-            Vector2.new(1000, 20)
-        )
-        textW = sz.X
-    end)
-
-    local startX = 10 + textW + 6
-
-    local popup = Instance.new("TextLabel", statPanel)
-    popup.Size = UDim2.new(0, 120, 0, 18)
-    popup.Position = UDim2.new(0, startX, 0, 108)
-    popup.BackgroundTransparency = 1
-    popup.Text = "+" .. fmtRP(delta)
-    popup.TextColor3 = Color3.fromRGB(0, 255, 120)
-    popup.TextSize = lblRPEarned.TextSize - 1
-    popup.Font = lblRPEarned.Font
-    popup.TextXAlignment = Enum.TextXAlignment.Left
-    popup.TextStrokeTransparency = 0.4
-    popup.TextStrokeColor3 = Color3.fromRGB(0, 60, 0)
-    popup.ZIndex = 20
-
-    task.spawn(function()
-        local dur = 1.2
-        local t0 = os.clock()
-        while popup and popup.Parent do
-            local t = math.min((os.clock() - t0) / dur, 1)
-            local ease = t * t
-            popup.Position = UDim2.new(0, startX, 0, 108 - 14 * ease)
-            popup.TextTransparency = ease
-            popup.TextStrokeTransparency = 0.4 + 0.6 * ease
-            if t >= 1 then break end
-            task.wait(0.03)
-        end
-        if popup then popup:Destroy() end
-    end)
-end
-task.spawn(function()
-    while true do
-        task.wait(0.5)
-        local ok, err = pcall(function()
-            if activeMode == "office" and farmStart > 0 then
-                if lblTime then lblTime.Text = "⏱ Thời gian: " .. fmtTime(os.clock() - farmStart) end
-                local rp = getRP()
-                if rp then
-                    if lblRPNow then lblRPNow.Text = "💰 Hiện tại: " .. fmtRP(rp) end
-                    local earned = rp - farmRPStart
-                    if lblRPEarned then lblRPEarned.Text = "📈 Farm được: +" .. fmtRP(earned) end
-                    if lastRPValue > 0 and rp > lastRPValue then
-                        pcall(spawnRPPopup, rp - lastRPValue)
-                    end
-                    lastRPValue = rp
-                end
-            end
-        end)
-        if not ok then warn("[RP Loop] " .. tostring(err)) end
-    end
-end)
-
-local perfOn, perfLocked = false, false
 local perfFrame = Instance.new("Frame")
 perfFrame.Size = UDim2.new(0, 160, 0, 40); perfFrame.Position = UDim2.new(1, -170, 0, 96)
 perfFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12); perfFrame.BackgroundTransparency = 0.35
@@ -309,115 +143,6 @@ local function getPing()
 end
 local fpsFrames = 0
 RunService.RenderStepped:Connect(function() fpsFrames = fpsFrames + 1 end)
--- ============================================================
--- AFK MODE (TREO MÁY)
--- ============================================================
-do
-    afkOverlay = Instance.new("Frame", ScreenGui)
-    afkOverlay.Size = UDim2.new(1, 0, 1, 0)
-    afkOverlay.Position = UDim2.new(0, 0, 0, 0)
-    afkOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    afkOverlay.BorderSizePixel = 0
-    afkOverlay.ZIndex = 9999
-    afkOverlay.Visible = false
-
-    local t1 = Instance.new("TextLabel", afkOverlay)
-    t1.Size = UDim2.new(1, 0, 0, 36)
-    t1.Position = UDim2.new(0, 0, 0, 60)
-    t1.BackgroundTransparency = 1
-    t1.Text = "🌙 CHẾ ĐỘ TREO MÁY"
-    t1.TextColor3 = Color3.fromRGB(120, 220, 255)
-    t1.TextSize = 22
-    t1.Font = Enum.Font.GothamBold
-    t1.ZIndex = 10000
-
-    afkTimeLbl = Instance.new("TextLabel", afkOverlay)
-    afkTimeLbl.Size = UDim2.new(1, 0, 0, 30)
-    afkTimeLbl.Position = UDim2.new(0, 0, 0, 120)
-    afkTimeLbl.BackgroundTransparency = 1
-    afkTimeLbl.Text = "⏱ 00:00"
-    afkTimeLbl.TextColor3 = Color3.fromRGB(200, 200, 220)
-    afkTimeLbl.TextSize = 18
-    afkTimeLbl.Font = Enum.Font.GothamBold
-    afkTimeLbl.ZIndex = 10000
-
-    afkRPNowLbl = Instance.new("TextLabel", afkOverlay)
-    afkRPNowLbl.Size = UDim2.new(1, 0, 0, 30)
-    afkRPNowLbl.Position = UDim2.new(0, 0, 0, 160)
-    afkRPNowLbl.BackgroundTransparency = 1
-    afkRPNowLbl.Text = "💰 Hiện tại: --"
-    afkRPNowLbl.TextColor3 = Color3.fromRGB(120, 220, 255)
-    afkRPNowLbl.TextSize = 16
-    afkRPNowLbl.Font = Enum.Font.GothamBold
-    afkRPNowLbl.ZIndex = 10000
-
-    afkRPEarnedLbl = Instance.new("TextLabel", afkOverlay)
-    afkRPEarnedLbl.Size = UDim2.new(1, 0, 0, 30)
-    afkRPEarnedLbl.Position = UDim2.new(0, 0, 0, 192)
-    afkRPEarnedLbl.BackgroundTransparency = 1
-    afkRPEarnedLbl.Text = "📈 Kiếm: +0"
-    afkRPEarnedLbl.TextColor3 = Color3.fromRGB(0, 255, 120)
-    afkRPEarnedLbl.TextSize = 16
-    afkRPEarnedLbl.Font = Enum.Font.GothamBold
-    afkRPEarnedLbl.ZIndex = 10000
-
-    local stopBtn = Instance.new("TextButton", afkOverlay)
-    stopBtn.Size = UDim2.new(0, 180, 0, 44)
-    stopBtn.Position = UDim2.new(0.5, -90, 0, 260)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 60)
-    stopBtn.Text = "TẮT TREO MÁY"
-    stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    stopBtn.TextSize = 14
-    stopBtn.Font = Enum.Font.GothamBold
-    stopBtn.ZIndex = 10000
-    Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0, 10)
-
-    local hint = Instance.new("TextLabel", afkOverlay)
-    hint.Size = UDim2.new(1, 0, 0, 20)
-    hint.Position = UDim2.new(0, 0, 1, -40)
-    hint.BackgroundTransparency = 1
-    hint.Text = "Game vẫn chạy • Tắt để trở lại bình thường"
-    hint.TextColor3 = Color3.fromRGB(80, 80, 100)
-    hint.TextSize = 12
-    hint.Font = Enum.Font.Gotham
-    hint.ZIndex = 10000
-
-    stopBtn.MouseButton1Click:Connect(function()
-    afkActive = false
-    afkOverlay.Visible = false
-    if writefile then pcall(writefile, "afkMode.txt", "0") end
-    if _G._setAFKToggle then _G._setAFKToggle(false) end
-end)
-end
-
-function _G.startAFK()
-    afkActive = true
-    afkStartTime = os.clock()
-    afkRPStart = getRP() or 0
-    if afkOverlay then afkOverlay.Visible = true end
-    if HubFrame then HubFrame.Visible = false end
-    if freecamMenuFrame then freecamMenuFrame.Visible = false end
-    if writefile then pcall(writefile, "afkMode.txt", "1") end
-end
-
-function _G.stopAFK()
-    afkActive = false
-    if afkOverlay then afkOverlay.Visible = false end
-    if writefile then pcall(writefile, "afkMode.txt", "0") end
-end
-
-task.spawn(function()
-    while true do task.wait(0.5)
-        if afkActive and afkTimeLbl then
-            afkTimeLbl.Text = "⏱ " .. fmtTime(os.clock() - afkStartTime)
-            local rp = getRP()
-            if rp then
-                afkRPNowLbl.Text = "💰 Hiện tại: " .. fmtRP(rp)
-                afkRPEarnedLbl.Text = "📈 Kiếm: +" .. fmtRP(rp - afkRPStart)
-            end
-        end
-    end
-end)
 task.spawn(function()
     while true do task.wait(1)
         local fps = fpsFrames; fpsFrames = 0
@@ -477,7 +202,7 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- KHOI 1: HUB UI
+-- HUB UI
 -- ============================================================
 do
     HubFrame = Instance.new("Frame")
@@ -492,7 +217,7 @@ do
 
     hubHeader = Instance.new("TextLabel", HubFrame)
     hubHeader.Size = UDim2.new(1, -40, 0, 34); hubHeader.Position = UDim2.new(0, 12, 0, 0)
-    hubHeader.BackgroundTransparency = 1; hubHeader.Text = "👑 KHANGLE DDS HUB"
+    hubHeader.BackgroundTransparency = 1; hubHeader.Text = "👑 KHANGLE FREECAM"
     hubHeader.TextColor3 = rainbowAt(0); hubHeader.TextSize = 13
     hubHeader.Font = Enum.Font.GothamBold; hubHeader.TextXAlignment = Enum.TextXAlignment.Left
     hubHeader.ZIndex = 18
@@ -514,7 +239,6 @@ do
     Instance.new("UICorner", content).CornerRadius = UDim.new(0, 12)
 
     local pages, navBtns = {}, {}
-    local currentPageName = nil
     local function addPage(name)
         if pages[name] then return pages[name] end
         local pg = Instance.new("Frame", content)
@@ -524,7 +248,6 @@ do
         return pg
     end
     local function selectPage(name)
-        currentPageName = name
         for n, pg in pairs(pages) do pg.Visible = (n == name) end
         for n, b in pairs(navBtns) do
             if n == name then
@@ -547,12 +270,9 @@ do
         addPage(name); return b
     end
 
-    addNav("TUNER", "🎛️"); addNav("CHUNG", "🧰")
-    addNav("FARMING", "💼"); addNav("SETTINGS", "⚙️")
+    addNav("CHUNG", "🧰"); addNav("SETTINGS", "⚙️")
 
-    local tunerPage = pages["TUNER"]
     local chungPage = pages["CHUNG"]
-    local farmingPage = pages["FARMING"]
     local settingsPage = pages["SETTINGS"]
 
     local function applyMenuColor(c)
@@ -569,213 +289,6 @@ do
         end
     end
     local function applyFloatRainbow() floatRainbow = true end
-
-    -- TUNER
-    local function createInput(name, dv, posY, pg)
-        local lbl = Instance.new("TextLabel", pg)
-        lbl.Size = UDim2.new(0.9, 0, 0, 14); lbl.Position = UDim2.new(0.05, 0, 0, posY)
-        lbl.BackgroundTransparency = 1; lbl.Text = name
-        lbl.TextColor3 = Color3.fromRGB(210, 210, 210); lbl.TextSize = 10
-        lbl.Font = Enum.Font.GothamMedium; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.ZIndex = 12
-        local box = Instance.new("TextBox", pg)
-        box.Size = UDim2.new(0.9, 0, 0, 24); box.Position = UDim2.new(0.05, 0, 0, posY + 14)
-        box.BackgroundColor3 = Color3.fromRGB(22, 22, 28); box.TextColor3 = Color3.fromRGB(255, 255, 255)
-        box.Text = tostring(dv); box.TextSize = 11; box.Font = Enum.Font.GothamBold
-        box.BorderSizePixel = 0; box.ZIndex = 12
-        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
-        local st = Instance.new("UIStroke", box); st.Color = Color3.fromRGB(60, 60, 75); st.Thickness = 1
-        return box
-    end
-    local hpBox = createInput("💪 Hệ số Mã lực (Mặc định: 5.0)", "5.0", 6, tunerPage)
-    local rpmBox = createInput("🔥 Cộng thêm Tua máy - RPM (Mặc định: 3500)", "3500", 48, tunerPage)
-    local gearRatioBox = createInput("⚙️ Tỷ số truyền số - Ratio Gear (Mặc định: 0.9)", "0.9", 90, tunerPage)
-    local finalDriveBox = createInput("⛓️ Tỷ số truyền cuối - Final Drive (Mặc định: 0.9)", "0.9", 132, tunerPage)
-    local Status = Instance.new("TextLabel", tunerPage)
-    Status.Size = UDim2.new(0.9, 0, 0, 18); Status.Position = UDim2.new(0.05, 0, 0, 174)
-    Status.BackgroundTransparency = 1; Status.Text = "Trạng thái: Sẵn sàng."
-    Status.TextColor3 = Color3.fromRGB(255, 200, 0); Status.TextSize = 10
-    Status.Font = Enum.Font.GothamBold; Status.TextXAlignment = Enum.TextXAlignment.Center; Status.ZIndex = 12
-    local InjectBtn = Instance.new("TextButton", tunerPage)
-    InjectBtn.Size = UDim2.new(0.9, 0, 0, 28); InjectBtn.Position = UDim2.new(0.05, 0, 0, 194)
-    InjectBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100); InjectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    InjectBtn.Text = "⚡ ÁP DỤNG TUNER"; InjectBtn.TextSize = 11
-    InjectBtn.Font = Enum.Font.GothamBold; InjectBtn.ZIndex = 12
-    Instance.new("UICorner", InjectBtn).CornerRadius = UDim.new(0, 7)
-    ToggleFloatMenuBtn = Instance.new("TextButton", tunerPage)
-    ToggleFloatMenuBtn.Size = UDim2.new(0.9, 0, 0, 28); ToggleFloatMenuBtn.Position = UDim2.new(0.05, 0, 0, 226)
-    ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40); ToggleFloatMenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG TẮT"; ToggleFloatMenuBtn.TextSize = 11
-    ToggleFloatMenuBtn.Font = Enum.Font.GothamBold; ToggleFloatMenuBtn.ZIndex = 12
-    Instance.new("UICorner", ToggleFloatMenuBtn).CornerRadius = UDim.new(0, 7)
-
-    local statusThread, tunedModels = nil, setmetatable({}, { __mode = "k" })
-    local function setStatusTmp(msg, color, delay)
-        if not Status or not Status.Parent then return end
-        if statusThread then task.cancel(statusThread); statusThread = nil end
-        Status.Text = msg; Status.TextColor3 = color
-        statusThread = task.delay(delay or 3, function()
-            if Status and Status.Parent then
-                Status.Text = "Trạng thái: Sẵn sàng."; Status.TextColor3 = Color3.fromRGB(255, 200, 0)
-            end
-        end)
-    end
-    InjectBtn.MouseButton1Click:Connect(function()
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local seat = hum and hum.SeatPart
-        local isInVehicle = seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat"))
-        if not isInVehicle then setStatusTmp("❌ Hãy ngồi lên xe rồi bấm áp dụng nhé!", Color3.fromRGB(255, 50, 50)); return end
-        local vehicleModel = seat.Parent
-        if vehicleModel and tunedModels[vehicleModel] then
-            setStatusTmp("⚠ Xe này đã tune rồi — respawn xe để apply", Color3.fromRGB(255, 180, 60), 4); return
-        end
-        local hpMult = tonumber(hpBox.Text) or 5.0
-        local rpmAdd = tonumber(rpmBox.Text) or 3500
-        local gearMult = tonumber(gearRatioBox.Text) or 0.8
-        local finalMult = tonumber(finalDriveBox.Text) or 0.8
-        local count = 0
-        local charParts = {}
-        if char then
-            for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") then charParts[p] = true end end
-            local hrp = char:FindFirstChild("HumanoidRootPart"); if hrp then charParts[hrp] = true end
-        end
-        local function isCharOwned(t)
-            local ok1, res1 = pcall(function()
-                for _, v in pairs(t) do if typeof(v) == "Instance" and charParts[v] then return true end end
-                return false
-            end)
-            return ok1 and res1
-        end
-        local function unfreeze(t) pcall(function() setreadonly(t, false) end) end
-        local SPEED_KEYS = { topspeed=true, maxspeed=true, speedlimit=true, maxvelocity=true, topspeedkmh=true, maxthrottle=true, limiter=true }
-        local POWER_KEYS = { horsepower=true, torque=true, maxpower=true }
-        local RPM_KEYS = { redline=true, maxrpm=true, rpm=true }
-        local GEAR_KEYS = { gearratio=true, finaldrive=true }
-        local GEAR_TBL = { gearratios=true, gears=true }
-        local DRAG_KEYS = { drag=true, dragcoefficient=true, airresistance=true }
-        local seen = {}
-local tuneVisited = 0
-local lastYieldTime = os.clock()
-
-local function tuneTable(t, depth)
-    if depth > 8 or seen[t] then return end
-    if type(t) ~= "table" then return end
-    if isCharOwned(t) then return end
-
-    tuneVisited = tuneVisited + 1
-    if tuneVisited > 2000000 then return end
-
-    seen[t] = true
-    pcall(setreadonly, t, false)
-
-    local cc = 0
-    for k, v in pairs(t) do
-        cc = cc + 1
-        -- Yield mỗi 50 key — game có frame để render, đơ cảm giác nhưng không sập
-        if cc >= 50 then
-            cc = 0
-            if os.clock() - lastYieldTime > 0.03 then
-                task.wait()
-                lastYieldTime = os.clock()
-            end
-        end
-
-        if type(k) == "string" then
-            local lk = k:lower()
-            local vt = type(v)
-            if vt == "number" then
-                local nv
-                if SPEED_KEYS[lk] and v > 0 then nv = v * 1.6
-                elseif POWER_KEYS[lk] then nv = v * hpMult
-                elseif RPM_KEYS[lk] and v >= 1000 then nv = v + rpmAdd
-                elseif GEAR_KEYS[lk] and v > 0 then nv = v * gearMult
-                elseif DRAG_KEYS[lk] and v > 0 then nv = v * 0.7
-                end
-                if nv then
-                    if pcall(rawset, t, k, nv) then count = count + 1 end
-                end
-            elseif vt == "table" then
-                if GEAR_TBL[lk] then
-                    pcall(setreadonly, v, false)
-                    for i, g in pairs(v) do
-                        if type(g) == "number" then
-                            if pcall(rawset, v, i, g * gearMult) then count = count + 1 end
-                        end
-                    end
-                else
-                    tuneTable(v, depth + 1)
-                end
-            end
-        elseif type(v) == "table" then
-            tuneTable(v, depth + 1)
-        end
-    end
-end
-
-if typeof(getgc) == "function" then
-    task.spawn(function()
-        tuneVisited = 0
-        lastYieldTime = os.clock()
-        local gcList = getgc(true)
-        for _, obj in pairs(gcList) do
-            if typeof(obj) == "table" then
-                pcall(tuneTable, obj, 1)
-            end
-            -- Yield mỗi 30ms — game vẫn render, đơ nhẹ
-            if os.clock() - lastYieldTime > 0.03 then
-                task.wait()
-                lastYieldTime = os.clock()
-            end
-        end
-    end)
-end
-        if vehicleModel then
-            for _, obj in pairs(vehicleModel:GetDescendants()) do
-                pcall(function()
-                    for an, av in pairs(obj:GetAttributes()) do
-                        if type(av) == "number" then
-                            local ln = an:lower()
-                            if ln:find("topspeed") or ln:find("maxspeed") or ln:find("speedlimit") or ln:find("maxvelocity") then
-                                obj:SetAttribute(an, av * 1.6); count = count + 1
-                            elseif ln:find("horsepower") or ln:find("power") or ln:find("torque") then
-                                obj:SetAttribute(an, av * hpMult); count = count + 1
-                            elseif ln:find("drag") then obj:SetAttribute(an, av * 0.7); count = count + 1 end
-                        end
-                    end
-                end)
-                if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-                    pcall(function()
-                        local name = obj.Name:lower()
-                        if name:find("topspeed") or name:find("maxspeed") or name:find("speedlimit") then
-                            obj.Value = obj.Value * 1.6; count = count + 1
-                        elseif name:find("horsepower") or name:find("power") or name:find("torque") then
-                            obj.Value = obj.Value * hpMult; count = count + 1
-                        elseif name:find("rpm") or name:find("redline") then
-                            if obj.Value >= 1000 then obj.Value = obj.Value + rpmAdd; count = count + 1 end
-                        elseif name:find("gear") or name:find("ratio") then
-                            obj.Value = obj.Value * gearMult; count = count + 1
-                        elseif name:find("drive") then obj.Value = obj.Value * finalMult; count = count + 1
-                        elseif name:find("drag") then obj.Value = obj.Value * 0.7; count = count + 1 end
-                    end)
-                end
-            end
-        end
-           task.spawn(function()
-    setStatusTmp("⏳ Đang tune…", Color3.fromRGB(255, 200, 80), 30)
-    task.wait(0.1)
-    local lastCount = -1
-    while tuneVisited ~= lastCount do
-        lastCount = tuneVisited
-        task.wait(0.3)
-    end
-    if count == 0 then
-        setStatusTmp("⚠ Không tìm thấy gì để tune", Color3.fromRGB(255, 180, 60), 4)
-    else
-        if vehicleModel then tunedModels[vehicleModel] = true end
-        setStatusTmp("✔ Đã xong (xuống xe lên lại)", Color3.fromRGB(0, 255, 120), 5)
-    end
-end)
-    end)
 
     -- CHUNG
     local scroll = Instance.new("ScrollingFrame", chungPage)
@@ -802,6 +315,7 @@ end)
         d.TextWrapped = true; d.ZIndex = 13
         return card
     end
+
     local cardBody = makeCard(scroll, 0, "🚗 THÁO DÀN ÁO — quản lý part xe", "BẬT = hiện nút nổi 🚗 để dùng.\nTẮT = ẩn nút nổi, đóng bảng.", Color3.fromRGB(0, 230, 180))
     bodyOpenBtn = Instance.new("TextButton", cardBody)
     bodyOpenBtn.Size = UDim2.new(0.9, 0, 0, 28); bodyOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
@@ -809,6 +323,7 @@ end)
     bodyOpenBtn.Text = "🚗 DÀN ÁO: ĐANG TẮT"; bodyOpenBtn.TextSize = 10
     bodyOpenBtn.Font = Enum.Font.GothamBold; bodyOpenBtn.ZIndex = 13
     Instance.new("UICorner", bodyOpenBtn).CornerRadius = UDim.new(0, 6)
+
     local cardFc = makeCard(scroll, 120, "📷 FREECAM CINEMATIC — quay phim", "BẬT = hiện nút nổi 📷 để dùng.\nTẮT = ẩn nút nổi, đóng menu.", Color3.fromRGB(100, 150, 255))
     fcOpenBtn = Instance.new("TextButton", cardFc)
     fcOpenBtn.Size = UDim2.new(0.9, 0, 0, 28); fcOpenBtn.Position = UDim2.new(0.05, 0, 0, 70)
@@ -816,41 +331,6 @@ end)
     fcOpenBtn.Text = "📷 FREECAM: ĐANG TẮT"; fcOpenBtn.TextSize = 10
     fcOpenBtn.Font = Enum.Font.GothamBold; fcOpenBtn.ZIndex = 13
     Instance.new("UICorner", fcOpenBtn).CornerRadius = UDim.new(0, 6)
-
-    -- FARMING
-    local farmScroll = Instance.new("ScrollingFrame", farmingPage)
-    farmScroll.Size = UDim2.new(1, 0, 1, 0); farmScroll.Position = UDim2.new(0, 0, 0, 0)
-    farmScroll.BackgroundTransparency = 1; farmScroll.BorderSizePixel = 0
-    farmScroll.CanvasSize = UDim2.new(0, 0, 0, 160); farmScroll.ScrollBarThickness = 4; farmScroll.ZIndex = 12
-    local farmPad = Instance.new("UIPadding", farmScroll)
-    farmPad.PaddingTop = UDim.new(0, 6); farmPad.PaddingBottom = UDim.new(0, 6)
-
-    local function makeSwitch(par, posY)
-        local track = Instance.new("TextButton", par)
-        track.Size = UDim2.new(0, 52, 0, 26); track.Position = UDim2.new(1, -64, 0, posY)
-        track.BackgroundColor3 = Color3.fromRGB(60, 60, 70); track.Text = ""; track.ZIndex = 14
-        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
-        local knob = Instance.new("Frame", track)
-        knob.Size = UDim2.new(0, 20, 0, 20); knob.Position = UDim2.new(0, 3, 0.5, -10)
-        knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235); knob.ZIndex = 15
-        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-        local on = false
-        local function set(v)
-            on = v
-            track.BackgroundColor3 = v and themeColor or Color3.fromRGB(60, 60, 70)
-            knob.Position = v and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
-        end
-        return { track = track, knob = knob, set = set, isOn = function() return on end }
-    end
-
-    local cardFarm = makeCard(farmScroll, 0, "🌾 OFFICE AUTOFARM — farm văn phòng", "Tự ngồi ghế, giải toán & in ấn.\nSố liệu hiện trong bảng status khi bật.", ACCENT2)
-    farmSwitch = makeSwitch(cardFarm, 10)
-    farmNote = Instance.new("TextLabel", cardFarm)
-    farmNote.Size = UDim2.new(1, -24, 0, 16); farmNote.Position = UDim2.new(0, 12, 0, 86)
-    farmNote.BackgroundTransparency = 1; farmNote.Text = ""
-    farmNote.TextColor3 = Color3.fromRGB(255, 120, 80); farmNote.TextSize = 10
-    farmNote.Font = Enum.Font.GothamBold; farmNote.TextXAlignment = Enum.TextXAlignment.Left
-    farmNote.TextWrapped = true; farmNote.ZIndex = 13
 
     -- SETTINGS
     local settingsScroll = Instance.new("ScrollingFrame", settingsPage)
@@ -1057,7 +537,6 @@ end)
     Color3.fromRGB(40, 110, 180), Color3.fromRGB(60, 60, 70), function(v)
     optFPS = v
     if v then
-        -- TAT HET EFFECT NANG + HA QUALITY XUONG MIN
         pcall(function() Lighting.GlobalShadows = false end)
         pcall(function() Lighting.Brightness = 1 end)
         pcall(function() Lighting.EnvironmentDiffuseScale = 0 end)
@@ -1068,7 +547,6 @@ end)
         pcall(function() workspace.StreamingEnabled = true end)
         setQualityLevel(1)
     else
-        -- RESTORE mac dinh
         pcall(function() Lighting.GlobalShadows = true end)
         pcall(function() Lighting.Brightness = 2 end)
         pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
@@ -1083,7 +561,6 @@ end)
 makeToggle(perfSection, 2, false, "🎨 CHẤT LƯỢNG CAO: BẬT", "🎨 CHẤT LƯỢNG CAO: TẮT",
     Color3.fromRGB(160, 100, 200), Color3.fromRGB(60, 60, 70), function(v)
     if v then
-        -- BAT HET EFFECT DEP + GIU SANG
         pcall(function() Lighting.GlobalShadows = true end)
         pcall(function() Lighting.Brightness = 2.5 end)
         pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
@@ -1095,7 +572,6 @@ makeToggle(perfSection, 2, false, "🎨 CHẤT LƯỢNG CAO: BẬT", "🎨 CHẤ
         pcall(function() workspace.StreamingEnabled = false end)
         setQualityLevel(10)
     else
-        -- RESTORE mac dinh
         pcall(function() Lighting.GlobalShadows = true end)
         pcall(function() Lighting.Brightness = 2 end)
         pcall(function() Lighting.EnvironmentDiffuseScale = 1 end)
@@ -1109,39 +585,7 @@ end)
     makeToggle(perfSection, 3, false, "📊 FPS/PING: BẬT", "📊 FPS/PING: TẮT",
         Color3.fromRGB(0, 150, 120), Color3.fromRGB(60, 60, 70),
         function(v) perfOn = v; perfFrame.Visible = v end)
-    do
-    local afkOn = false
-    local afkBtn = Instance.new("TextButton", perfSection)
-    afkBtn.Size = UDim2.new(1, 0, 0, 28)
-    afkBtn.LayoutOrder = 5
-    afkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    afkBtn.TextSize = 10
-    afkBtn.Font = Enum.Font.GothamBold
-    afkBtn.ZIndex = 14
-    Instance.new("UICorner", afkBtn).CornerRadius = UDim.new(0, 7)
-
-    local function paintAFK()
-        afkBtn.Text = afkOn and "🌙 TREO MÁY: BẬT" or "🌙 TREO MÁY: TẮT"
-        afkBtn.BackgroundColor3 = afkOn and Color3.fromRGB(60, 60, 140) or Color3.fromRGB(60, 60, 70)
-    end
-    paintAFK()
-
-    _G._setAFKToggle = function(on)
-        afkOn = on
-        paintAFK()
-    end
-
-    afkBtn.MouseButton1Click:Connect(function()
-        afkOn = not afkOn
-        paintAFK()
-        if afkOn then
-            if _G.startAFK then _G.startAFK() end
-        else
-            if _G.stopAFK then _G.stopAFK() end
-        end
-    end)
-end
-makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT",
+    makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA VỊ TRÍ: TẮT",
         Color3.fromRGB(180, 120, 40), Color3.fromRGB(60, 60, 70),
         function(v) perfLocked = v; perfFrame.Draggable = not v end)
 
@@ -1205,7 +649,7 @@ makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA V�
         Color3.fromRGB(120, 80, 200), Color3.fromRGB(60, 60, 70), function(v)
         if writefile then pcall(writefile, "autoExecute.txt", v and "1" or "0") end
         if v and queue_on_teleport then
-            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangfreecam.lua"))()]])
         end
     end)
     makeToggle(rejoinSection, 3, readFlag("autoRejoin.txt"), "🔁 AUTO REJOIN: BẬT", "🔁 AUTO REJOIN: TẮT",
@@ -1217,87 +661,12 @@ makeToggle(perfSection, 4, false, "🔒 KHÓA VỊ TRÍ: BẬT", "🔒 KHÓA V�
     makeToggle(afkSection, 1, true, "🛡️ ANTI-AFK: BẬT", "🛡️ ANTI-AFK: TẮT",
         Color3.fromRGB(46, 140, 67), Color3.fromRGB(60, 60, 70), function(v) antiAfk = v end)
 
-    selectPage("TUNER")
-
-    local function applyFarmAvailability()
-        local ok = checkFarmOK()
-        farmOK = ok
-        if ok then
-            farmNote.Text = ""
-            farmSwitch.track.Active = true
-            farmSwitch.track.AutoButtonColor = true
-            if not farmSwitch.isOn() then
-                farmSwitch.track.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-                farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-            end
-        else
-            farmNote.Text = "⚠ Chỉ hoạt động ở Surakarta"
-            farmSwitch.track.Active = false
-            farmSwitch.track.AutoButtonColor = false
-            farmSwitch.track.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-            farmSwitch.knob.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
-        end
-    end
-    applyFarmAvailability()
-    task.spawn(function()
-        while true do
-            task.wait(2)
-            local ok = checkFarmOK()
-            if ok ~= farmOK then applyFarmAvailability() end
-        end
-    end)
-
+    selectPage("CHUNG")
     HubFrame.Visible = false
 end
 
 -- ============================================================
--- KHOI 2: AUTO T
--- ============================================================
-do
-    local autoTActive = false
-    ToggleFloatMenuBtn.MouseButton1Click:Connect(function()
-        showAutoTFloat = not showAutoTFloat
-        AutoTFloatingBtn.Visible = showAutoTFloat
-        if showAutoTFloat then
-            ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG BẬT"
-            ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-        else
-            ToggleFloatMenuBtn.Text = "🕹️ NÚT NỔI AUTO T: ĐANG TẮT"
-            ToggleFloatMenuBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-            autoTActive = false
-            AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
-        end
-    end)
-    AutoTFloatingBtn.MouseButton1Click:Connect(function()
-        autoTActive = not autoTActive
-        if autoTActive then
-            AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-            pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game) end)
-        else
-            AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
-        end
-    end)
-    RunService.Heartbeat:Connect(function()
-        local c = LocalPlayer.Character
-        local h = c and c:FindFirstChildOfClass("Humanoid")
-        local s = h and h.SeatPart
-        local isInVehicle = (s and (s:IsA("VehicleSeat") or s:IsA("Seat")))
-        if autoTActive then
-            if isInVehicle then
-                pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game) end)
-            else
-                autoTActive = false
-                AutoTFloatingBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-                pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game) end)
-            end
-        end
-    end)
-end
-
--- ============================================================
--- KHOI 3: DAN AO
+-- KHOI: DAN AO
 -- ============================================================
 do
     local currentVehicle, selectedPart, selectedParentContainer = nil, nil, nil
@@ -1535,8 +904,9 @@ do
         updateSelectionInfo()
     end)
 end
+
 -- ============================================================
--- KHOI 4: FREECAM
+-- KHOI: FREECAM
 -- ============================================================
 do
     local function addStroke(par, col, th)
@@ -1544,7 +914,6 @@ do
         return s
     end
 
-    -- ===== MENU FREECAM =====
     freecamMenuFrame = Instance.new("Frame", ScreenGui)
     freecamMenuFrame.Size = UDim2.new(0, 300, 0, 230); freecamMenuFrame.Position = UDim2.new(0.5, -150, 0.5, -115)
     freecamMenuFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 21); freecamMenuFrame.BackgroundTransparency = 0.12
@@ -1596,7 +965,6 @@ do
     local rotLbl, rotDec, rotInc = makeCompactRow(150, "Tốc độ xoay: 1.00x")
     local rollLbl, rollDec, rollInc = makeCompactRow(184, "Tốc độ nghiêng: 1.00x")
 
-    -- ===== NÚT ẨN FLOAT =====
     hideFloatBtn = Instance.new("TextButton", ScreenGui)
     hideFloatBtn.Size = UDim2.new(0, 52, 0, 52); hideFloatBtn.Position = UDim2.new(0, 80, 0, 150)
     hideFloatBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 28); hideFloatBtn.BackgroundTransparency = 0.2
@@ -1606,14 +974,12 @@ do
     addStroke(hideFloatBtn, Color3.fromRGB(80, 80, 110), 2)
     hideFloatBtn.Visible = false
 
-    -- ===== CỤM ĐIỀU KHIỂN =====
     local controlFrame = Instance.new("Frame", ScreenGui)
     controlFrame.Size = UDim2.new(0, 245, 0, 160)
     controlFrame.Position = UDim2.new(0, 80, 1, -215)
     controlFrame.BackgroundTransparency = 1; controlFrame.Visible = false; controlFrame.ZIndex = 1
     controlFrame.Active = false
 
-    -- Load vị trí đã lưu
     if readfile and isfile and isfile("freecam_pos.txt") then
         local ok, data = pcall(readfile, "freecam_pos.txt")
         if ok then
@@ -1624,7 +990,6 @@ do
         end
     end
 
-    -- Drag bar
     local dragBar = Instance.new("Frame", controlFrame)
     dragBar.Size = UDim2.new(1, 0, 0, 22); dragBar.Position = UDim2.new(0, 0, 0, -26)
     dragBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40); dragBar.BackgroundTransparency = 0.3
@@ -1637,14 +1002,12 @@ do
     dragLbl.TextColor3 = Color3.fromRGB(150, 150, 170); dragLbl.TextSize = 10
     dragLbl.Font = Enum.Font.GothamBold; dragLbl.TextXAlignment = Enum.TextXAlignment.Left; dragLbl.ZIndex = 3
 
-    -- Eye button trong drag bar
     local eyeBtn = Instance.new("TextButton", dragBar)
     eyeBtn.Size = UDim2.new(0, 20, 0, 20); eyeBtn.Position = UDim2.new(1, -22, 0.5, -10)
     eyeBtn.BackgroundTransparency = 1; eyeBtn.Text = "👁"
     eyeBtn.TextColor3 = Color3.fromRGB(200, 200, 220); eyeBtn.TextSize = 12
     eyeBtn.Font = Enum.Font.GothamBold; eyeBtn.ZIndex = 3
 
-    -- Drag logic
     local dragBarDragging = false
     local dragStartPos, dragFrameStart
     dragBar.InputBegan:Connect(function(input)
@@ -1674,14 +1037,12 @@ do
         end
     end)
 
-    -- Nút cụm
     local controlButtons = {}
     local function mkPad(txt, size, pos)
         local b = Instance.new("TextButton", controlFrame)
         b.Size = size; b.Position = pos; b.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
         b.BackgroundTransparency = 0.35; b.Text = txt; b.TextColor3 = Color3.fromRGB(240, 240, 250)
         b.TextSize = 15; b.Font = Enum.Font.GothamBold; b.ZIndex = 2
-        
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
         addStroke(b, Color3.fromRGB(70, 70, 95), 1)
         table.insert(controlButtons, b); return b
@@ -1698,7 +1059,6 @@ do
     local btnZoomIn = mkPad("🔍+", UDim2.new(0, 38, 0, 38), UDim2.new(0, 152, 0, 96))
     local btnZoomOut = mkPad("🔍-", UDim2.new(0, 38, 0, 38), UDim2.new(0, 194, 0, 96))
 
-    -- ===== NÚT MẮT NỔI =====
     local floatEye = Instance.new("TextButton", ScreenGui)
     floatEye.Size = UDim2.new(0, 44, 0, 44)
     floatEye.Position = UDim2.new(0, 20, 0.5, -22)
@@ -1727,7 +1087,6 @@ do
         end)
     end
 
-    -- ===== ẨN/HIỆN =====
     local hiddenMode = false
     local function setRobloxTouchGuiTransparency(t)
         local target = LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -1804,7 +1163,6 @@ do
         end
     end)
 
-    -- ===== DRAG MENU FREECAM =====
     do
         local dg, ds, sp
         freecamMenuTitle.InputBegan:Connect(function(i)
@@ -1825,76 +1183,68 @@ do
         freecamMenuFrame.Visible = not freecamMenuFrame.Visible
     end)
 
-    -- ===== BIẾN =====
     local speed = 25.0
     local rotSens = 1.0
     local rollSens = 1.0
     local rollSpeed = 1.8
 
     local function autoRepeat(btn, step)
-    local holding = false
-    btn.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            holding = true
-            step()
-            task.spawn(function()
-                task.wait(0.45)
-                while holding do
-                    step()
-                    task.wait(0.07)
-                end
-            end)
-        end
+        local holding = false
+        btn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+                holding = true
+                step()
+                task.spawn(function()
+                    task.wait(0.45)
+                    while holding do
+                        step()
+                        task.wait(0.07)
+                    end
+                end)
+            end
+        end)
+        btn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+                holding = false
+            end
+        end)
+    end
+
+    autoRepeat(spdInc, function()
+        local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
+        speed = math.clamp(speed + st, 0.3, 250)
+        spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
     end)
-    btn.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-            holding = false
-        end
+    autoRepeat(spdDec, function()
+        local st = speed <= 2 and 0.1 or (speed <= 10 and 1 or 5)
+        speed = math.clamp(speed - st, 0.3, 250)
+        spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
     end)
-end
+    autoRepeat(rotInc, function()
+        rotSens = math.clamp(rotSens + 0.05, 0.1, 3.0)
+        rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
+    end)
+    autoRepeat(rotDec, function()
+        rotSens = math.clamp(rotSens - 0.05, 0.1, 3.0)
+        rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
+    end)
+    autoRepeat(rollInc, function()
+        rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
+        rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+    end)
+    autoRepeat(rollDec, function()
+        rollSens = math.clamp(rollSens - 0.05, 0.1, 5.0)
+        rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
+    end)
 
-autoRepeat(spdInc, function()
-    local st = speed < 2 and 0.1 or (speed < 10 and 1 or 5)
-    speed = math.clamp(speed + st, 0.3, 250)
-    spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
-end)
-autoRepeat(spdDec, function()
-    local st = speed <= 2 and 0.1 or (speed <= 10 and 1 or 5)
-    speed = math.clamp(speed - st, 0.3, 250)
-    spdLbl.Text = string.format("Tốc độ di chuyển: %.1f", speed)
-end)
-autoRepeat(rotInc, function()
-    rotSens = math.clamp(rotSens + 0.05, 0.1, 3.0)
-    rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
-end)
-autoRepeat(rotDec, function()
-    rotSens = math.clamp(rotSens - 0.05, 0.1, 3.0)
-    rotLbl.Text = string.format("Tốc độ xoay: %.2fx", rotSens)
-end)
-autoRepeat(rollInc, function()
-    rollSens = math.clamp(rollSens + 0.05, 0.1, 5.0)
-    rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
-end)
-autoRepeat(rollDec, function()
-    rollSens = math.clamp(rollSens - 0.05, 0.1, 5.0)
-    rollLbl.Text = string.format("Tốc độ nghiêng: %.2fx", rollSens)
-end)
-
-    -- ===== CAMERA STATE =====
-   
-
- local freecamActive = false
+    local freecamActive = false
     local followMode = false
-
-
-
     local followOffset = Vector3.new(0, 0, 0)
     local camPos = camera.CFrame.Position
     local camAngles = Vector3.new(0, 0, 0)
     local targetCamAngles = Vector3.new(0, 0, 0)
     local currentFOV = camera.FieldOfView
     local moveStates = {W = false, S = false, A = false, D = false, Up = false, Down = false, RollL = false, RollR = false}
-    
 
     local function bindTouch(btn, key)
         btn.InputBegan:Connect(function(i)
@@ -1929,12 +1279,11 @@ end)
             currentFOV = camera.FieldOfView; camera.CameraType = Enum.CameraType.Scriptable
             freecamToggleBtn.Text = "Freecam: ON"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 140, 50)
             controlFrame.Visible = true; freecamMenuFrame.Visible = false
-      else
-    camera.CameraType = Enum.CameraType.Custom; camera.FieldOfView = 70
-    freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
-
-controlFrame.Visible = false
-if followMode then
+        else
+            camera.CameraType = Enum.CameraType.Custom; camera.FieldOfView = 70
+            freecamToggleBtn.Text = "Freecam: OFF"; freecamToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+            controlFrame.Visible = false
+            if followMode then
                 followMode = false
                 followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
             end
@@ -1953,70 +1302,62 @@ if followMode then
             followBtn.Text = "Khóa Tầm: OFF"; followBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 68)
         end
     end)
--- ===== TOUCH =====
-local function isInside(pt, f)
-    if not f.Visible then return false end
-    local ap, as = f.AbsolutePosition, f.AbsoluteSize
-    return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
-end
 
-local function isInAnyButton(pos)
-    for _, b in ipairs(controlButtons) do
-        if isInside(pos, b) then return true end
+    local function isInside(pt, f)
+        if not f.Visible then return false end
+        local ap, as = f.AbsolutePosition, f.AbsoluteSize
+        return pt.X >= ap.X and pt.X <= ap.X + as.X and pt.Y >= ap.Y and pt.Y <= ap.Y + as.Y
     end
-    return false
-end
-
-local rotateTouch = nil
-local lastRotatePos = nil
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not freecamActive then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch then return end
-    local pos = Vector2.new(input.Position.X, input.Position.Y)
-
-    if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
-       or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
-       or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
-       or (floatEye.Visible and isInside(pos, floatEye))
-       or isInside(pos, dragBar) then
-        return
+    local function isInAnyButton(pos)
+        for _, b in ipairs(controlButtons) do
+            if isInside(pos, b) then return true end
+        end
+        return false
     end
 
-    if isInAnyButton(pos) then return end
-    if gameProcessed then return end
+    local rotateTouch = nil
+    local lastRotatePos = nil
 
-    local vp = workspace.CurrentCamera.ViewportSize
-    if pos.X < vp.X * 0.55 and pos.Y > vp.Y * 0.45 then return end
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not freecamActive then return end
+        if input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local pos = Vector2.new(input.Position.X, input.Position.Y)
+        if isInside(pos, freecamMenuFrame) or isInside(pos, FreecamFloatingBtn)
+           or isInside(pos, HubFrame) or isInside(pos, ToggleBtn)
+           or (hideFloatBtn.Visible and isInside(pos, hideFloatBtn))
+           or (floatEye.Visible and isInside(pos, floatEye))
+           or isInside(pos, dragBar) then
+            return
+        end
+        if isInAnyButton(pos) then return end
+        if gameProcessed then return end
+        local vp = workspace.CurrentCamera.ViewportSize
+        if pos.X < vp.X * 0.55 and pos.Y > vp.Y * 0.45 then return end
+        if rotateTouch then return end
+        rotateTouch = input
+        lastRotatePos = pos
+    end)
 
-    if rotateTouch then return end
+    UserInputService.InputChanged:Connect(function(input)
+        if not freecamActive then return end
+        if input ~= rotateTouch or not lastRotatePos then return end
+        local pos = Vector2.new(input.Position.X, input.Position.Y)
+        local d = pos - lastRotatePos
+        targetCamAngles = Vector3.new(
+            targetCamAngles.X - d.X * 0.004 * rotSens,
+            targetCamAngles.Y - d.Y * 0.004 * rotSens,
+            targetCamAngles.Z
+        )
+        lastRotatePos = pos
+    end)
 
-    rotateTouch = input
-    lastRotatePos = pos
-end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input == rotateTouch then
+            rotateTouch = nil
+            lastRotatePos = nil
+        end
+    end)
 
-UserInputService.InputChanged:Connect(function(input)
-    if not freecamActive then return end
-    if input ~= rotateTouch or not lastRotatePos then return end
-    local pos = Vector2.new(input.Position.X, input.Position.Y)
-    local d = pos - lastRotatePos
-    targetCamAngles = Vector3.new(
-        targetCamAngles.X - d.X * 0.004 * rotSens,
-        targetCamAngles.Y - d.Y * 0.004 * rotSens,
-        targetCamAngles.Z
-    )
-    lastRotatePos = pos
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input == rotateTouch then
-        rotateTouch = nil
-        lastRotatePos = nil
-    end
-end)
-    
-
-    -- ===== RENDER LOOP =====
     RunService.RenderStepped:Connect(function(dt)
         if not freecamActive then return end
         local sf = math.clamp(dt * 16, 0, 1)
@@ -2047,577 +1388,7 @@ end)
             camPos = camPos + (rotCF * mv) * speed * dt
         end
 
-                        camera.CFrame = CFrame.new(camPos) * rotCF
-    end)
-end
-   
-        
-        
--- ============================================================
--- KHOI 5: OFFICE FARM
--- ============================================================
-do
-    local JobEvents = ReplicatedStorage:WaitForChild("JobEvents", 10)
-    local TeamChangeRequest = JobEvents:WaitForChild("TeamChangeRequest", 5)
-    local GenerateQuestion = JobEvents:WaitForChild("GenerateQuestion")
-    local CorrectAnswer = JobEvents:WaitForChild("CorrectAnswer")
-    local AssignPrintJob = JobEvents:WaitForChild("AssignPrintJob")
-    local ClearPrintJob = JobEvents:WaitForChild("ClearPrintJob")
-    local Computers = workspace:FindFirstChild("Computers")
-
-    local CHAIR_POS = Vector3.new(-5902.42, 2.71, -228.54)
-    local PATTERN = { "CHOICE", "QID" }
-    local UUID_PAT = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
-    local of_phasing, of_activeBV, of_savedCollide = false, nil, {}
-    local of_resetUntil, of_pendingQuestion, of_lastKnownQuestion = 0, nil, nil
-    local of_questionArrivedAt, of_nextDelay, of_printAssigned = 0, 2.4, nil
-    local of_awaitingAck, of_lastFireAt, of_refired = false, 0, false
-
-    local function of_killBV()
-        if of_activeBV then
-            pcall(function() of_activeBV.Velocity = Vector3.zero end)
-            pcall(function() of_activeBV:Destroy() end)
-            of_activeBV = nil
-        end
-        of_phasing = false
-    end
-    RunService.Stepped:Connect(function()
-        local char = player.Character; if not char then return end
-        if of_phasing then
-            for _, p in ipairs(char:GetDescendants()) do
-                if p:IsA("BasePart") and p.CanCollide then of_savedCollide[p] = true; p.CanCollide = false end
-            end
-        elseif next(of_savedCollide) then
-            for p in pairs(of_savedCollide) do if p.Parent then p.CanCollide = true end end
-            table.clear(of_savedCollide)
-        end
-    end)
-    local function of_enableSit(char)
-        local h = char and char:FindFirstChildOfClass("Humanoid")
-        if h then h:SetStateEnabled(Enum.HumanoidStateType.Seated, true) end
-    end
-    GenerateQuestion.OnClientEvent:Connect(function(...)
-        local q = { text = nil, choices = nil, questionID = nil }
-        for _, a in ipairs({ ... }) do
-            if type(a) == "string" then
-                if a:match(UUID_PAT) then if not q.questionID then q.questionID = a end
-                elseif not q.text and a:match("%d") and a:match("[=%?]") then q.text = a end
-            elseif type(a) == "table" and not q.choices then q.choices = a end
-        end
-        of_pendingQuestion = q; of_lastKnownQuestion = q; of_questionArrivedAt = os.clock()
-        if farmOffice then setStatus("đang giải") end
-    end)
-    CorrectAnswer.OnClientEvent:Connect(function(status)
-        of_awaitingAck = false; of_refired = false
-        local s = type(status) == "string" and status:lower() or ""
-        if s == "success" then ofAnswers = ofAnswers + 1; refreshStatPanel() end
-    end)
-    AssignPrintJob.OnClientEvent:Connect(function(n) of_printAssigned = n end)
-    ClearPrintJob.OnClientEvent:Connect(function()
-        of_printAssigned = nil; ofPrints = ofPrints + 1; refreshStatPanel()
-    end)
-    local function of_findButton(text)
-        local pg = player:FindFirstChildOfClass("PlayerGui"); if not pg then return nil end
-        for _, d in ipairs(pg:GetDescendants()) do
-            if d:IsA("TextButton") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then return d end
-        end
-        for _, d in ipairs(pg:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Text == text and d.Visible and d.AbsoluteSize.X > 0 then
-                local p = d.Parent
-                if p and (p:IsA("TextButton") or p:IsA("ImageButton")) then return p end
-            end
-        end
-        return nil
-    end
-    local function of_onScreen(x, y)
-        local cam = workspace.CurrentCamera; if not cam then return false end
-        local vp = cam.ViewportSize
-        return x >= 0 and y >= 0 and x <= vp.X and y <= vp.Y
-    end
-    local function of_clickButton(btn)
-        if pcall(function() firesignal(btn.MouseButton1Click) end) then return 1 end
-        if pcall(function() firesignal(btn.Activated) end) then return 2 end
-        local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
-        local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-        if of_onScreen(x, y) then
-            if pcall(function() touchpress(x, y); task.wait(0.06); touchrelease(x, y) end) then return 3 end
-        end
-        return nil
-    end
-    local function of_root() local c = player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
--- Anti-stuck: đứng im 5s → jump boost nhẹ, tối đa 3 lần liên tiếp
-local stuckAnchor = nil
-local stuckSince = 0
-local stuckJumpCount = 0
-local origJumpPower = nil
-local origUseJumpPower = nil
-local jumpBoostActive = false
-
-local function getHumanoidSafe()
-    local c = player.Character
-    return c and c:FindFirstChildOfClass("Humanoid")
-end
-
-local function restoreJumpPower()
-    local h = getHumanoidSafe()
-    if h and origJumpPower then
-        pcall(function()
-            if origUseJumpPower ~= nil then h.UseJumpPower = origUseJumpPower end
-            h.JumpPower = origJumpPower
-        end)
-    end
-    jumpBoostActive = false
-end
-
-local function doJumpBoost()
-    local h = getHumanoidSafe()
-    if not h then return end
-    if not origJumpPower then
-        origJumpPower = h.JumpPower or 50
-        origUseJumpPower = h.UseJumpPower
-    end
-    jumpBoostActive = true
-    pcall(function()
-        h.UseJumpPower = true
-        h.JumpPower = (origJumpPower or 50) + 12
-        -- ChangeState bắt buộc nhảy — Jump = true không hoạt động khi đứng yên
-        h:ChangeState(Enum.HumanoidStateType.Jumping)
-    end)
-    task.delay(1, function()
-        local h2 = getHumanoidSafe()
-        if h2 and origJumpPower then
-            pcall(function() h2.JumpPower = origJumpPower end)
-        end
-    end)
-end
-
-RunService.Heartbeat:Connect(function()
-    if not farmOffice then
-        stuckAnchor = nil
-        stuckSince = 0
-        stuckJumpCount = 0
-        if jumpBoostActive then restoreJumpPower() end
-        return
-    end
-
-    -- BỎ QUA nếu đang ngồi ghế (giải toán, chờ câu hỏi)
-    local c = player.Character
-    local h = c and c:FindFirstChildOfClass("Humanoid")
-    if h and h.Sit then
-        stuckAnchor = nil
-        stuckSince = 0
-        stuckJumpCount = 0
-        if jumpBoostActive then restoreJumpPower() end
-        return
-    end
-
-    -- BỎ QUA nếu đang in (chờ prompt, không di chuyển là bình thường)
-    if lblWork then
-        local s = lblWork.Text or ""
-        if s:find("đang in") or s:find("thử in") or s:find("chờ 5s") or s:find("chuẩn bị in") then
-            stuckAnchor = nil
-            stuckSince = 0
-            stuckJumpCount = 0
-            return
-        end
-    end
-
-    local hrp = c and c:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local now = os.clock()
-    if not stuckAnchor then
-        stuckAnchor = hrp.Position
-        stuckSince = now
-        stuckJumpCount = 0
-        return
-    end
-
-    local moved = (hrp.Position - stuckAnchor).Magnitude
-    if moved > 3 then
-        stuckAnchor = hrp.Position
-        stuckSince = now
-        stuckJumpCount = 0
-        if jumpBoostActive then restoreJumpPower() end
-        return
-    end
-
-    if now - stuckSince >= 5 then
-        if stuckJumpCount < 3 then
-            stuckJumpCount = stuckJumpCount + 1
-            setStatus("kẹt — nhảy lần " .. stuckJumpCount)
-            doJumpBoost()
-            stuckSince = now
-        else
-            restoreJumpPower()
-            setStatus("kẹt 3 lần — tự reset farm")
-            stuckAnchor = hrp.Position
-            stuckSince = now
-            stuckJumpCount = 0
-
-            task.spawn(function()
-                if _G._officeStop then
-                    pcall(function() _G._officeStop() end)
-                end
-                task.wait(2)
-                if farmSwitch and farmSwitch.track then
-                    pcall(function() firesignal(farmSwitch.track.MouseButton1Click) end)
-                end
-            end)
-        end
-    end
-end)
-local function of_humanoid() local c = player.Character; return c and c:FindFirstChildOfClass("Humanoid") end
-    local function of_standUp()
-        local h = of_humanoid(); if not h then return end
-        if not h.Sit and h:GetState() ~= Enum.HumanoidStateType.Seated then return end
-        pcall(function() h.Sit = false end); task.wait(0.25)
-        if h.Sit then pcall(function() h.Jump = true end); task.wait(0.3) end
-        if h.Sit then pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end); task.wait(0.3) end
-    end
-    local OF_TELE_MIN = 60
-    
-    
-    local function of_solve(q)
-        if not q or type(q.text) ~= "string" or type(q.choices) ~= "table" then return nil end
-        local a, op, b = q.text:match("(%-?%d+%.?%d*)%s*([%+%-%*/xX])%s*(%-?%d+%.?%d*)")
-        if not a then return nil end
-        a, b = tonumber(a), tonumber(b)
-        local r
-        if op == "+" then r = a + b
-        elseif op == "-" then r = a - b
-        elseif op == "*" or op:lower() == "x" then r = a * b
-        elseif op == "/" then if b == 0 then return nil end; r = a / b end
-        for _, c in ipairs(q.choices) do
-            local v = tonumber(c.Text)
-            if (v and math.abs(v - r) < 1e-6) or tostring(c.Text) == tostring(r) then return c end
-        end
-        return nil
-    end
-    local function of_buildArgs(q, c)
-        local out = {}
-        for i, v in ipairs(PATTERN) do
-            if v == "CHOICE" then out[i] = c.ID
-            elseif v == "QID" then out[i] = q.questionID
-            elseif v == "TEXT" then out[i] = q.text
-            else out[i] = v end
-        end
-        return out
-    end
-    local function of_fireAnswer(q)
-        local choice = of_solve(q)
-        if not choice then warn("[farm] khong parse: " .. tostring(q and q.text)); return false end
-        local btn = of_findButton(choice.Text)
-        local how = btn and of_clickButton(btn) or nil
-        if how then pcall(function() CorrectAnswer:FireServer(unpack(of_buildArgs(q, choice))) end) end
-        of_awaitingAck = true; of_lastFireAt = os.clock(); return true
-    end
-    local of_initialTeleDone = false
-    local OF_SKIPPED_SEATS = {}
-    local function of_findNearestUntriedSeat(pos, radius, tried)
-        local ok, parts = pcall(function() return workspace:GetPartBoundsInRadius(pos, radius or 350) end)
-        if not ok or not parts then return nil end
-        local best, bestD = nil, math.huge
-        for _, p in ipairs(parts) do
-            if (p:IsA("Seat") or p:IsA("VehicleSeat")) and p.Occupant == nil and not tried[p] and not OF_SKIPPED_SEATS[p] then
-                local d = (p.Position - pos).Magnitude
-                if d < bestD then best, bestD = p, d end
-            end
-        end
-        return best
-    end
-    
-        local function of_walkTo(target, stopDist, timeout)
-    stopDist = stopDist or 4
-    timeout = timeout or 20
-    local deadline = os.clock() + timeout
-    local reached = false
-    pcall(function()
-        while os.clock() < deadline and farmOffice do
-            local h = of_humanoid()
-            local hrp = of_root()
-            if not h or not hrp then break end
-            if h.Sit then
-                pcall(function() h.Sit = false end)
-                task.wait(0.4)
-            end
-            local delta = target - hrp.Position
-            local flat = Vector3.new(delta.X, 0, delta.Z)
-            if flat.Magnitude <= stopDist then
-                reached = true
-                break
-            end
-            h:MoveTo(Vector3.new(target.X, hrp.Position.Y, target.Z))
-            task.wait(0.15)
-        end
-    end)
-    local h = of_humanoid()
-    local hrp = of_root()
-    if h and hrp and not h.Sit then
-        pcall(function() h:MoveTo(hrp.Position) end)
-    end
-    return reached
-end
-
-local function of_sitAtChair()
-    local h = of_humanoid()
-    if h and h.Sit then return true end
-    local hrp = of_root(); if not hrp then return false end
-   if not of_initialTeleDone then
-    local dist = (hrp.Position - CHAIR_POS).Magnitude
-    if dist > 500 then
-        setStatus("tele lần đầu tới office")
-        hrp.CFrame = CFrame.new(CHAIR_POS)
-        task.wait(1.5)
-    end
-    of_initialTeleDone = true
-
-    -- Đứng im 10s chờ game tự đẩy vào ghế
-    setStatus("chờ 10s — game tự ngồi")
-    local waitStart = os.clock()
-    while os.clock() - waitStart < 10 and farmOffice do
-        task.wait(0.3)
-        local h2 = of_humanoid()
-        if h2 and h2.Sit then
-            setStatus("đã ngồi ghế")
-            return true
-        end
-    end
-    -- Hết 10s chưa ngồi → flow bình thường
-    setStatus("chưa ngồi — tìm ghế khác")
-end
-    h = of_humanoid(); if h and h.Sit then return true end
-
-    local tried = {}
-    while farmOffice do
-        hrp = of_root(); if not hrp then return false end
-        local seat = of_findNearestUntriedSeat(hrp.Position, 500, tried)
-        if not seat then
-            setStatus("hết ghế — quét lại")
-            tried = {}
-            task.wait(2)
-            seat = of_findNearestUntriedSeat(hrp.Position, 500, tried)
-            if not seat then
-                setStatus("không có ghế trống")
-                task.wait(3)
-                return false
-            end
-        end
-        tried[seat] = true
-        setStatus("đi bộ tới ghế")
-
-        of_walkTo(seat.Position, 3, 12)
-task.wait(1)
-
-h = of_humanoid()
-if h and h.Sit then return true end
-if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
-
--- Chưa ngồi sau 1s → CFrame đẩy vào ghế (logic cũ)
-hrp = of_root()
-if hrp then
-    local dir = seat.Position - hrp.Position
-    dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude > 0.1 then
-        dir = dir.Unit
-        pcall(function()
-            hrp.CFrame = CFrame.new(seat.Position - dir * 1.2)
-        end)
-        task.wait(0.6)
-    end
-end
-
-h = of_humanoid()
-if h and h.Sit then return true end
-if h and h:GetState() == Enum.HumanoidStateType.Seated then return true end
-    end
-    return false
-end
-
-local function of_doPrint(name)
-    local Comp = workspace:FindFirstChild("Computers"); if not Comp then return end
-    local model = Comp:FindFirstChild(name); if not model then return end
-    local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-    if not part then return end
-
-    of_standUp()
-    setStatus("đi bộ tới máy in")
-    of_walkTo(part.Position, 5, 20)
-
-    -- Nếu lỡ ngồi ghế nào → jump ra
-    local h = of_humanoid()
-    if h and h.Sit then
-        setStatus("đang ngồi — nhảy ra")
-        pcall(function() h.Jump = true end)
-        task.wait(0.5)
-        if h.Sit then
-            pcall(function() h.Sit = false end)
-            task.wait(0.4)
-        end
-        of_walkTo(part.Position, 5, 10)
-    end
-
-    setStatus("chuẩn bị in")
-    task.wait(0.5)
-
-    local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
-    local attempt = 0
-    local retried = false
-
-    while of_printAssigned and farmOffice do
-        attempt = attempt + 1
-        if attempt == 1 then
-            setStatus("đang in")
-        else
-            setStatus("thử in lại (lần " .. attempt .. ")")
-        end
-
-        if prompt then
-            pcall(function() prompt:InputHoldBegin() end)
-            local t1 = os.clock()
-            while of_printAssigned and farmOffice and os.clock() - t1 < 3 do task.wait(0.2) end
-            pcall(function() prompt:InputHoldEnd() end)
-        end
-
-        local t2 = os.clock()
-        while of_printAssigned and farmOffice and os.clock() - t2 < 3 do task.wait(0.2) end
-
-        if not of_printAssigned then break end
-
-        setStatus("thử lại — đi bộ lại tới máy in")
-of_walkTo(part.Position, 5, 10)
-task.wait(0.3)
--- Nếu lỡ ngồi ghế giữa đường → jump ra
-local hh = of_humanoid()
-if hh and hh.Sit then
-    pcall(function() hh.Jump = true end)
-    task.wait(0.5)
-    if hh.Sit then
-        pcall(function() hh.Sit = false end)
-        task.wait(0.3)
-    end
-    of_walkTo(part.Position, 5, 8)
-end
-    end
-
-    if not farmOffice then return end
-    setStatus("đã in")
-    task.wait(2)
-    of_sitAtChair()
-end
-    local function of_runCycle()
-        while farmOffice and os.clock() < of_resetUntil do setStatus("chờ reset nhân vật"); task.wait(0.2) end
-        if not farmOffice then return end
-        if not of_sitAtChair() then if farmOffice then task.wait(3) end return end
-setStatus("ngồi ghế, chờ câu hỏi")
-
--- QUICK CHECK: 3s không có câu hỏi → nhảy ra tìm ghế khác
-local quickStart = os.clock()
-local gotQuick = of_pendingQuestion ~= nil
-while not gotQuick and os.clock() - quickStart < 3 and farmOffice do
-    task.wait(0.2)
-    if of_pendingQuestion then gotQuick = true end
-end
-
-if not gotQuick then
-    setStatus("3s không câu hỏi — đổi ghế")
-    local hh = of_humanoid()
-    if hh and hh.Sit then
-        OF_SKIPPED_SEATS[hh.SeatPart] = true
-        pcall(function() hh.Jump = true end)
-        task.wait(0.3)
-        pcall(function() hh.Sit = false end)
-        task.wait(0.5)
-    end
-    return
-end
-
-local idleStart = os.clock()
-local lastAnsweredAt = 0
-local hasAnsweredOne = false
-
-while farmOffice do
-    if of_printAssigned then break end
-
-    if of_pendingQuestion and not of_awaitingAck and (os.clock() - of_questionArrivedAt >= of_nextDelay) then
-        local q = of_pendingQuestion; of_pendingQuestion = nil
-        of_fireAnswer(q); setStatus("đã giải"); of_nextDelay = math.random(20, 28) / 10
-        idleStart = os.clock()
-        lastAnsweredAt = os.clock()
-        hasAnsweredOne = true
-    end
-
-    if of_awaitingAck and os.clock() - of_lastFireAt > 8 and not of_refired then
-        of_refired = true
-        if of_lastKnownQuestion then of_fireAnswer(of_lastKnownQuestion); setStatus("đã giải") end
-        idleStart = os.clock()
-        lastAnsweredAt = os.clock()
-        hasAnsweredOne = true
-    end
-
-    -- Đã giải ít nhất 1 câu + 5s không có câu mới → đổi ghế
-    if hasAnsweredOne and not of_pendingQuestion and not of_awaitingAck then
-        if os.clock() - lastAnsweredAt > 5 then
-            setStatus("5s không câu mới — đổi ghế")
-            local hh = of_humanoid()
-            if hh and hh.Sit then
-                OF_SKIPPED_SEATS[hh.SeatPart] = true
-                pcall(function() hh.Jump = true end)
-                task.wait(0.3)
-                pcall(function() hh.Sit = false end)
-                task.wait(0.5)
-            end
-            break
-        end
-    end
-
-    if os.clock() - idleStart > 60 then break end
-    task.wait(0.2)
-end
-        if farmOffice and of_printAssigned then
-            if not Computers then return end
-            of_doPrint(of_printAssigned)
-        end
-    end
-    task.spawn(function()
-        while true do
-            if farmOffice then
-                local ok, err = pcall(of_runCycle)
-                if not ok then of_killBV(); warn("[farm] LOOP ERR: " .. tostring(err)); task.wait(1) end
-            else task.wait(0.3) end
-        end
-    end)
-    local function stopOffice(forceClose)
-        if not farmOffice then
-            if forceClose then
-                if activeMode == "office" then activeMode = nil end
-                statPanel.Visible = false; farmSwitch.set(false)
-            end
-            return
-        end
-        farmOffice = false; of_killBV(); of_resetUntil = 0
-        if writefile then pcall(writefile, "farmState.txt", "0") end
-        local h = of_humanoid(); if h and h.Sit then pcall(function() h.Sit = false end) end
-        if activeMode == "office" then activeMode = nil end
-        statPanel.Visible = false; farmSwitch.set(false); setStatus("tạm nghỉ")
-    end
-    _G._officeStop = stopOffice
-    farmSwitch.track.MouseButton1Click:Connect(function()
-        if not farmOK then return end
-        if farmOffice then stopOffice(); return end
-        of_initialTeleDone = false; of_printAssigned = nil; of_pendingQuestion = nil; of_awaitingAck = false
-        of_lastKnownQuestion = nil; of_questionArrivedAt = 0; of_nextDelay = 2.4; of_refired = false
-        of_lastFireAt = 0; of_phasing = false; ofAnswers = 0; OF_SKIPPED_SEATS = {}; ofPrints = 0
-        refreshStatPanel(); farmOffice = true; activeMode = "office"; farmStart = os.clock()
-local rp0 = getRP(); farmRPStart = rp0 or 0; lastRPValue = rp0 or 0
-        TeamChangeRequest:FireServer("Office Worker", 11378976, 0, 0, "Detector")
-        of_resetUntil = os.clock() + 5
-        if writefile then pcall(writefile, "farmState.txt", "1") end
-        if queue_on_teleport then
-            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
-        end
-        local char = player.Character; of_enableSit(char)
-        farmSwitch.set(true); statPanel.Visible = true; refreshStatPanel(); setStatus("khởi động office")
+        camera.CFrame = CFrame.new(camPos) * rotCF
     end)
 end
 
@@ -2649,13 +1420,12 @@ fcOpenBtn.MouseButton1Click:Connect(function()
 end)
 
 addRGBStroke(ToggleBtn)
-addRGBStroke(AutoTFloatingBtn)
 addRGBStroke(BodyManagerFloatingBtn)
 addRGBStroke(FreecamFloatingBtn)
 addRGBStroke(hideFloatBtn)
 
 -- ============================================================
--- AUTO REJOIN v3: fix click CHƠI lần 2
+-- AUTO REJOIN
 -- ============================================================
 local _autoRejoin = false
 if readfile and isfile and isfile("autoRejoin.txt") then
@@ -2692,7 +1462,7 @@ if _autoRejoin then
                     lastAttempt = os.time()
                     if writefile then pcall(writefile, "lastRejoin.txt", tostring(lastAttempt)) end
                     if queue_on_teleport then
-                        pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+                        pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangfreecam.lua"))()]])
                     end
                     pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
                 end
@@ -2711,11 +1481,8 @@ task.spawn(function()
         end
     end
     if not wasRejoin then return end
-
-    -- Cho game load xong
     repeat task.wait(1) until game:IsLoaded()
     task.wait(3)
-
     local pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
     for _ = 1, 30 do
         if pg then break end
@@ -2723,14 +1490,11 @@ task.spawn(function()
         pg = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
     end
     if not pg then return end
-
     for _ = 1, 30 do
         if pg:FindFirstChild("mainMenuSystem") then break end
         task.wait(1)
     end
     task.wait(3)
-
-    -- Tim nut CHOI
     local function findPlayBtn()
         local p = game.Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
         if not p then return nil end
@@ -2739,9 +1503,7 @@ task.spawn(function()
         local play = base and base:FindFirstChild("playFrame")
         if play then
             for _, d in ipairs(play:GetDescendants()) do
-                if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then
-                    return d
-                end
+                if d:IsA("TextButton") and d.Visible and d.AbsoluteSize.X > 40 then return d end
             end
         end
         for _, d in ipairs(p:GetDescendants()) do
@@ -2752,19 +1514,15 @@ task.spawn(function()
         end
         return nil
     end
-
     local btn1 = nil
     for _ = 1, 40 do
         btn1 = findPlayBtn()
         if btn1 then break end
         task.wait(1)
     end
-
     if btn1 then
         pcall(function() firesignal(btn1.MouseButton1Click) end)
     end
-
-    -- Doi menu render xong (playReady)
     local playReady = false
     for _ = 1, 40 do
         pcall(function()
@@ -2778,53 +1536,12 @@ task.spawn(function()
         if playReady then break end
         task.wait(0.5)
     end
-    print("[Rejoin] playReady:", playReady)
-
-    -- Fire menuToggleRequest mot phat
     task.wait(2)
     pcall(function()
         game:GetService("ReplicatedStorage"):WaitForChild("menuToggleRequest", 5):FireServer()
     end)
-    print("[Rejoin] fired menuToggle")
-
-    -- Doi 10s vao han game
     task.wait(10)
-
     if writefile then pcall(writefile, "lastRejoin.txt", "0") end
-    print("[Rejoin] Computers:", workspace:FindFirstChild("Computers") ~= nil)
-
-    -- Bat farm neu co flag
-    local officeFlag = false
-    if readfile and isfile and isfile("farmState.txt") then
-        local ok, v = pcall(readfile, "farmState.txt")
-        if ok and v == "1" then officeFlag = true end
-    end
-
-    if officeFlag then
-        for _ = 1, 60 do
-            if workspace:FindFirstChild("Computers") then break end
-            task.wait(1)
-        end
-        task.wait(3)
-        pcall(function()
-            if farmSwitch and farmSwitch.track and not farmOffice then
-                firesignal(farmSwitch.track.MouseButton1Click)
-            end
-        end)
-        print("[Rejoin] farm toggled")
-    end
-
-    -- Auto restore AFK mode
-    local afkFlag = false
-    if readfile and isfile and isfile("afkMode.txt") then
-        local ok, v = pcall(readfile, "afkMode.txt")
-        if ok and v == "1" then afkFlag = true end
-    end
-    if afkFlag and _G.startAFK then
-        task.wait(2)
-        _G.startAFK()
-        print("[Rejoin] AFK restored")
-    end
 end)
 end
 -- ============================================================
@@ -2914,12 +1631,6 @@ overlay.BorderSizePixel = 0
 overlay.Parent = gui
 TweenService:Create(overlay, TweenInfo.new(0.4), { BackgroundTransparency = 0.55 }):Play()
 
-
-
-
-
-
-
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 400, 0, 320)
 frame.Position = UDim2.new(0.5, -200, 0.5, -160)
@@ -2960,23 +1671,6 @@ for row = 1, 10 do
     end
 end
 
-
-
-local progBar = Instance.new("Frame")
-progBar.Size = UDim2.new(0, 0, 0, 2)
-progBar.Position = UDim2.new(0, 0, 0, 3)
-progBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-progBar.BorderSizePixel = 0
-progBar.ZIndex = 5
-progBar.Visible = false
-progBar.Parent = frame
-local progGrad = Instance.new("UIGradient")
-progGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.accent2),
-    ColorSequenceKeypoint.new(1, C.accent3),
-})
-progGrad.Parent = progBar
-
 local stroke = Instance.new("UIStroke", frame)
 stroke.Color = C.card_edge
 stroke.Thickness = 1.2
@@ -2998,21 +1692,19 @@ task.spawn(function()
         Position = UDim2.new(0.5, -220, 0.5, -175),
         BackgroundTransparency = 0,
     }):Play()
-    
     task.wait(0.5)
     TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, 440, 0, 340),
         Position = UDim2.new(0.5, -220, 0.5, -170),
     }):Play()
-    
 end)
 
 do
     local drag, ds, sp
     frame.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        drag, ds, sp = true, i.Position, frame.Position
-        i.Changed:Connect(function()
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag, ds, sp = true, i.Position, frame.Position
+            i.Changed:Connect(function()
                 if i.UserInputState == Enum.UserInputState.End then drag = false end
             end)
         end
@@ -3244,8 +1936,6 @@ btn.Position = UDim2.new(0, 24, 0, 192)
 btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 btn.BorderSizePixel = 0
 btn.Text = "KÍCH HOẠT"
-btn.Font = Enum.Font.GothamBold
-btn.TextSize = 15
 btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 btn.AutoButtonColor = false
 btn.ClipsDescendants = true
@@ -3408,7 +2098,6 @@ end)
 
 close.MouseButton1Click:Connect(function()
     TweenService:Create(frame, TweenInfo.new(0.2), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
-    
     TweenService:Create(overlay, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
     task.wait(0.2)
     gui:Destroy()
@@ -3427,19 +2116,10 @@ local function set_btn(text, colorSeq)
     if colorSeq then btnGrad.Color = colorSeq end
 end
 
-local function start_progress()
-    return nil
-end
-
-local function end_progress(success)
-    return nil
-end
-
 local function launch()
     if running then return end
     running = true
     TweenService:Create(frame, TweenInfo.new(0.25), { Size = UDim2.new(0, 400, 0, 320), BackgroundTransparency = 1 }):Play()
-    
     TweenService:Create(overlay, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
     task.wait(0.25)
     gui:Destroy()
@@ -3451,12 +2131,15 @@ end
 
 local function start_heartbeat()
     task.spawn(function()
+        local firstSend = true
         while token and not running do
-            task.wait(HEARTBEAT_INTERVAL)
+            if not firstSend then task.wait(HEARTBEAT_INTERVAL) end
+            firstSend = false
             if not token or running then break end
             local code = http_post("/heartbeat", {}, {
                 ["Authorization"] = "Bearer " .. token,
                 ["X-HWID"] = HWID,
+                ["X-Player-Name"] = player.Name,
             })
             if code ~= 200 then token = nil; break end
         end
@@ -3468,9 +2151,12 @@ local GRAD_LOAD = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRG
 local GRAD_IDLE = ColorSequence.new({ ColorSequenceKeypoint.new(0, C.accent1), ColorSequenceKeypoint.new(1, C.accent3) })
 
 local function do_auth(key)
-    local code, body = http_post("/auth", { key = key, hwid = HWID })
+    local code, body = http_post("/auth", {
+        key = key,
+        hwid = HWID,
+        name = player.Name,
+    })
     if not code then
-        end_progress(false)
         set_status("Khong ket noi duoc server", C.err)
         set_btn("KÍCH HOẠT", GRAD_IDLE)
         return
@@ -3478,7 +2164,6 @@ local function do_auth(key)
     if code == 200 and type(body) == "table" and body.token then
         token = body.token
         save_token(token)
-        end_progress(true)
         burst(220, 216, C.ok)
         set_status("License hợp lệ", C.ok)
         set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
@@ -3495,7 +2180,6 @@ local function do_auth(key)
             elseif d == "hwid mismatch" then msg = "Key đã kích hoạt cho thiết bị khác"
             else msg = d end
         end
-        end_progress(false)
         set_status(msg, C.err)
         set_btn("KÍCH HOẠT", GRAD_IDLE)
         TweenService:Create(stroke, TweenInfo.new(0.1), { Color = C.err, Transparency = 0 }):Play()
@@ -3521,7 +2205,6 @@ btn.MouseButton1Click:Connect(function()
     end
     set_btn("ĐANG KIỂM TRA...", GRAD_LOAD)
     set_status("Đang xác thực...", C.text_dim)
-    start_progress()
     task.spawn(do_auth, key)
 end)
 
@@ -3534,21 +2217,18 @@ task.spawn(function()
     if not saved then return end
     set_btn("DANG TỰ ĐỘNG ĐĂNG NHẬP...", GRAD_LOAD)
     set_status("Dang kiem tra phien cu...", C.text_dim)
-    start_progress()
     local code = http_post("/heartbeat", {}, {
         ["Authorization"] = "Bearer " .. saved,
         ["X-HWID"] = HWID,
     })
     if code == 200 then
         token = saved
-        end_progress(true)
         set_status("Auto-login thành công", C.ok)
         set_btn("ĐÃ KÍCH HOẠT", GRAD_OK)
         start_heartbeat()
         task.wait(0.6)
         launch()
     else
-        end_progress(false)
         set_btn("KÍCH HOẠT", GRAD_IDLE)
         set_status("", C.text_dim)
     end
