@@ -91,29 +91,23 @@ local bodyOpenBtn, fcOpenBtn
 local perfOn, perfLocked = false, false
 local antiAfk = true
 local optFPS = false
--- ANTI-AFK THỰC SỰ
 do
     local vu = game:GetService("VirtualUser")
     local lp = game:GetService("Players").LocalPlayer
-    
 
-    -- Cách 1: bắt sự kiện Idled — Roblox gọi khi sắp kick
+    -- Cách 1: bắt Idled → claim controller + click giả
     lp.Idled:Connect(function()
-    if not antiAfk then return end
-    pcall(function()
-        local cam = workspace.CurrentCamera
-        if cam then
-            vu:Button2Down(Vector2.new(0, 0), cam.CFrame)
-            task.wait(1)
-            vu:Button2Up(Vector2.new(0, 0), cam.CFrame)
-        end
+        if not antiAfk then return end
+        pcall(function()
+            vu:CaptureController()
+            vu:ClickButton2(Vector2.new(0, 0))
+        end)
     end)
-end)
 
-    -- Cách 2: gửi key event mỗi 5 phút (chủ động hơn)
+    -- Cách 2: gửi key event mỗi 4 phút (dự phòng)
     task.spawn(function()
         while true do
-            task.wait(300)
+            task.wait(240)
             if antiAfk then
                 pcall(function()
                     local vim = game:GetService("VirtualInputManager")
@@ -124,8 +118,20 @@ end)
             end
         end
     end)
-end
 
+    -- Cách 3: reset camera CFrame mỗi 3 phút (dự phòng 2)
+    task.spawn(function()
+        while true do
+            task.wait(180)
+            if antiAfk then
+                pcall(function()
+                    local cam = workspace.CurrentCamera
+                    if cam then cam.CFrame = cam.CFrame end
+                end)
+            end
+        end
+    end)
+end
 local function makeFloatBtn(icon, color, yPos)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0, 48, 0, 48); b.Position = UDim2.new(0, 25, yPos, 0)
