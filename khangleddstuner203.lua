@@ -2542,15 +2542,26 @@ end
         if not of_sitAtChair() then if farmOffice then task.wait(3) end return end
 setStatus("ngồi ghế, chờ câu hỏi")
 
--- QUICK CHECK: 3s không có câu hỏi → nhảy ra tìm ghế khác
+-- QUICK CHECK: 3s không có câu hỏi → check print job → đi in hoặc đổi ghế
 local quickStart = os.clock()
 local gotQuick = of_pendingQuestion ~= nil
 while not gotQuick and os.clock() - quickStart < 3 and farmOffice do
     task.wait(0.2)
     if of_pendingQuestion then gotQuick = true end
+    if of_printAssigned then break end
 end
 
 if not gotQuick then
+    -- Có print job đang chờ → đi in luôn
+    if of_printAssigned then
+        if Computers then
+            setStatus("có print job — đi in")
+            of_doPrint(of_printAssigned)
+            return
+        end
+    end
+
+    -- Không có print job → đổi ghế
     setStatus("3s không câu hỏi — đổi ghế")
     local hh = of_humanoid()
     if hh and hh.Sit then
@@ -2561,6 +2572,48 @@ if not gotQuick then
         task.wait(0.5)
     end
     return
+end
+
+-- Fallback 2 phút: nếu vẫn không có tiến triển → rejoin
+local fallbackStart = os.clock()
+local lastProgress = os.clock()
+local lastAnswers = ofAnswers
+local lastPrints = ofPrints
+
+while farmOffice and os.clock() - fallbackStart < 120 do
+    task.wait(3)
+
+    if of_printAssigned then
+        lastProgress = os.clock()
+        break
+    end
+
+    if of_pendingQuestion then
+        lastProgress = os.clock()
+    end
+
+    if ofAnswers > lastAnswers or ofPrints > lastPrints then
+        lastAnswers = ofAnswers
+        lastPrints = ofPrints
+        lastProgress = os.clock()
+    end
+
+    if os.clock() - lastProgress > 120 then
+        warn("[Farm] 2 phút không tiến triển — rejoin")
+        setStatus("2p không tiến triển — rejoin")
+        if writefile then
+            pcall(writefile, "lastRejoin.txt", tostring(os.time()))
+            pcall(writefile, "farmState.txt", "1")
+        end
+        if queue_on_teleport then
+            pcall(queue_on_teleport, [[loadstring(game:HttpGet("https://raw.githubusercontent.com/Khangnee28/my-script/refs/heads/main/khangleddstuner.lua"))()]])
+        end
+        task.wait(2)
+        pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId) end)
+        return
+    end
+
+    if of_pendingQuestion then break end
 end
 
 local idleStart = os.clock()
